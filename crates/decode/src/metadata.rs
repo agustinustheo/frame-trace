@@ -129,6 +129,24 @@ impl Metadata {
         })
     }
 
+    /// Resolve a pallet crate via metadata type paths (including aliased runtime names).
+    /// Ambiguous instances use the crate fallback rather than guessing an instance.
+    pub fn pallet_for_crate(&self, krate: &str) -> Option<String> {
+        let mut names = Vec::new();
+        with_runtime!(&self.runtime, md => {
+            for pallet in &md.pallets {
+                let ids = pallet.calls.iter().map(|c| c.ty.id)
+                    .chain(pallet.event.iter().map(|e| e.ty.id))
+                    .chain(pallet.error.iter().map(|e| e.ty.id));
+                if ids.filter_map(|id| md.types.resolve(id))
+                    .any(|ty| ty.path.segments.first().is_some_and(|s| s == krate)) {
+                    names.push(pallet.name.clone());
+                }
+            }
+        });
+        if names.len() == 1 { names.pop() } else { None }
+    }
+
     /// Metadata version (14, 15 or 16).
     pub fn version(&self) -> u32 {
         match self.runtime {

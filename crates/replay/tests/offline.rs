@@ -318,6 +318,11 @@ fn missing_execution_node_is_an_error_with_sdk_panic_handler_in_subprocess() {
         String::from_utf8_lossy(&output.stdout),
         String::from_utf8_lossy(&output.stderr)
     );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !stderr.contains("panicked at") && !stderr.contains("Externalities not allowed"),
+        "{stderr}"
+    );
 }
 
 #[test]
@@ -356,5 +361,31 @@ fn corrupt_artifact_files_and_limits_name_the_path() {
             "{error}"
         );
     }
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn concurrent_artifact_saves_are_atomic_and_leave_no_temporary_files() {
+    let dir = std::env::temp_dir().join(format!(
+        "frame-trace-concurrent-save-{}",
+        std::process::id()
+    ));
+    let original = Artifact::load(&fixture("people-transfer")).unwrap();
+    std::thread::scope(|scope| {
+        let mut handles = Vec::new();
+        for i in 0..8 {
+            let mut artifact = original.clone();
+            artifact.metadata = format!("writer-{i}");
+            let dir = &dir;
+            handles.push(scope.spawn(move || artifact.save(dir).unwrap()));
+        }
+        for handle in handles {
+            handle.join().unwrap();
+        }
+    });
+    let artifact = Artifact::load(&dir).unwrap();
+    assert!(artifact.metadata.starts_with("writer-"));
+    assert_eq!(artifact.proof_nodes, original.proof_nodes);
+    assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
     std::fs::remove_dir_all(dir).unwrap();
 }

@@ -275,7 +275,6 @@ fn record_measured(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) -
                         },
                     ))
                 })
-                .unwrap_or((0, 0))
         })
         .collect();
     // Resolve native ancestors once. Capture parents precede children; no per-op tree scans.
@@ -294,7 +293,7 @@ fn record_measured(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) -
         if !runtime_span(observed) {
             continue;
         }
-        let named = match observed.name.as_str() {
+        let named = match observed.name.split(": ").next().unwrap_or(&observed.name) {
             "apply_extrinsic" => {
                 let i = extrinsic;
                 extrinsic += 1;
@@ -303,7 +302,7 @@ fn record_measured(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) -
             "initialize_block" | "on_initialize" => {
                 phases.iter().position(|p| p.kind == "initialization")
             }
-            "finalize_block" | "on_finalize" => {
+            "finalize_block" | "on_finalize" | "on_idle" => {
                 phases.iter().position(|p| p.kind == "finalization")
             }
             "inherents_applied" | "on_poll" => {
@@ -322,6 +321,7 @@ fn record_measured(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) -
             bounds
                 .iter()
                 .enumerate()
+                .filter_map(|(i, b)| b.map(|b| (i, b)))
                 .min_by_key(|(_, (lo, hi))| {
                     if observed.start_ns < *lo {
                         lo - observed.start_ns
@@ -332,19 +332,28 @@ fn record_measured(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) -
                 .map_or(0, |(i, _)| i)
         });
         owners.insert(observed.id, owner);
-        if let Some((lo, hi)) = bounds.get_mut(owner) {
-            *lo = (*lo).min(observed.start_ns);
-            *hi = (*hi).max(observed.end_ns.unwrap_or(observed.start_ns));
+        if let Some(bound) = bounds.get_mut(owner) {
+            *bound = merge_bounds(
+                *bound,
+                Some((
+                    observed.start_ns,
+                    observed.end_ns.unwrap_or(observed.start_ns),
+                )),
+            );
         }
     }
     for (i, phase) in phases.iter().enumerate() {
         if phase.post_inherents.is_some() && i + 1 < bounds.len() {
-            bounds[i] = (
-                bounds[i].0.min(bounds[i + 1].0),
-                bounds[i].1.max(bounds[i + 1].1),
-            );
+            bounds[i] = merge_bounds(bounds[i], bounds[i + 1]);
         }
     }
+    // A phase with no observed timing uses the enclosing block interval and is explicitly
+    // marked unavailable. Never fold a fabricated zero into a measured phase's bounds.
+    let phase_timed: Vec<_> = bounds.iter().map(Option::is_some).collect();
+    let bounds: Vec<_> = bounds
+        .into_iter()
+        .map(|b| b.unwrap_or((0, block.timing.map_or(0, |t| t.duration_ns))))
+        .collect();
     let mut phase_contexts: Vec<Context> = Vec::new();
     for (i, phase) in phases.iter().enumerate() {
         let parent =
@@ -357,6 +366,10 @@ fn record_measured(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) -
             KeyValue::new("frame.timing", "measured"),
             KeyValue::new("frame.phase", phase.kind),
         ];
+        attrs.push(KeyValue::new(
+            "frame.phase.timing_available",
+            phase_timed[i],
+        ));
         attrs.extend(stats_attributes(&phase.stats));
         if let Some(index) = phase.extrinsic_index {
             attrs.push(KeyValue::new("frame.extrinsic.index", i64::from(index)));
@@ -440,6 +453,13 @@ fn record_measured(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) -
     span_count(block)
 }
 
+fn merge_bounds(a: Option<(u64, u64)>, b: Option<(u64, u64)>) -> Option<(u64, u64)> {
+    match (a, b) {
+        (Some((a, b)), Some((c, d))) => Some((a.min(c), b.max(d))),
+        (a, b) => a.or(b),
+    }
+}
+
 fn record_phase(
     tracer: &SdkTracer,
     parent: &Context,
@@ -502,9 +522,18 @@ fn op_attributes(op: &AnnotatedOp, extrinsic_index: Option<u32>) -> Vec<KeyValue
         KeyValue::new("frame.storage.duplicate_read", op.duplicate_read),
         KeyValue::new("frame.storage.key_complete", op.key_complete),
     ];
-    if let Some(pallet) = &op.pallet {
-        attrs.push(KeyValue::new("db.collection.name", pallet.clone()));
-    }
+    let collection = op.pallet.as_deref().unwrap_or_else(|| {
+        if op.child_trie.is_some() {
+            "child_trie"
+        } else if op.item.starts_with(':') {
+            "well_known"
+        } else if matches!(op.op, "storage_root" | "iteration" | "next_key") || op.key == "0x" {
+            "state"
+        } else {
+            "unknown"
+        }
+    });
+    attrs.push(KeyValue::new("db.collection.name", collection.to_owned()));
     if !op.map_keys.is_empty() {
         let keys = op.map_keys.iter().cloned().map(StringValue::from).collect();
         attrs.push(KeyValue::new(

@@ -14,6 +14,7 @@ use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, tungstenite::Message};
 pub use tokio_util::sync::CancellationToken;
 
 const ALLOWED: &[&str] = &[
+    "chain_getFinalizedHead",
     "chain_getBlock",
     "chain_getHeader",
     "chain_getBlockHash",
@@ -136,9 +137,9 @@ impl Rpc {
         runtime()?.block_on(async {
             tokio::select! {
                 biased;
-                _ = self.inner.cancel.cancelled() => Err(Error::Rpc(format!("{method}: cancelled"))),
+                _ = self.inner.cancel.cancelled() => Err(Error::Cancelled),
                 result = tokio::time::timeout(self.inner.deadline, self.retry(method, params)) =>
-                    result.unwrap_or_else(|_| Err(Error::Rpc(format!("{method}: overall request deadline exceeded")))),
+                    result.unwrap_or_else(|_| Err(Error::TransientRpc(format!("{method}: overall request deadline exceeded")))),
             }
         })
     }
@@ -166,14 +167,23 @@ impl Rpc {
                             self.backoff(attempt, id).await;
                             continue;
                         }
-                        let pruned = if text.contains("State already discarded")
-                            || text.contains("State is not available")
+                        let lower = text.to_lowercase();
+                        let message = format!("{method}: {error}");
+                        if lower.contains("state already discarded")
+                            || lower.contains("state is not available")
+                            || lower.contains("pruned")
                         {
-                            "; parent state may be pruned (use an archive endpoint)"
-                        } else {
-                            ""
-                        };
-                        return Err(Error::Rpc(format!("{method}: {error}{pruned}")));
+                            return Err(Error::Unavailable(format!(
+                                "{message}; parent state may be pruned (use an archive endpoint)"
+                            )));
+                        }
+                        if method == "state_getMetadata" && error["code"] == -32601 {
+                            return Err(Error::Unavailable(message));
+                        }
+                        if error["code"] == 429 || lower.contains("too many requests") {
+                            return Err(Error::TransientRpc(message));
+                        }
+                        return Err(Error::Rpc(message));
                     }
                     return body
                         .get("result")
@@ -182,7 +192,11 @@ impl Rpc {
                 }
                 Err((message, transient)) => {
                     if !transient || attempt == 3 {
-                        return Err(Error::Rpc(format!("{method}: {message}")));
+                        return Err(if transient {
+                            Error::TransientRpc(format!("{method}: {message}"))
+                        } else {
+                            Error::Rpc(format!("{method}: {message}"))
+                        });
                     }
                     self.backoff(attempt, id).await;
                 }
@@ -321,13 +335,15 @@ mod tests {
                 let (mut stream, _) = listener.accept().unwrap();
                 stream.set_nonblocking(false).unwrap();
                 stream
-                    .set_read_timeout(Some(Duration::from_secs(2)))
+                    .set_read_timeout(Some(Duration::from_secs(15)))
                     .unwrap();
                 let mut reader = BufReader::new(stream.try_clone().unwrap());
                 let mut len = 0;
                 loop {
                     let mut line = String::new();
-                    reader.read_line(&mut line).unwrap();
+                    if reader.read_line(&mut line).unwrap() == 0 {
+                        return;
+                    }
                     if line == "\r\n" {
                         break;
                     }
@@ -339,7 +355,8 @@ mod tests {
                 reader.read_exact(&mut bytes).unwrap();
                 let request: Value = serde_json::from_slice(&bytes).unwrap();
                 if status == 0 {
-                    thread::sleep(Duration::from_millis(350));
+                    let _ = reader.read_to_end(&mut Vec::new());
+                    continue;
                 }
                 let status = if status == 0 { 200 } else { status };
                 let body = body.replace("$ID", &request["id"].to_string());
@@ -351,6 +368,29 @@ mod tests {
             }
         });
         (Rpc::new(&url).unwrap(), worker)
+    }
+    #[test]
+    fn mock_responses_stops_at_request_eof() {
+        let (rpc, worker) = responses(vec![(200, "unused")]);
+        let address = rpc.inner.url.strip_prefix("http://").unwrap();
+        drop(std::net::TcpStream::connect(address).unwrap());
+        worker.join().unwrap();
+    }
+    #[test]
+    fn exhausted_rate_limits_remain_transient_and_cancellation_is_typed() {
+        let (rpc, worker) = responses(vec![(429, "busy"); 4]);
+        assert!(
+            rpc.call("chain_getHeader", json!([]))
+                .unwrap_err()
+                .is_transient()
+        );
+        assert_eq!(rpc.count(), 4);
+        worker.join().unwrap();
+        rpc.inner.cancel.cancel();
+        assert!(matches!(
+            rpc.call("chain_getHeader", json!([])),
+            Err(Error::Cancelled)
+        ));
     }
     #[test]
     fn http_429_and_json_rpc_rate_limits_are_retried() {
@@ -375,7 +415,7 @@ mod tests {
         let rpc = Rpc::with_options(
             &initial.inner.url,
             1,
-            Duration::from_secs(1),
+            Duration::from_secs(8),
             CancellationToken::new(),
         )
         .unwrap();

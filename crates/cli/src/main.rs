@@ -25,7 +25,7 @@ enum Command {
     Block(BlockArgs),
     /// Print tables of storage use per phase and the busiest storage items.
     Summary(SummaryArgs),
-    /// Replay new best blocks with a bounded queue and shared caches.
+    /// Replay new finalized blocks with a bounded queue and shared caches.
     Follow(FollowArgs),
 }
 
@@ -120,9 +120,12 @@ fn write_json(block: &AnnotatedBlock, path: &PathBuf) -> Result<()> {
     Ok(())
 }
 
-/// Follow best headers at replay speed, retrying failed blocks while they are retained.
+/// Follow finalized headers at replay speed; opt into reversible best heads with --best.
 #[derive(Args)]
 struct FollowArgs {
+    /// Follow best heads instead of finalized heads; report reorgs and reverted traces.
+    #[arg(long)]
+    best: bool,
     /// Node HTTP(S) or WS(S) safe RPC endpoint.
     #[arg(long, value_name = "URL")]
     rpc: String,
@@ -135,6 +138,9 @@ struct FollowArgs {
     /// Persistent proof-node and compiled Wasm cache directory.
     #[arg(long, value_name = "DIR")]
     cache_dir: Option<PathBuf>,
+    /// Combined proof-node and Wasm disk cache limit; evict oldest files after each replay.
+    #[arg(long, default_value_t = 1073741824)]
+    cache_max_bytes: u64,
 }
 
 fn follow(args: FollowArgs) -> Result<()> {

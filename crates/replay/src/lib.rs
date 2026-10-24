@@ -4,6 +4,7 @@ mod session;
 pub use session::ReplaySession;
 mod backend;
 mod capture;
+mod panic_scope;
 mod proof;
 pub mod rpc;
 
@@ -41,6 +42,12 @@ pub enum Error {
     MethodNotAllowed(String),
     #[error("RPC error: {0}")]
     Rpc(String),
+    #[error("RPC error: {0}")]
+    TransientRpc(String),
+    #[error("RPC cancelled")]
+    Cancelled,
+    #[error("RPC unavailable: {0}")]
+    Unavailable(String),
     #[error("invalid replay input: {0}")]
     Invalid(String),
     #[error(
@@ -51,6 +58,25 @@ pub enum Error {
     Io(#[from] std::io::Error),
     #[error("artifact JSON: {0}")]
     Json(#[from] serde_json::Error),
+}
+
+impl Error {
+    /// Only transport/deadline/rate-limit failures are eligible for block retries.
+    pub fn is_transient(&self) -> bool {
+        matches!(self, Self::TransientRpc(_))
+    }
+}
+
+fn metadata_result(result: Result<Value>) -> Result<String> {
+    match result {
+        Ok(Value::String(text)) => Ok(text),
+        Ok(Value::Null) | Err(Error::Unavailable(_)) => {
+            eprintln!("warning: metadata unavailable; continuing with undecoded names");
+            Ok(String::new())
+        }
+        Ok(_) => Err(Error::Rpc("state_getMetadata: non-string result".into())),
+        Err(error) => Err(error),
+    }
 }
 
 type Header = generic::Header<u32, BlakeTwo256>;
@@ -159,15 +185,7 @@ pub fn online_with_session(rpc: &Rpc, selector: &str, session: &ReplaySession) -
         block: response["block"].clone(),
         parent_header: rpc.call("chain_getHeader", json!([parent_hash]))?,
         runtime_version: rpc.call("state_getRuntimeVersion", json!([parent_hash]))?,
-        metadata: match rpc.call("state_getMetadata", json!([parent_hash])) {
-            Ok(value) if value.is_string() => value.as_str().unwrap_or_default().to_owned(),
-            other => {
-                eprintln!(
-                    "warning: metadata unavailable: {other:?}; continuing with undecoded names"
-                );
-                String::new()
-            }
-        },
+        metadata: metadata_result(rpc.call("state_getMetadata", json!([parent_hash])))?,
         proof_nodes: Vec::new(),
     };
     let mut replay = replay_with_session(artifact, Some(rpc.clone()), session)?;
@@ -185,6 +203,26 @@ pub fn replay(artifact: Artifact, rpc: Option<Rpc>) -> Result<Replay> {
     replay_with_session(artifact, rpc, ReplaySession::shared()?)
 }
 pub fn replay_with_session(
+    artifact: Artifact,
+    rpc: Option<Rpc>,
+    session: &ReplaySession,
+) -> Result<Replay> {
+    let replay = replay_inner(artifact, rpc, session);
+    let maintenance = session.prune_disk_cache();
+    match replay {
+        Ok(replay) => {
+            maintenance?;
+            Ok(replay)
+        }
+        Err(error) => {
+            if let Err(cache_error) = maintenance {
+                eprintln!("warning: cache eviction: {cache_error}");
+            }
+            Err(error)
+        }
+    }
+}
+fn replay_inner(
     mut artifact: Artifact,
     rpc: Option<Rpc>,
     session: &ReplaySession,
@@ -198,6 +236,7 @@ pub fn replay_with_session(
         .logs
         .retain(|d| !matches!(d, generic::DigestItem::Seal(_, _)));
     let db = ProofDb::with_session(rpc.clone(), parent.hash(), session.clone());
+    db.set_root(root);
     db.insert_nodes(
         artifact
             .proof_nodes
@@ -212,10 +251,10 @@ pub fn replay_with_session(
         sp_state_machine::TrieBackendBuilder::<_, Blake2Hasher>::new(db.clone(), root).build();
     // Complete-key hints acquire :code and :heappages in at most one call each.
     let wasm = proof::with_key_hint(b":code", || initial.storage(b":code"))
-        .map_err(|e| Error::Invalid(db.failure.lock().take().unwrap_or(e)))?
+        .map_err(|e| db.take_error(db.failure.lock().take().unwrap_or(e)))?
         .ok_or_else(|| Error::Invalid("no authenticated parent :code".into()))?;
     let heap_pages = proof::with_key_hint(b":heappages", || initial.storage(b":heappages"))
-        .map_err(|e| Error::Invalid(db.failure.lock().take().unwrap_or(e)))?
+        .map_err(|e| db.take_error(db.failure.lock().take().unwrap_or(e)))?
         .map(|b| u64::decode(&mut &b[..]).map_err(|e| Error::Invalid(format!(":heappages: {e}"))))
         .transpose()?;
     let executor = &session.executor;
@@ -311,7 +350,7 @@ fn execute(
         hash: sp_io::hashing::blake2_256(wasm).to_vec(),
     };
     let dispatch = tracing::Dispatch::new(capture.clone());
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+    let result = panic_scope::catch(|| {
         tracing::dispatcher::with_default(&dispatch, || {
             let span = tracing::info_span!(target: "frame_trace_replay", "replay");
             let _entered = span.enter();
@@ -328,9 +367,9 @@ fn execute(
             .set_parent_hash(*block.header.parent_hash())
             .execute()
         })
-    }));
+    });
     if let Some(failure) = db.failure.lock().take() {
-        return Err(Error::Invalid(failure));
+        return Err(db.take_error(failure));
     }
     result
         .map_err(|e| {

@@ -496,3 +496,214 @@ fn measured_hooks_descend_from_the_corresponding_phase() {
         assert!(attr(hook, "frame.proof.marginal_bytes").is_none());
     }
 }
+
+#[test]
+fn measured_phases_without_ops_use_only_real_runtime_bounds() {
+    use frame_trace_model::{MeasuredTiming, RuntimeSpan};
+    let mut block = synthetic_block(0);
+    block.timing = Some(MeasuredTiming {
+        start_ns: 0,
+        duration_ns: 100,
+    });
+    let mut init = block.phases[0].clone();
+    init.kind = "initialization";
+    init.label = "initialization".into();
+    let mut ext = init.clone();
+    ext.kind = "apply_extrinsic";
+    ext.label = "extrinsic".into();
+    ext.extrinsic_index = Some(0);
+    let mut nested = init.clone();
+    nested.kind = "post_inherents";
+    nested.label = "post inherents".into();
+    ext.post_inherents = Some(Box::new(nested));
+    let mut empty = init.clone();
+    empty.kind = "finalization";
+    empty.label = "untimed finalization".into();
+    block.phases = vec![init, ext, empty];
+    block.runtime_spans = [("on_initialize", 30, 40), ("on_poll", 50, 60)]
+        .into_iter()
+        .enumerate()
+        .map(|(i, (name, start, end))| RuntimeSpan {
+            id: i as u64 + 1,
+            parent_id: None,
+            name: name.into(),
+            target: "runtime".into(),
+            wasm: true,
+            fields: Default::default(),
+            start_ns: start,
+            end_ns: Some(end),
+            duration_ns: end - start,
+            enters: 1,
+            proof_start_bytes: 0,
+            proof_end_bytes: 0,
+        })
+        .collect();
+    let start = SystemTime::UNIX_EPOCH;
+    let spans = export(
+        &block,
+        Timing {
+            start,
+            ..Timing::default()
+        },
+    );
+    for (name, lo, hi) in [
+        ("initialization", 30, 40),
+        ("extrinsic", 50, 60),
+        ("post inherents", 50, 60),
+    ] {
+        let phase = by_name(&spans, name);
+        assert_eq!(
+            (phase.start_time, phase.end_time),
+            (
+                start + Duration::from_nanos(lo),
+                start + Duration::from_nanos(hi)
+            )
+        );
+        assert_eq!(
+            attr(phase, "frame.phase.timing_available"),
+            Some(true.into())
+        );
+    }
+    let untimed = by_name(&spans, "untimed finalization");
+    assert_eq!(
+        (untimed.start_time, untimed.end_time),
+        (start, start + Duration::from_nanos(100))
+    );
+    assert_eq!(
+        attr(untimed, "frame.phase.timing_available"),
+        Some(false.into())
+    );
+}
+
+#[test]
+fn hook_names_resolve_pallet_metadata_and_fall_back_to_crates() {
+    use frame_trace_model::{MeasuredTiming, RuntimeSpan};
+    let json = String::from_utf8(fixture("model/two-extrinsics.json")).unwrap();
+    let mut traced = TracedBlock::from_trace(&parse_trace_block(&json).unwrap()).unwrap();
+    traced.timing = Some(MeasuredTiming {
+        start_ns: 0,
+        duration_ns: 100,
+    });
+    traced.runtime_spans = ["on_initialize", "on_finalize", "on_idle", "on_poll"]
+        .into_iter()
+        .enumerate()
+        .map(|(i, name)| RuntimeSpan {
+            id: i as u64 + 1,
+            parent_id: None,
+            name: name.into(),
+            target: "pallet_balances::pallet".into(),
+            wasm: true,
+            fields: Default::default(),
+            start_ns: 10 + i as u64 * 10,
+            end_ns: Some(20 + i as u64 * 10),
+            duration_ns: 10,
+            enters: 1,
+            proof_start_bytes: 0,
+            proof_end_bytes: 0,
+        })
+        .collect();
+    let md = Metadata::from_bytes(&fixture("metadata/westend-v16.scale")).unwrap();
+    assert_eq!(
+        md.pallet_for_crate("pallet_balances"),
+        Some("Balances".into())
+    );
+    let block = annotate(&traced, Some(&md));
+    let spans = export(&block, Timing::default());
+    for (hook, phase) in [
+        ("on_initialize", "initialization"),
+        ("on_finalize", "finalization"),
+        ("on_idle", "finalization"),
+        ("on_poll", "post inherents (on_poll)"),
+    ] {
+        let hook = by_name(&spans, &format!("{hook}: Balances"));
+        assert_eq!(
+            hook.parent_span_id,
+            by_name(&spans, phase).span_context.span_id()
+        );
+        assert_eq!(
+            attr(hook, "frame.runtime.target"),
+            Some("pallet_balances::pallet".into())
+        );
+    }
+    let fallback = annotate(&traced, None);
+    assert_eq!(
+        fallback.runtime_spans[0].name,
+        "on_initialize: pallet_balances"
+    );
+}
+
+#[test]
+fn every_storage_op_has_a_collection_including_well_known_roots_and_iteration() {
+    use frame_trace_model::{ReplayCapture, ReplayEvent};
+    let system = "26aa394eea5630e07c48ae0c9558cef7";
+    let capture = ReplayCapture {
+        duration_ns: 100,
+        events: [
+            (
+                "state",
+                "Get",
+                "key",
+                frame_trace_replay::rpc::hex0(b":code"),
+            ),
+            (
+                "state",
+                "Get",
+                "key",
+                frame_trace_replay::rpc::hex0(b":extrinsic_index"),
+            ),
+            (
+                "state",
+                "Get",
+                "key",
+                frame_trace_replay::rpc::hex0(b":transaction_level:"),
+            ),
+            ("state", "StorageRoot", "storage_root", "00".into()),
+            (
+                "frame_trace_backend",
+                "BackendIterNextKey",
+                "prefix",
+                system.into(),
+            ),
+            (
+                "frame_trace_backend",
+                "BackendIterNextPair",
+                "prefix",
+                String::new(),
+            ),
+        ]
+        .into_iter()
+        .enumerate()
+        .map(|(seq, (target, method, field, value))| ReplayEvent {
+            seq,
+            at_ns: seq as u64 * 10,
+            parent_id: None,
+            target: target.into(),
+            fields: [("method".into(), method.into()), (field.into(), value)].into(),
+        })
+        .collect(),
+        ..Default::default()
+    };
+    let traced = TracedBlock::from_replay(&capture).unwrap();
+    let md = Metadata::from_bytes(&fixture("metadata/westend-v16.scale")).unwrap();
+    let spans = export(&annotate(&traced, Some(&md)), Timing::default());
+    let mut ops: Vec<_> = spans
+        .iter()
+        .filter(|s| attr(s, "db.operation.name").is_some())
+        .collect();
+    ops.sort_by_key(|s| attr(s, "frame.storage.seq").map(|v| v.to_string()));
+    let collections: Vec<_> = ops
+        .iter()
+        .map(|s| attr(s, "db.collection.name").unwrap().to_string())
+        .collect();
+    assert_eq!(
+        collections,
+        [
+            "well_known",
+            "well_known",
+            "well_known",
+            "state",
+            "System",
+            "state"
+        ]
+    );
+}

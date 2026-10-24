@@ -42,6 +42,8 @@ pub fn with_child<T>(child: &ChildInfo, f: impl FnOnce() -> T) -> T {
     f()
 }
 
+type PendingKey = (Option<Vec<u8>>, Vec<u8>);
+
 #[derive(Clone)]
 pub struct ProofDb {
     rpc: Option<Rpc>,
@@ -53,7 +55,9 @@ pub struct ProofDb {
     fetch_gate: Arc<Mutex<()>>,
     pub online: Arc<AtomicBool>,
     pub speculative: Arc<AtomicBool>,
-    pending: Arc<Mutex<BTreeMap<Vec<u8>, Option<ChildInfo>>>>,
+    pending: Arc<Mutex<BTreeMap<PendingKey, Option<ChildInfo>>>>,
+    root: Arc<Mutex<Option<H256>>>,
+    rpc_failure: Arc<Mutex<Option<Error>>>,
     pub failure: Arc<Mutex<Option<String>>>,
 }
 impl ProofDb {
@@ -76,7 +80,38 @@ impl ProofDb {
             online: Arc::new(AtomicBool::new(online)),
             speculative: Default::default(),
             pending: Default::default(),
+            root: Default::default(),
+            rpc_failure: Default::default(),
             failure: Default::default(),
+        }
+    }
+    pub fn set_root(&self, root: H256) {
+        *self.root.lock() = Some(root);
+    }
+    pub fn take_error(&self, fallback: String) -> Error {
+        self.rpc_failure
+            .lock()
+            .take()
+            .unwrap_or(Error::Invalid(fallback))
+    }
+    /// Walk only authenticated cache nodes from this block's parent root. This probe cannot
+    /// fetch, record failures, or use speculative placeholders. It also imports used nodes
+    /// into the block's self-contained artifact.
+    fn covered(&self, child: Option<&ChildInfo>, key: &[u8]) -> bool {
+        use sp_state_machine::Backend;
+        struct Cached<'a>(&'a ProofDb);
+        impl TrieBackendStorage<Blake2Hasher> for Cached<'_> {
+            fn get(&self, hash: &H256, _: Prefix) -> std::result::Result<Option<Vec<u8>>, String> {
+                self.0.cached(hash)
+            }
+        }
+        let Some(root) = *self.root.lock() else {
+            return false;
+        };
+        let backend = sp_state_machine::TrieBackendBuilder::new(Cached(self), root).build();
+        match child {
+            Some(child) => backend.child_storage(child, key).is_ok(),
+            None => backend.storage(key).is_ok(),
         }
     }
     pub fn fetch(&self, child: Option<&ChildInfo>, paths: &[Vec<u8>]) -> Result<()> {
@@ -87,7 +122,14 @@ impl ProofDb {
             .rpc
             .as_ref()
             .ok_or_else(|| Error::Invalid("offline proof cache miss".into()))?;
-        let keys: Vec<_> = paths.iter().map(|k| hex0(k)).collect();
+        let keys: Vec<_> = paths
+            .iter()
+            .filter(|key| !self.covered(child, key))
+            .map(|k| hex0(k))
+            .collect();
+        if keys.is_empty() {
+            return Ok(());
+        }
         let proof = match child {
             Some(child) => rpc.call(
                 "state_getChildReadProof",
@@ -153,7 +195,13 @@ impl ProofDb {
                     if node.len() > 16 * 1024 * 1024
                         || H256::from(sp_io::hashing::blake2_256(&node)) != *hash
                     {
-                        return Err(format!("{}: proof node {hash:?} invalid", path.display()));
+                        // Content-addressed disk caches are disposable. Heal corrupt files.
+                        match std::fs::remove_file(&path) {
+                            Ok(()) => {}
+                            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                            Err(e) => return Err(format!("{}: {e}", path.display())),
+                        }
+                        return Ok(None);
                     }
                     self.insert_nodes([node.clone()]);
                     return Ok(Some(node));
@@ -198,7 +246,7 @@ impl ProofDb {
             return Ok(false);
         }
         let mut top = Vec::new();
-        for (path, child) in pending {
+        for ((_, path), child) in pending {
             if let Some(child) = child {
                 self.fetch(Some(&child), &[path])?;
             } else {
@@ -222,7 +270,10 @@ impl ProofDb {
         if let Some(dir) = &self.session.node_dir {
             for (hash, node) in self.nodes.lock().iter() {
                 let path = dir.join(format!("{hash:x}"));
-                if path.exists() {
+                if std::fs::metadata(&path).is_ok_and(|meta| meta.len() == node.len() as u64)
+                    && let Ok(bytes) = std::fs::read(&path)
+                    && H256::from(sp_io::hashing::blake2_256(&bytes)) == *hash
+                {
                     continue;
                 }
                 static NEXT: std::sync::atomic::AtomicUsize =
@@ -275,7 +326,7 @@ impl TrieBackendStorage<Blake2Hasher> for ProofDb {
                 if let Some(key) = &*h.borrow()
                     // On warm blocks fetch only the missing branch of :code. Requesting the
                     // full key would download the unchanged multi-megabyte Wasm again.
-                    && (key != b":code" || self.session.nodes.lock().nodes.is_empty())
+                    && (key != b":code" || bytes == key.as_slice() || self.session.nodes.lock().nodes.is_empty())
                     && key.starts_with(bytes)
                     && prefix
                         .1
@@ -298,7 +349,10 @@ impl TrieBackendStorage<Blake2Hasher> for ProofDb {
                 // and root are never accepted; the final two runs use strict authentication.
                 let mut pending = self.pending.lock();
                 for path in &paths {
-                    pending.insert(path.clone(), child.clone());
+                    pending.insert(
+                        (child.as_ref().map(|c| c.keyspace().to_vec()), path.clone()),
+                        child.clone(),
+                    );
                 }
                 return Err(format!(
                     "speculative proof node {hash:?} at {}",
@@ -311,8 +365,11 @@ impl TrieBackendStorage<Blake2Hasher> for ProofDb {
                     hex0(&path)
                 ));
             }
-            self.fetch(child.as_ref(), &paths)
-                .map_err(|e| format!("proof fetch for {hash:?} at {}: {e}", hex0(&path)))?;
+            self.fetch(child.as_ref(), &paths).map_err(|e| {
+                let message = format!("proof fetch for {hash:?} at {}: {e}", hex0(&path));
+                *self.rpc_failure.lock() = Some(e);
+                message
+            })?;
             self.cached(hash)?.map(Some).ok_or_else(|| {
                 format!(
                     "proof did not contain {hash:?} at {}; missing/invalid proof node",
@@ -336,7 +393,7 @@ pub(crate) fn sibling_paths(path: &[u8], odd: bool) -> Vec<Vec<u8>> {
         let mut sibling = path.to_vec();
         if odd {
             if let Some(last) = sibling.last_mut() {
-                *last = (*last & 0xf0) | nibble;
+                *last = (nibble << 4) | (*last & 0x0f);
             }
         } else {
             sibling.push(nibble << 4);

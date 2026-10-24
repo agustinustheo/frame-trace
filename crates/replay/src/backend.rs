@@ -37,6 +37,7 @@ impl TracedBackend {
 pub struct Iter {
     inner: <Trie as Backend<H>>::RawIter,
     child: Option<ChildInfo>,
+    prefix: Vec<u8>,
 }
 impl StorageIterator<H> for Iter {
     type Backend = TracedBackend;
@@ -47,7 +48,7 @@ impl StorageIterator<H> for Iter {
             Some(c) => with_child(c, || self.inner.next_key(&b.trie)),
             None => self.inner.next_key(&b.trie),
         };
-        tracing::trace!(target: "frame_trace_backend", method = "BackendIterNextKey",
+        tracing::trace!(target: "frame_trace_backend", method = "BackendIterNextKey", prefix = %hex0(&self.prefix),
             result = ?result, child_info = %self.child.as_ref().map(|c| hex0(c.storage_key())).unwrap_or_default(), duration_ns = start.elapsed().as_nanos() as u64);
         if b.db.speculative.load(std::sync::atomic::Ordering::SeqCst) {
             result.filter(Result::is_ok)
@@ -61,7 +62,7 @@ impl StorageIterator<H> for Iter {
             Some(c) => with_child(c, || self.inner.next_pair(&b.trie)),
             None => self.inner.next_pair(&b.trie),
         };
-        tracing::trace!(target: "frame_trace_backend", method = "BackendIterNextPair", child_info = %self.child.as_ref().map(|c| hex0(c.storage_key())).unwrap_or_default(), duration_ns = start.elapsed().as_nanos() as u64);
+        tracing::trace!(target: "frame_trace_backend", method = "BackendIterNextPair", prefix = %hex0(&self.prefix), child_info = %self.child.as_ref().map(|c| hex0(c.storage_key())).unwrap_or_default(), duration_ns = start.elapsed().as_nanos() as u64);
         if b.db.speculative.load(std::sync::atomic::Ordering::SeqCst) {
             result.filter(Result::is_ok)
         } else {
@@ -129,6 +130,7 @@ impl Backend<H> for TracedBackend {
     }
     fn raw_iter(&self, args: IterArgs) -> Result<Iter, String> {
         let child = args.child_info.clone();
+        let prefix = args.prefix.unwrap_or_default().to_vec();
         if let Some(c) = &child {
             self.trie.storage(c.prefixed_storage_key().as_slice())?;
         }
@@ -136,7 +138,11 @@ impl Backend<H> for TracedBackend {
             Some(c) => with_child(c, || self.trie.raw_iter(args)),
             None => self.trie.raw_iter(args),
         }?;
-        Ok(Iter { inner, child })
+        Ok(Iter {
+            inner,
+            child,
+            prefix,
+        })
     }
     fn storage_root<'a>(
         &self,

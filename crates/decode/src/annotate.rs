@@ -117,7 +117,26 @@ pub struct AnnotatedOp {
 /// are `<unknown>` and extrinsics are unnamed.
 pub fn annotate(block: &TracedBlock, metadata: Option<&Metadata>) -> AnnotatedBlock {
     AnnotatedBlock {
-        runtime_spans: block.runtime_spans.clone(),
+        runtime_spans: block
+            .runtime_spans
+            .iter()
+            .cloned()
+            .map(|mut span| {
+                if matches!(
+                    span.name.as_str(),
+                    "on_initialize" | "on_finalize" | "on_idle" | "on_poll"
+                ) {
+                    let krate = span.target.split("::").next().unwrap_or(&span.target);
+                    let pallet = metadata
+                        .and_then(|md| md.pallet_for_crate(krate))
+                        .unwrap_or_else(|| krate.to_owned());
+                    if krate != "runtime" && !krate.is_empty() {
+                        span.name = format!("{}: {pallet}", span.name);
+                    }
+                }
+                span
+            })
+            .collect(),
         timing: block.timing,
         block_number: None,
         block_hash: block.block_hash.clone(),

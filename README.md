@@ -48,20 +48,32 @@ and runtime compilation/loading.
 The measured run uses a warm cache and zero RPC. A missing proof is an error.
 Offline replay never creates an RPC client. HTTP(S) endpoints also work.
 
-`follow` polls best headers every two seconds and walks changing best ancestry.
-Two workers share authenticated content-addressed nodes (bounded to 256 MiB),
-full-key hints and compiled runtimes keyed by code hash. Each block authenticates
-nodes by traversal from its own parent state root. Fresh overlays and recorders
-preserve proof sizes. `--cache-dir DIR` also persists proof nodes and Wasmtime's
-compiled-module cache. Without it, compiled modules persist under
-`$XDG_CACHE_HOME/frame-trace/wasm` (or `~/.cache/frame-trace/wasm`); proof nodes
-remain in memory. Offline artifacts always supply their own proof nodes.
+`follow` polls finalized headers every two seconds. Use `--best` to follow reversible
+best heads; reorgs and reverted traced blocks are logged. Two workers share authenticated
+content-addressed nodes (bounded to 256 MiB), full-key hints and compiled runtimes
+keyed by code hash. Before fetching predictions, each block walks the cache from
+its own parent state root and skips fully covered paths (including proven absence).
+Fresh overlays and recorders preserve proof sizes. `--cache-dir DIR` also persists
+proof nodes and Wasmtime's compiled-module cache. Without it, compiled modules
+persist under `$XDG_CACHE_HOME/frame-trace/wasm` (or `~/.cache/frame-trace/wasm`);
+proof nodes remain in memory. Offline artifacts always supply their own proof nodes.
+Corrupt content-addressed disk nodes are discarded and fetched again online.
 
-An eight-block queue bounds pending work. Queued, in-flight, done and failed
-counts are reported. Failed blocks retry with capped backoff while retained in a
-256-block history; queue-full blocks remain eligible for later polls. Ancestry
-walks stop at 64 blocks. **Follow samples at replay speed when it cannot keep up**;
-it does not guarantee every block or track finality. Best blocks can be reverted.
+`--cache-max-bytes N` bounds the combined proof-node and compiled Wasm disk cache
+(default 1 GiB), including the default Wasm directory when `--cache-dir` is omitted.
+Oldest files by modification time are evicted at startup and after each replay;
+compilation/persistence can temporarily exceed the cap. Saved artifacts are separate
+and never evicted. Deleting cached files does not remove nodes or runtimes already
+held by active workers.
+
+An eight-block queue bounds pending work. Catch-up/reorg walks never precede the
+first observed height or the latest eight heights, and schedule newest blocks first.
+Queued blocks that fall outside that window are skipped before replay. Queued,
+in-flight, done, retryable, terminal and reverted counts are reported. Transient RPC
+failures retry at most four block attempts with capped backoff. Pruned state, invalid
+blocks, root mismatches and job panics are terminal and logged. Entries are retained
+in a bounded 256-block history. **Follow samples at replay speed when it cannot keep
+up**; it does not guarantee every block.
 RPC calls retry transient timeouts, dropped connections, HTTP 429/5xx and RPC rate
 limits, up to four attempts with capped exponential backoff and jitter. DNS/TCP/
 TLS/WebSocket setup has a ten-second deadline and the whole call, including pool
@@ -79,8 +91,21 @@ by the block span. Only traced `apply_extrinsic` spans carry
 `frame.proof.marginal_bytes`, the recorder's growth during that span. These are
 not standalone extrinsic proof sizes.
 
-Names require metadata V14 or newer. Missing, malformed or unsupported metadata
-produces a warning and undecoded names; a passed replay is still saved/exported.
+Names require metadata V14 or newer. Unavailable/pruned metadata, or malformed or
+unsupported metadata bytes, produce a warning and undecoded names; a passed replay
+is still saved/exported. Metadata transport errors, exhausted retries, cancellation
+and malformed RPC responses propagate as errors so follow cannot mark such blocks done.
+Caught replay-execution panics return clean errors without the default panic text;
+panics outside that execution scope still use the normal panic hook.
+
+Hook spans are named `on_initialize: Balances` (also `on_finalize`, `on_idle` and
+`on_poll`). Metadata type paths resolve the pallet's runtime name; unavailable or
+ambiguous mappings fall back to the crate name. `frame.runtime.target` is retained.
+Every storage op has `db.collection.name`: the decoded pallet (including prefixed
+iteration), `well_known` for keys such as `:code`, `child_trie` for child operations,
+`state` for whole-state roots/unprefixed iteration, or `unknown` for other keys.
+Untimed measured phases carry `frame.phase.timing_available = false` and use the
+block's enclosing interval; absent timing never widens a timed phase.
 
 Recorded `state_traceBlock` JSON remains available as a secondary source. Its
 timestamps are synthetic. Metadata is optional for this source.

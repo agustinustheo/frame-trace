@@ -78,9 +78,18 @@ impl Artifact {
                 return Err(Error::Invalid("artifact size limit exceeded".into()));
             }
             let bytes = zstd::stream::encode_all(raw.as_slice(), 9)?;
-            let temporary = dir.join("artifact.json.zst.tmp");
+            static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+            let temporary = dir.join(format!(
+                ".artifact.{}.{}.tmp",
+                std::process::id(),
+                NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+            ));
+
             fs::write(&temporary, bytes).map_err(|e| context(&temporary, e))?;
-            fs::rename(&temporary, &path)?;
+            if let Err(error) = fs::rename(&temporary, &path) {
+                let _ = fs::remove_file(&temporary);
+                return Err(error.into());
+            }
             Ok(())
         };
         save().map_err(|e| context(&path, e))

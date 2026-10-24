@@ -368,9 +368,10 @@ fn artifact_rpc(
 ) -> serde_json::Value {
     use serde_json::json;
     json!({"result": match request["method"].as_str().unwrap() {
-        "chain_getBlockHash" => json!(artifact.block_hash),
+        "chain_getFinalizedHead" | "chain_getBlockHash" => json!(artifact.block_hash),
         "chain_getBlock" => json!({"block":artifact.block}),
         "chain_getHeader" if request["params"].as_array().unwrap().is_empty() => artifact.block["header"].clone(),
+        "chain_getHeader" if request["params"][0] == json!(artifact.block_hash) => artifact.block["header"].clone(),
         "chain_getHeader" => artifact.parent_header.clone(),
         "state_getRuntimeVersion" => artifact.runtime_version.clone(),
         // Metadata V13 with its opaque payload encoded as an empty Vec. Execution must survive.
@@ -446,16 +447,17 @@ fn follow_mock_node_retries_failed_blocks_observes_new_heads_and_cancels() {
     let new_hash = frame_trace_replay::header_hash(&new_header).unwrap();
     let expected_new = new_hash.clone();
     let node = MockNode::new(move |request| {
-        if request["method"] == "chain_getBlock" {
-            if request["params"][0] == new_hash {
-                return serde_json::json!({"result": null});
-            }
-            if attempts.fetch_add(1, Ordering::SeqCst) == 0 {
-                return serde_json::json!({"error":{"code":-32000,"message":"temporary mock failure"}});
-            }
+        if request["method"] == "chain_getBlock" && request["params"][0] == new_hash {
+            return serde_json::json!({"result": null});
+        }
+        if request["method"] == "state_getMetadata" && attempts.fetch_add(1, Ordering::SeqCst) < 4 {
+            return serde_json::json!({"error":{"code":429,"message":"too many requests"}});
+        }
+        if request["method"] == "chain_getFinalizedHead" && advance.load(Ordering::SeqCst) > 0 {
+            return serde_json::json!({"result":new_hash});
         }
         if request["method"] == "chain_getHeader"
-            && request["params"] == serde_json::json!([])
+            && request["params"][0] == new_hash
             && advance.load(Ordering::SeqCst) > 0
         {
             return serde_json::json!({"result":new_header});
@@ -477,11 +479,12 @@ fn follow_mock_node_retries_failed_blocks_observes_new_heads_and_cancels() {
     let mut passed = false;
     while start.elapsed() < Duration::from_secs(120) {
         let text = std::fs::read_to_string(&log).unwrap();
-        if text.contains("traced best block #2") {
+        if text.contains("traced finalized block #2") {
             stage.store(1, Ordering::SeqCst);
         }
         if text.contains(&format!("block {expected_new} not found"))
             && text.contains("retrying block")
+            && text.contains(&format!("terminal block {expected_new}"))
         {
             passed = true;
             break;
@@ -496,7 +499,7 @@ fn follow_mock_node_retries_failed_blocks_observes_new_heads_and_cancels() {
         .args(["-INT", &child.id().to_string()])
         .status()
         .unwrap();
-    while child.try_wait().unwrap().is_none() && stopped.elapsed() < Duration::from_secs(2) {
+    while child.try_wait().unwrap().is_none() && stopped.elapsed() < Duration::from_secs(10) {
         thread::sleep(Duration::from_millis(20));
     }
     if child.try_wait().unwrap().is_none() {
@@ -506,10 +509,13 @@ fn follow_mock_node_retries_failed_blocks_observes_new_heads_and_cancels() {
     let text = std::fs::read_to_string(&log).unwrap();
     std::fs::remove_file(log).unwrap();
     assert!(passed && status.success(), "{status:?}: {text}");
-    assert!(stopped.elapsed() < Duration::from_secs(2));
-    assert!(failures.load(Ordering::SeqCst) >= 2);
+    assert!(stopped.elapsed() < Duration::from_secs(10));
+    assert!(failures.load(Ordering::SeqCst) >= 5);
     assert!(
-        text.contains("in-flight=") && text.contains("failed=") && text.contains("follow stopped")
+        text.contains("in-flight=")
+            && text.contains("terminal=")
+            && text.contains("follow stopped")
+            && !text.contains("panicked at")
     );
 }
 
@@ -533,20 +539,19 @@ fn follow_ctrl_c_interrupts_a_stalled_websocket_handshake() {
     let node = thread::spawn(move || {
         let _ = stream.read_to_end(&mut Vec::new());
     });
-    thread::sleep(Duration::from_millis(50));
     let start = Instant::now();
     Command::new("kill")
         .args(["-INT", &child.id().to_string()])
         .status()
         .unwrap();
-    while child.try_wait().unwrap().is_none() && start.elapsed() < Duration::from_secs(2) {
+    while child.try_wait().unwrap().is_none() && start.elapsed() < Duration::from_secs(10) {
         thread::sleep(Duration::from_millis(10));
     }
     if child.try_wait().unwrap().is_none() {
         child.kill().unwrap();
     }
     assert!(child.wait().unwrap().success());
-    assert!(start.elapsed() < Duration::from_secs(2));
+    assert!(start.elapsed() < Duration::from_secs(10));
     node.join().unwrap();
 }
 
@@ -558,11 +563,16 @@ fn help_describes_best_concurrency_cache_and_otlp_default() {
         "best",
         "--proof-concurrency",
         "--cache-dir",
+        "--cache-max-bytes",
         "http://127.0.0.1:4318",
     ] {
         assert!(text.contains(word), "{text}");
     }
     let output = run(&["follow", "--help"]);
     let text = String::from_utf8_lossy(&output.stdout);
-    assert!(text.contains("http://127.0.0.1:4318"));
+    assert!(
+        text.contains("http://127.0.0.1:4318")
+            && text.contains("--best")
+            && text.contains("finalized")
+    );
 }

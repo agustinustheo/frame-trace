@@ -264,7 +264,11 @@ fn parse_event(event: &Event) -> Result<Option<StorageOp>, String> {
         OpKind::NextKey => {
             op.key = display_hex(required(event, "key")?)?;
         }
-        OpKind::Iteration => {}
+        OpKind::Iteration => {
+            if let Some(prefix) = event.field("prefix") {
+                op.key = display_hex(prefix)?;
+            }
+        }
         OpKind::Clear
         | OpKind::KillChild
         | OpKind::StorageRoot

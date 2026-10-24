@@ -44,6 +44,9 @@ pub struct SourceArgs {
     /// Persistent authenticated proof nodes and compiled Wasm cache directory.
     #[arg(long, value_name = "DIR")]
     pub cache_dir: Option<PathBuf>,
+    /// Combined proof-node and Wasm disk cache limit; evict oldest files after each replay.
+    #[arg(long, default_value_t = 1073741824)]
+    pub cache_max_bytes: u64,
 }
 
 /// A block trace and what is needed to decode it.
@@ -60,7 +63,10 @@ pub fn load(args: &SourceArgs) -> Result<Loaded> {
                 frame_trace_replay::replay_with_session(
                     artifact,
                     None,
-                    &frame_trace_replay::ReplaySession::new(args.cache_dir.as_deref())?,
+                    &frame_trace_replay::ReplaySession::with_cache_max_bytes(
+                        args.cache_dir.as_deref(),
+                        args.cache_max_bytes,
+                    )?,
                 )
             })
             .map_err(|e| anyhow::anyhow!("{}: {e}", dir.join("artifact.json.zst").display()))
@@ -84,7 +90,10 @@ pub fn load(args: &SourceArgs) -> Result<Loaded> {
             let replay = frame_trace_replay::online_with_session(
                 &rpc,
                 args.block.as_deref().unwrap_or_default(),
-                &frame_trace_replay::ReplaySession::new(args.cache_dir.as_deref())?,
+                &frame_trace_replay::ReplaySession::with_cache_max_bytes(
+                    args.cache_dir.as_deref(),
+                    args.cache_max_bytes,
+                )?,
             )
             .inspect_err(|_| {
                 eprintln!("root check: NOT VERIFIED; RPC calls: {}", rpc.count());
