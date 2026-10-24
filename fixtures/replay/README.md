@@ -2,16 +2,20 @@
 
 These are E2's successful full `Core_execute_block` inputs, converted to the
 [version 1 artifact format](../../crates/replay/ARTIFACT.md). No live node is needed.
-All include authenticated runtime code, parent header, runtime version, metadata
-and complete discovery proof nodes. Compression is required because runtime Wasm
-accounts for most of their size. The eight compressed files, including oracles and
-the public reference, total 15,882,348 bytes (15.15 MiB).
+All rehydrate authenticated runtime code, parent header, runtime version, metadata
+and complete discovery proof nodes. The shared People Wasm and metadata are stored
+once under `blobs/<blake2-256>.zst`; fixture metadata/node strings use `blob:<hash>`.
+The loader bounds decompression and verifies each blob's content hash before
+rehydrating hex. No arbitrary reference paths are accepted. `Artifact::save`
+always writes self-contained artifacts. The ten compressed files, including blobs,
+oracles and the public reference, total 11,195,050 bytes (10.68 MiB), down from
+15,882,348 bytes.
 
 | Directory | Block | Source | Artifact bytes |
 | --- | --- | --- | ---: |
-| `people-transfer` | 2 / `ea56e9d6…` | E2 untraced People, signed transfer | 4,212,334 |
-| `people-kill-prefix` | 8 / `7d99aaa1…` | E2 untraced People, sudo kill_prefix | 4,212,877 |
-| `people-traced` | 4 / `06618995…` | E2 traced People, three-transfer batch | 4,260,185 |
+| `people-transfer` | 2 / `ea56e9d6…` | E2 untraced People, signed transfer | 7,882 |
+| `people-kill-prefix` | 8 / `7d99aaa1…` | E2 untraced People, sudo kill_prefix | 8,368 |
+| `people-traced` | 4 / `06618995…` | E2 traced People, three-transfer batch | 4,115,093 |
 | `westend-asset-hub` | 18,558,320 / `4c0d1d57…` | Public Westend Asset Hub, two inherents | 3,154,143 |
 
 The local `oracle.json.zst` files are E2's independent `state_traceBlock` RPC

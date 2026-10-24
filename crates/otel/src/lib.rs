@@ -89,7 +89,17 @@ impl Default for Timing {
 /// Spans [`record_block`] creates for `block`: root, phases and ops.
 pub fn span_count(block: &AnnotatedBlock) -> usize {
     1 + block.all_phases().map(|p| 1 + p.ops.len()).sum::<usize>()
-        + block.runtime_spans.iter().filter(|s| s.wasm).count()
+        + block
+            .runtime_spans
+            .iter()
+            .filter(|s| runtime_span(s))
+            .count()
+}
+
+// The runtime's whole-block wrapper is represented by the OTel block itself. Keeping it
+// below initialization would incorrectly stretch that phase across the entire block.
+fn runtime_span(span: &frame_trace_model::RuntimeSpan) -> bool {
+    span.wasm && span.name != "execute_block" && span.name != "Core_execute_block"
 }
 
 /// A tracer provider exporting through `exporter` with a batch processor whose queue holds
@@ -242,122 +252,192 @@ fn record_measured(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) -
         .with_attributes(attrs)
         .start_with_context(tracer, &Context::new());
     let root = Context::new().with_span(root);
-    let mut contexts = HashMap::new();
-    for observed in block.runtime_spans.iter().filter(|s| s.wasm) {
-        let mut parent_id = observed.parent_id;
-        let mut parent = &root;
-        // Capture IDs form a tree; bound traversal for defensive handling of caller-built data.
-        for _ in 0..block.runtime_spans.len() {
-            let Some(id) = parent_id else { break };
-            if let Some(cx) = contexts.get(&id) {
-                parent = cx;
-                break;
+    let phases: Vec<_> = block.all_phases().collect();
+    let index: HashMap<_, _> = block.runtime_spans.iter().map(|s| (s.id, s)).collect();
+    let mut nearest = HashMap::new();
+    let mut owners = HashMap::new();
+    let mut extrinsic = 0u32;
+    let mut bounds: Vec<_> = phases
+        .iter()
+        .map(|phase| {
+            phase
+                .with_nested()
+                .flat_map(|p| &p.ops)
+                .filter_map(|op| op.timing)
+                .fold(None, |acc: Option<(u64, u64)>, t| {
+                    Some(acc.map_or(
+                        (t.start_ns, t.start_ns.saturating_add(t.duration_ns)),
+                        |(lo, hi)| {
+                            (
+                                lo.min(t.start_ns),
+                                hi.max(t.start_ns.saturating_add(t.duration_ns)),
+                            )
+                        },
+                    ))
+                })
+                .unwrap_or((0, 0))
+        })
+        .collect();
+    // Resolve native ancestors once. Capture parents precede children; no per-op tree scans.
+    for observed in &block.runtime_spans {
+        let ancestor = observed
+            .parent_id
+            .and_then(|id| nearest.get(&id).copied().flatten());
+        nearest.insert(
+            observed.id,
+            if runtime_span(observed) {
+                Some(observed.id)
+            } else {
+                ancestor
+            },
+        );
+        if !runtime_span(observed) {
+            continue;
+        }
+        let named = match observed.name.as_str() {
+            "apply_extrinsic" => {
+                let i = extrinsic;
+                extrinsic += 1;
+                phases.iter().position(|p| p.extrinsic_index == Some(i))
             }
-            parent_id = block
-                .runtime_spans
+            "initialize_block" | "on_initialize" => {
+                phases.iter().position(|p| p.kind == "initialization")
+            }
+            "finalize_block" | "on_finalize" => {
+                phases.iter().position(|p| p.kind == "finalization")
+            }
+            "inherents_applied" | "on_poll" => {
+                phases.iter().position(|p| p.kind == "post_inherents")
+            }
+            _ => None,
+        };
+        let inherited = ancestor
+            .and_then(|id| owners.get(&id).copied())
+            .filter(|_| {
+                ancestor
+                    .and_then(|id| index.get(&id))
+                    .is_none_or(|s| s.name != "execute_block")
+            });
+        let owner = named.or(inherited).unwrap_or_else(|| {
+            bounds
                 .iter()
-                .find(|s| s.id == id)
-                .and_then(|s| s.parent_id);
+                .enumerate()
+                .min_by_key(|(_, (lo, hi))| {
+                    if observed.start_ns < *lo {
+                        lo - observed.start_ns
+                    } else {
+                        observed.start_ns.saturating_sub(*hi)
+                    }
+                })
+                .map_or(0, |(i, _)| i)
+        });
+        owners.insert(observed.id, owner);
+        if let Some((lo, hi)) = bounds.get_mut(owner) {
+            *lo = (*lo).min(observed.start_ns);
+            *hi = (*hi).max(observed.end_ns.unwrap_or(observed.start_ns));
+        }
+    }
+    for (i, phase) in phases.iter().enumerate() {
+        if phase.post_inherents.is_some() && i + 1 < bounds.len() {
+            bounds[i] = (
+                bounds[i].0.min(bounds[i + 1].0),
+                bounds[i].1.max(bounds[i + 1].1),
+            );
+        }
+    }
+    let mut phase_contexts: Vec<Context> = Vec::new();
+    for (i, phase) in phases.iter().enumerate() {
+        let parent =
+            if phase.kind == "post_inherents" && i > 0 && phases[i - 1].post_inherents.is_some() {
+                &phase_contexts[i - 1]
+            } else {
+                &root
+            };
+        let mut attrs = vec![
+            KeyValue::new("frame.timing", "measured"),
+            KeyValue::new("frame.phase", phase.kind),
+        ];
+        attrs.extend(stats_attributes(&phase.stats));
+        if let Some(index) = phase.extrinsic_index {
+            attrs.push(KeyValue::new("frame.extrinsic.index", i64::from(index)));
+        }
+        if let Some(call) = &phase.call {
+            attrs.push(KeyValue::new("frame.extrinsic.call", call.clone()));
+        }
+        let span = tracer
+            .span_builder(phase.label.clone())
+            .with_start_time(at(bounds[i].0))
+            .with_attributes(attrs)
+            .start_with_context(tracer, parent);
+        phase_contexts.push(parent.with_span(span));
+    }
+    let mut contexts = HashMap::new();
+    for observed in block.runtime_spans.iter().filter(|s| runtime_span(s)) {
+        let Some(&owner) = owners.get(&observed.id) else {
+            continue;
+        };
+        let Some(phase_cx) = phase_contexts.get(owner) else {
+            continue;
+        };
+        let ancestor = observed
+            .parent_id
+            .and_then(|id| nearest.get(&id).copied().flatten());
+        let parent = ancestor
+            .filter(|id| owners.get(id) == Some(&owner))
+            .and_then(|id| contexts.get(&id))
+            .unwrap_or(phase_cx);
+        let mut attrs = vec![
+            KeyValue::new("frame.timing", "measured"),
+            KeyValue::new("frame.runtime.target", observed.target.clone()),
+        ];
+        if observed.name == "apply_extrinsic" {
+            attrs.push(KeyValue::new(
+                "frame.proof.marginal_bytes",
+                count(
+                    observed
+                        .proof_end_bytes
+                        .saturating_sub(observed.proof_start_bytes),
+                ),
+            ));
         }
         let span = tracer
             .span_builder(truncate(&observed.name))
             .with_start_time(at(observed.start_ns))
-            .with_attributes([
-                KeyValue::new("frame.timing", "measured"),
-                KeyValue::new("frame.runtime.target", observed.target.clone()),
-                KeyValue::new(
-                    "frame.proof.marginal_bytes",
-                    count(
-                        observed
-                            .proof_end_bytes
-                            .saturating_sub(observed.proof_start_bytes),
-                    ),
-                ),
-            ])
+            .with_attributes(attrs)
             .start_with_context(tracer, parent);
         let cx = parent.with_span(span);
         cx.span()
             .end_with_timestamp(at(observed.end_ns.unwrap_or(observed.start_ns)));
         contexts.insert(observed.id, cx);
     }
-    for phase in &block.phases {
-        record_measured_phase(tracer, block, phase, &root, &contexts, timing.start);
+    for (i, phase) in phases.iter().enumerate() {
+        let cx = &phase_contexts[i];
+        for op in &phase.ops {
+            let parent = op
+                .parent_span
+                .and_then(|id| nearest.get(&id).copied().flatten())
+                .filter(|id| owners.get(id) == Some(&i))
+                .and_then(|id| contexts.get(&id))
+                .unwrap_or(cx);
+            let t = op.timing.unwrap_or(frame_trace_model::MeasuredTiming {
+                start_ns: bounds[i].0,
+                duration_ns: 0,
+            });
+            let mut span = tracer
+                .span_builder(truncate(&op.label))
+                .with_start_time(at(t.start_ns))
+                .with_attributes(op_attributes(op, phase.extrinsic_index))
+                .start_with_context(tracer, parent);
+            opentelemetry::trace::Span::end_with_timestamp(
+                &mut span,
+                at(t.start_ns.saturating_add(t.duration_ns)),
+            );
+        }
+        cx.span().end_with_timestamp(at(bounds[i].1));
     }
     root.span()
         .end_with_timestamp(at(block.timing.map_or(0, |t| t.duration_ns)));
     span_count(block)
-}
-
-fn record_measured_phase(
-    tracer: &SdkTracer,
-    block: &AnnotatedBlock,
-    phase: &AnnotatedPhase,
-    parent: &Context,
-    contexts: &std::collections::HashMap<u64, Context>,
-    start: SystemTime,
-) {
-    let at = |ns| start + Duration::from_nanos(ns);
-    let intervals: Vec<_> = phase
-        .with_nested()
-        .flat_map(|p| &p.ops)
-        .filter_map(|o| o.timing)
-        .collect();
-    let lo = intervals.iter().map(|t| t.start_ns).min().unwrap_or(0);
-    let hi = intervals
-        .iter()
-        .map(|t| t.start_ns.saturating_add(t.duration_ns))
-        .max()
-        .unwrap_or(lo);
-    let mut attrs = vec![
-        KeyValue::new("frame.timing", "measured"),
-        KeyValue::new("frame.phase", phase.kind),
-    ];
-    attrs.extend(stats_attributes(&phase.stats));
-    if let Some(i) = phase.extrinsic_index {
-        attrs.push(KeyValue::new("frame.extrinsic.index", i64::from(i)));
-    }
-    if let Some(call) = &phase.call {
-        attrs.push(KeyValue::new("frame.extrinsic.call", call.clone()));
-    }
-    let span = tracer
-        .span_builder(phase.label.clone())
-        .with_start_time(at(lo))
-        .with_attributes(attrs)
-        .start_with_context(tracer, parent);
-    let cx = parent.with_span(span);
-    for op in &phase.ops {
-        let mut parent_id = op.parent_span;
-        let mut parent = &cx;
-        for _ in 0..block.runtime_spans.len() {
-            let Some(id) = parent_id else { break };
-            if let Some(observed) = contexts.get(&id) {
-                parent = observed;
-                break;
-            }
-            parent_id = block
-                .runtime_spans
-                .iter()
-                .find(|s| s.id == id)
-                .and_then(|s| s.parent_id);
-        }
-        let t = op.timing.unwrap_or(frame_trace_model::MeasuredTiming {
-            start_ns: lo,
-            duration_ns: 0,
-        });
-        let mut span = tracer
-            .span_builder(truncate(&op.label))
-            .with_start_time(at(t.start_ns))
-            .with_attributes(op_attributes(op, phase.extrinsic_index))
-            .start_with_context(tracer, parent);
-        opentelemetry::trace::Span::end_with_timestamp(
-            &mut span,
-            at(t.start_ns.saturating_add(t.duration_ns)),
-        );
-    }
-    if let Some(nested) = &phase.post_inherents {
-        record_measured_phase(tracer, block, nested, &cx, contexts, start);
-    }
-    cx.span().end_with_timestamp(at(hi));
 }
 
 fn record_phase(

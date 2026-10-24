@@ -198,14 +198,17 @@ fn tampered_parent_and_missing_proof_fail() {
         replay(artifact, None)
             .unwrap_err()
             .to_string()
-            .contains("offline proof cache miss")
+            .contains("missing/invalid at path")
     );
 }
 #[test]
 fn artifact_round_trip_and_version_rejection() {
     let dir = std::env::temp_dir().join(format!("frame-trace-artifact-{}", std::process::id()));
     let mut artifact = Artifact::load(&fixture("people-transfer")).unwrap();
+    // Auxiliary metadata must not prevent a verified replay from being saved.
+    artifact.metadata = "malformed auxiliary metadata".into();
     artifact.save(&dir).unwrap();
+    assert_eq!(Artifact::load(&dir).unwrap().metadata, artifact.metadata);
     assert_eq!(
         Artifact::load(&dir).unwrap().proof_nodes,
         artifact.proof_nodes
@@ -241,6 +244,117 @@ fn tampered_runtime_proof_node_is_rejected() {
         replay(artifact, None)
             .unwrap_err()
             .to_string()
-            .contains("offline proof cache miss")
+            .contains("missing/invalid at path")
     );
+}
+
+#[test]
+fn missing_execution_node_is_an_error_with_sdk_panic_handler_in_subprocess() {
+    const CHILD: &str = "FRAME_TRACE_PROOF_PANIC_CHILD";
+    if std::env::var_os(CHILD).is_some() {
+        sp_panic_handler::set("regression test", "test");
+        let original = Artifact::load(&fixture("people-transfer")).unwrap();
+        // Preserve the code-loading proof, and remove a node demanded by execution itself.
+        use hash_db::{EMPTY_PREFIX, HashDB};
+        use sp_core::Blake2Hasher;
+        let mut memory = sp_trie::MemoryDB::<Blake2Hasher>::default();
+        for node in &original.proof_nodes {
+            HashDB::insert(
+                &mut memory,
+                EMPTY_PREFIX,
+                &frame_trace_replay::rpc::unhex(node).unwrap(),
+            );
+        }
+        let parent: sp_runtime::generic::Header<u32, sp_runtime::traits::BlakeTwo256> =
+            serde_json::from_value(original.parent_header.clone()).unwrap();
+        let trie = sp_state_machine::TrieBackendBuilder::new(memory, parent.state_root).build();
+        let code = sp_state_machine::prove_read_on_trie_backend(
+            &trie,
+            [b":code".as_slice(), b":heappages".as_slice()],
+        )
+        .unwrap();
+        let protected: std::collections::BTreeSet<_> = code
+            .into_iter_nodes()
+            .map(|n| frame_trace_replay::rpc::hex0(&n))
+            .collect();
+        let index = original
+            .proof_nodes
+            .iter()
+            .position(|n| !protected.contains(n) && n.len() > 130)
+            .unwrap();
+        for corrupt in [false, true] {
+            let mut artifact = original.clone();
+            let missing = artifact.proof_nodes[index].clone();
+            if corrupt {
+                artifact.proof_nodes[index].replace_range(2..4, "42");
+            } else {
+                artifact.proof_nodes.remove(index);
+            }
+            let error = replay(artifact, None).unwrap_err().to_string();
+            assert!(
+                error.contains("proof node") && error.contains("missing/invalid at path"),
+                "{error}"
+            );
+            assert!(!error.contains("offline proof cache miss"));
+            let hash =
+                sp_crypto_hashing::blake2_256(&frame_trace_replay::rpc::unhex(&missing).unwrap());
+            assert!(error.contains(&hex::encode(hash)), "{error}");
+        }
+        return;
+    }
+    let output = std::process::Command::new(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "missing_execution_node_is_an_error_with_sdk_panic_handler_in_subprocess",
+            "--nocapture",
+        ])
+        .env(CHILD, "1")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "subprocess {:?}\n{}\n{}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn corrupt_artifact_files_and_limits_name_the_path() {
+    let dir = std::env::temp_dir().join(format!("frame-trace-corrupt-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("artifact.json.zst");
+    for bytes in [
+        b"not zstd".to_vec(),
+        zstd::stream::encode_all(b"invalid json".as_slice(), 1).unwrap(),
+        zstd::stream::encode_all(vec![b' '; 64 * 1024 * 1024 + 1].as_slice(), 1).unwrap(),
+    ] {
+        std::fs::write(&path, bytes).unwrap();
+        assert!(
+            Artifact::load(&dir)
+                .unwrap_err()
+                .to_string()
+                .contains(path.to_str().unwrap())
+        );
+    }
+    let original = Artifact::load(&fixture("people-transfer")).unwrap();
+    for (nodes, expected) in [
+        (vec!["0x00".to_owned(); 100_001], "proof count"),
+        (
+            vec![format!("0x{}", "00".repeat(24 * 1024 * 1024 + 1))],
+            "total proof bytes",
+        ),
+    ] {
+        let mut artifact = original.clone();
+        artifact.proof_nodes = nodes;
+        let raw = serde_json::to_vec(&artifact).unwrap();
+        std::fs::write(&path, zstd::stream::encode_all(raw.as_slice(), 1).unwrap()).unwrap();
+        let error = Artifact::load(&dir).unwrap_err().to_string();
+        assert!(
+            error.contains(expected) && error.contains(path.to_str().unwrap()),
+            "{error}"
+        );
+    }
+    std::fs::remove_dir_all(dir).unwrap();
 }

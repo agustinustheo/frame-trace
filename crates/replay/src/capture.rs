@@ -45,14 +45,26 @@ pub struct Span {
     entered: Option<Instant>,
 }
 
-#[derive(Clone, Serialize)]
-pub struct Event {
-    pub seq: usize,
-    pub at_ns: u64,
-    pub parent_id: Option<u64>,
-    pub target: String,
-    pub fields: BTreeMap<String, String>,
+impl Span {
+    pub fn to_model(&self) -> frame_trace_model::RuntimeSpan {
+        frame_trace_model::RuntimeSpan {
+            id: self.id,
+            parent_id: self.parent_id,
+            name: self.name.clone(),
+            target: self.target.clone(),
+            wasm: self.wasm,
+            fields: self.fields.clone(),
+            start_ns: self.start_ns,
+            end_ns: self.end_ns,
+            duration_ns: self.duration_ns,
+            enters: self.enters,
+            proof_start_bytes: self.proof_start_bytes,
+            proof_end_bytes: self.proof_end_bytes,
+        }
+    }
 }
+
+pub use frame_trace_model::ReplayEvent as Event;
 
 pub struct Data {
     pub start: Instant,

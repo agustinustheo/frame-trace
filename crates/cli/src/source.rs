@@ -29,8 +29,8 @@ pub struct SourceArgs {
         conflicts_with = "offline"
     )]
     pub rpc: Option<String>,
-    /// Block number or hash to trace with --rpc.
-    #[arg(long, value_name = "NUMBER|HASH")]
+    /// Block number, hash or `best` to trace with --rpc.
+    #[arg(long, value_name = "NUMBER|HASH|best")]
     pub block: Option<String>,
     /// Replay a saved artifact with no network.
     #[arg(long, value_name = "DIR", conflicts_with = "block")]
@@ -38,6 +38,12 @@ pub struct SourceArgs {
     /// Save the replay context and proofs for offline use.
     #[arg(long, value_name = "DIR", conflicts_with = "from_file")]
     pub save: Option<PathBuf>,
+    /// Maximum concurrent proof requests (keys are batched, 32 per request).
+    #[arg(long, default_value_t = 8, value_parser = clap::value_parser!(u8).range(1..=64))]
+    pub proof_concurrency: u8,
+    /// Persistent authenticated proof nodes and compiled Wasm cache directory.
+    #[arg(long, value_name = "DIR")]
+    pub cache_dir: Option<PathBuf>,
 }
 
 /// A block trace and what is needed to decode it.
@@ -49,22 +55,40 @@ pub struct Loaded {
 
 pub fn load(args: &SourceArgs) -> Result<Loaded> {
     if let Some(dir) = &args.offline {
-        let replay = frame_trace_replay::offline(dir).inspect_err(|_| {
-            eprintln!("root check: NOT VERIFIED; RPC calls: 0");
-        })?;
+        let replay = frame_trace_replay::Artifact::load(dir)
+            .and_then(|artifact| {
+                frame_trace_replay::replay_with_session(
+                    artifact,
+                    None,
+                    &frame_trace_replay::ReplaySession::new(args.cache_dir.as_deref())?,
+                )
+            })
+            .map_err(|e| anyhow::anyhow!("{}: {e}", dir.join("artifact.json.zst").display()))
+            .inspect_err(|_| {
+                eprintln!("root check: NOT VERIFIED; RPC calls: 0");
+            })?;
         return replay_loaded(replay, args.save.as_deref());
     }
     match (&args.from_file, &args.rpc) {
         (Some(trace), _) => file::load(trace, args.metadata.as_deref()),
         (None, Some(url)) => {
-            let rpc = frame_trace_replay::rpc::Rpc::new(url).inspect_err(|_| {
+            let rpc = frame_trace_replay::rpc::Rpc::with_options(
+                url,
+                args.proof_concurrency as usize,
+                std::time::Duration::from_secs(30),
+                Default::default(),
+            )
+            .inspect_err(|_| {
                 eprintln!("root check: NOT VERIFIED; RPC calls: 0");
             })?;
-            let replay =
-                frame_trace_replay::online(&rpc, args.block.as_deref().unwrap_or_default())
-                    .inspect_err(|_| {
-                        eprintln!("root check: NOT VERIFIED; RPC calls: {}", rpc.count());
-                    })?;
+            let replay = frame_trace_replay::online_with_session(
+                &rpc,
+                args.block.as_deref().unwrap_or_default(),
+                &frame_trace_replay::ReplaySession::new(args.cache_dir.as_deref())?,
+            )
+            .inspect_err(|_| {
+                eprintln!("root check: NOT VERIFIED; RPC calls: {}", rpc.count());
+            })?;
             replay_loaded(replay, args.save.as_deref())
         }
         (None, None) => bail!("pass --rpc, --offline or --from-file"),
@@ -77,11 +101,13 @@ mod file {
     pub fn load(trace: &Path, metadata: Option<&Path>) -> Result<Loaded> {
         let json = std::fs::read_to_string(trace)
             .with_context(|| format!("reading {}", trace.display()))?;
+        let trace_path = trace;
         let trace = frame_trace_model::rpc::parse_trace_block(&json)
             .with_context(|| format!("parsing {}", trace.display()))?;
         let metadata = metadata.map(load_metadata).transpose()?;
         Ok(Loaded {
-            traced: frame_trace_model::TracedBlock::from_trace(&trace)?,
+            traced: frame_trace_model::TracedBlock::from_trace(&trace)
+                .with_context(|| format!("converting trace from {}", trace_path.display()))?,
             metadata,
             block_number: None,
         })
@@ -116,15 +142,31 @@ mod file {
 /// Both block and summary consume the same faithful measured result.
 pub fn replay_loaded(replay: frame_trace_replay::Replay, save: Option<&Path>) -> Result<Loaded> {
     eprintln!(
-        "root check: PASS; RPC calls: {} (measured: {}); execution proof: {} bytes",
-        replay.rpc_count, replay.measured_rpc_count, replay.proof_bytes
+        "root check: {}; RPC calls: {} (measured: {}); execution proof: {} bytes",
+        if replay.root_check { "PASS" } else { "FAIL" },
+        replay.rpc_count,
+        replay.measured_rpc_count,
+        replay.proof_bytes
     );
     if let Some(dir) = save {
         replay.artifact.save(dir)?;
     }
+    eprintln!(
+        "state root: computed {:?}; header {:?}",
+        replay.computed_state_root, replay.expected_state_root
+    );
+    let metadata = match Metadata::from_hex(&replay.artifact.metadata) {
+        Ok(metadata) => Some(metadata),
+        Err(error) => {
+            eprintln!(
+                "warning: metadata decoding failed: {error}; continuing with undecoded names (names require metadata V14+)"
+            );
+            None
+        }
+    };
     Ok(Loaded {
         traced: frame_trace_model::TracedBlock::from_replay(&replay.capture)?,
-        metadata: Some(Metadata::from_hex(&replay.artifact.metadata)?),
+        metadata,
         block_number: Some(replay.block_number),
     })
 }

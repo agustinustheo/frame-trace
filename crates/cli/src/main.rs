@@ -8,6 +8,7 @@ use frame_trace_decode::{AnnotatedBlock, annotate};
 
 use frame_trace_otel::Timing;
 
+mod follow;
 mod source;
 mod summary;
 
@@ -24,7 +25,7 @@ enum Command {
     Block(BlockArgs),
     /// Print tables of storage use per phase and the busiest storage items.
     Summary(SummaryArgs),
-    /// Replay each new best block. Bounded queue and two replay workers.
+    /// Replay new best blocks with a bounded queue and shared caches.
     Follow(FollowArgs),
 }
 
@@ -32,8 +33,8 @@ enum Command {
 struct BlockArgs {
     #[command(flatten)]
     source: source::SourceArgs,
-    /// OTLP/HTTP endpoint to export the trace to, for example http://127.0.0.1:4318.
-    #[arg(long, value_name = "URL")]
+    /// OTLP/HTTP endpoint (bare --otlp uses http://127.0.0.1:4318).
+    #[arg(long, value_name = "URL", num_args = 0..=1, default_missing_value = "http://127.0.0.1:4318")]
     otlp: Option<String>,
     /// Write the decoded trace as JSON to this file (`-` for stdout).
     #[arg(long, value_name = "FILE")]
@@ -119,139 +120,23 @@ fn write_json(block: &AnnotatedBlock, path: &PathBuf) -> Result<()> {
     Ok(())
 }
 
+/// Follow best headers at replay speed, retrying failed blocks while they are retained.
 #[derive(Args)]
 struct FollowArgs {
+    /// Node HTTP(S) or WS(S) safe RPC endpoint.
     #[arg(long, value_name = "URL")]
     rpc: String,
+    /// OTLP/HTTP endpoint (bare --otlp uses http://127.0.0.1:4318).
     #[arg(long, value_name = "URL", num_args = 0..=1, default_missing_value = "http://127.0.0.1:4318")]
     otlp: Option<String>,
+    /// Maximum concurrent proof requests; each request batches up to 32 keys.
+    #[arg(long, default_value_t = 8, value_parser = clap::value_parser!(u8).range(1..=64))]
+    proof_concurrency: u8,
+    /// Persistent proof-node and compiled Wasm cache directory.
+    #[arg(long, value_name = "DIR")]
+    cache_dir: Option<PathBuf>,
 }
 
 fn follow(args: FollowArgs) -> Result<()> {
-    use std::{
-        collections::VecDeque,
-        sync::{
-            Arc, Mutex,
-            atomic::{AtomicBool, Ordering},
-            mpsc,
-        },
-        thread,
-        time::Duration,
-    };
-    let running = Arc::new(AtomicBool::new(true));
-    let signal = running.clone();
-    ctrlc::set_handler(move || signal.store(false, Ordering::SeqCst))?;
-    let (send, receive) = mpsc::sync_channel::<String>(8);
-    let receive = Arc::new(Mutex::new(receive));
-    let workers: Vec<_> = (0..2)
-        .map(|_| {
-            let receive = receive.clone();
-            let url = args.rpc.clone();
-            let otlp = args.otlp.clone();
-            let running = running.clone();
-            thread::spawn(move || {
-                loop {
-                    if !running.load(Ordering::SeqCst) {
-                        break;
-                    }
-                    let hash = match receive.lock() {
-                        Ok(rx) => match rx.recv() {
-                            Ok(hash) => hash,
-                            Err(_) => break,
-                        },
-                        Err(_) => break,
-                    };
-                    let result = (|| -> Result<()> {
-                        let rpc = frame_trace_replay::rpc::Rpc::new(&url)?;
-                        let loaded =
-                            source::replay_loaded(frame_trace_replay::online(&rpc, &hash)?, None)?;
-                        let mut block = annotate(&loaded.traced, loaded.metadata.as_ref());
-                        block.block_number = loaded.block_number;
-                        if let Some(endpoint) = &otlp {
-                            frame_trace_otel::export_otlp(&block, endpoint, Timing::default())?;
-                        }
-                        eprintln!(
-                            "traced best block #{} {}: {} ops",
-                            loaded.block_number.unwrap_or(0),
-                            hash,
-                            block.totals.ops
-                        );
-                        Ok(())
-                    })();
-                    if let Err(error) = result {
-                        eprintln!("skipped block {hash}: {error:#}");
-                    }
-                }
-            })
-        })
-        .collect();
-    // Poll the allowlisted chain_getHeader instead of using a subscription RPC outside the
-    // replay allowlist. Walk new ancestry to cover blocks between polls and report best reorgs.
-    let mut rpc = None;
-    let mut seen = VecDeque::new();
-    while running.load(Ordering::SeqCst) {
-        let result = (|| -> Result<()> {
-            if rpc.is_none() {
-                rpc = Some(frame_trace_replay::rpc::Rpc::new(&args.rpc)?);
-            }
-            let client = rpc.as_ref().context("RPC connection unavailable")?;
-            let mut header = client.call("chain_getHeader", serde_json::json!([]))?;
-            let mut hash = frame_trace_replay::header_hash(&header)?;
-            let mut pending = Vec::new();
-            for _ in 0..64 {
-                if seen.contains(&hash) {
-                    break;
-                }
-                pending.push(hash.clone());
-                if seen.is_empty() {
-                    break;
-                }
-                let parent = header["parentHash"]
-                    .as_str()
-                    .context("parent hash missing")?
-                    .to_owned();
-                if seen.contains(&parent) {
-                    break;
-                }
-                hash = parent;
-                header = client.call("chain_getHeader", serde_json::json!([hash]))?;
-            }
-            if pending.len() == 64 {
-                eprintln!("follow ancestry exceeded 64 blocks; older blocks skipped");
-            }
-            for hash in pending.into_iter().rev() {
-                match send.try_send(hash.clone()) {
-                    Ok(()) => {}
-                    Err(mpsc::TrySendError::Full(_)) => {
-                        eprintln!("skipped block {hash}: replay queue full")
-                    }
-                    Err(mpsc::TrySendError::Disconnected(_)) => {
-                        anyhow::bail!("replay workers stopped")
-                    }
-                }
-                seen.push_back(hash);
-                if seen.len() > 256 {
-                    seen.pop_front();
-                }
-            }
-            Ok(())
-        })();
-        if let Err(error) = result {
-            eprintln!("follow poll failed: {error:#}; reconnecting");
-            rpc = None;
-        }
-        for _ in 0..20 {
-            if !running.load(Ordering::SeqCst) {
-                break;
-            }
-            thread::sleep(Duration::from_millis(100));
-        }
-    }
-    drop(send);
-    for worker in workers {
-        worker
-            .join()
-            .map_err(|_| anyhow::anyhow!("replay worker panicked"))?;
-    }
-    Ok(())
+    follow::run(args)
 }

@@ -1,4 +1,7 @@
 //! Faithful block replay using safe RPC and SDK authenticated trie execution.
+mod artifact;
+mod session;
+pub use session::ReplaySession;
 mod backend;
 mod capture;
 mod proof;
@@ -24,11 +27,7 @@ use sp_runtime::{
 };
 use sp_state_machine::{Backend, OverlayedChanges, StateMachine};
 use sp_trie::{proof_size_extension::ProofSizeExt, recorder::Recorder};
-use std::{
-    fs,
-    path::Path,
-    sync::{OnceLock, atomic::Ordering},
-};
+use std::{path::Path, sync::atomic::Ordering};
 
 #[cfg(test)]
 mod conformance;
@@ -77,25 +76,8 @@ pub struct Artifact {
     pub proof_nodes: Vec<String>,
 }
 impl Artifact {
-    pub fn load(dir: &Path) -> Result<Self> {
-        let bytes = zstd::stream::decode_all(fs::File::open(dir.join("artifact.json.zst"))?)?;
-        let artifact: Self = serde_json::from_slice(&bytes)?;
-        artifact.validate()?;
-        Ok(artifact)
-    }
-    pub fn save(&self, dir: &Path) -> Result<()> {
-        self.validate()?;
-        fs::create_dir_all(dir)?;
-        let bytes = zstd::stream::encode_all(serde_json::to_vec(self)?.as_slice(), 9)?;
-        // Write a complete file before replacing the artifact.
-        fs::write(dir.join("artifact.json.zst.tmp"), bytes)?;
-        fs::rename(
-            dir.join("artifact.json.zst.tmp"),
-            dir.join("artifact.json.zst"),
-        )?;
-        Ok(())
-    }
     fn validate(&self) -> Result<(Block, Header)> {
+        self.check_limits()?;
         if self.format_version != 1 {
             return Err(Error::Invalid(format!(
                 "unsupported artifact version {}",
@@ -120,6 +102,8 @@ pub struct Replay {
     pub capture: ReplayCapture,
     pub block_number: u64,
     pub root_check: bool,
+    pub computed_state_root: H256,
+    pub expected_state_root: H256,
     pub rpc_count: usize,
     pub measured_rpc_count: usize,
     pub proof_bytes: usize,
@@ -128,6 +112,10 @@ pub struct Replay {
 
 /// Fetch a number, hash, or `best` block. Context and proofs are pinned to its parent.
 pub fn online(rpc: &Rpc, selector: &str) -> Result<Replay> {
+    online_with_session(rpc, selector, ReplaySession::shared()?)
+}
+
+pub fn online_with_session(rpc: &Rpc, selector: &str, session: &ReplaySession) -> Result<Replay> {
     let initial_calls = rpc.count();
     let hash = if selector == "best" {
         None
@@ -141,15 +129,24 @@ pub fn online(rpc: &Rpc, selector: &str) -> Result<Replay> {
         let number: u32 = selector
             .parse()
             .map_err(|e| Error::Invalid(format!("block number: {e}")))?;
-        Some(serde_json::from_value::<H256>(
-            rpc.call("chain_getBlockHash", json!([number]))?,
-        )?)
+        let value = rpc.call("chain_getBlockHash", json!([number]))?;
+        if value.is_null() {
+            return Err(Error::Invalid(format!("block {selector} not found")));
+        }
+        Some(
+            serde_json::from_value::<H256>(value)
+                .map_err(|e| Error::Rpc(format!("chain_getBlockHash: malformed response: {e}")))?,
+        )
     };
     let response = rpc.call(
         "chain_getBlock",
         hash.map_or_else(|| json!([]), |h| json!([h])),
     )?;
-    let block: Block = serde_json::from_value(response["block"].clone())?;
+    if response.is_null() || response.get("block").is_some_and(Value::is_null) {
+        return Err(Error::Invalid(format!("block {selector} not found")));
+    }
+    let block: Block = serde_json::from_value(response["block"].clone())
+        .map_err(|e| Error::Rpc(format!("chain_getBlock: malformed response: {e}")))?;
     if hash.is_some_and(|h| block.header.hash() != h) {
         return Err(Error::Invalid(
             "block header hash does not match request".into(),
@@ -162,24 +159,36 @@ pub fn online(rpc: &Rpc, selector: &str) -> Result<Replay> {
         block: response["block"].clone(),
         parent_header: rpc.call("chain_getHeader", json!([parent_hash]))?,
         runtime_version: rpc.call("state_getRuntimeVersion", json!([parent_hash]))?,
-        metadata: rpc
-            .call("state_getMetadata", json!([parent_hash]))?
-            .as_str()
-            .ok_or_else(|| Error::Invalid("metadata is not hex".into()))?
-            .to_owned(),
+        metadata: match rpc.call("state_getMetadata", json!([parent_hash])) {
+            Ok(value) if value.is_string() => value.as_str().unwrap_or_default().to_owned(),
+            other => {
+                eprintln!(
+                    "warning: metadata unavailable: {other:?}; continuing with undecoded names"
+                );
+                String::new()
+            }
+        },
         proof_nodes: Vec::new(),
     };
-    let mut replay = replay(artifact, Some(rpc.clone()))?;
+    let mut replay = replay_with_session(artifact, Some(rpc.clone()), session)?;
     replay.rpc_count = rpc.count().saturating_sub(initial_calls);
     Ok(replay)
 }
 
 pub fn offline(dir: &Path) -> Result<Replay> {
     replay(Artifact::load(dir)?, None)
+        .map_err(|e| artifact::context(&dir.join("artifact.json.zst"), e))
 }
 
 /// Also accepts in-memory artifacts for callers that store them themselves.
-pub fn replay(mut artifact: Artifact, rpc: Option<Rpc>) -> Result<Replay> {
+pub fn replay(artifact: Artifact, rpc: Option<Rpc>) -> Result<Replay> {
+    replay_with_session(artifact, rpc, ReplaySession::shared()?)
+}
+pub fn replay_with_session(
+    mut artifact: Artifact,
+    rpc: Option<Rpc>,
+    session: &ReplaySession,
+) -> Result<Replay> {
     let (mut block, parent) = artifact.validate()?;
     let number = u64::from(*block.header.number());
     let root = *parent.state_root();
@@ -188,7 +197,7 @@ pub fn replay(mut artifact: Artifact, rpc: Option<Rpc>) -> Result<Replay> {
         .digest_mut()
         .logs
         .retain(|d| !matches!(d, generic::DigestItem::Seal(_, _)));
-    let db = ProofDb::new(rpc.clone(), parent.hash());
+    let db = ProofDb::with_session(rpc.clone(), parent.hash(), session.clone());
     db.insert_nodes(
         artifact
             .proof_nodes
@@ -196,7 +205,7 @@ pub fn replay(mut artifact: Artifact, rpc: Option<Rpc>) -> Result<Replay> {
             .map(|s| unhex(s))
             .collect::<Result<Vec<_>>>()?,
     );
-    if rpc.is_some() && artifact.proof_nodes.is_empty() {
+    if rpc.is_some() && artifact.proof_nodes.is_empty() && session.nodes.lock().nodes.is_empty() {
         db.fetch(None, &[b":code".to_vec(), b":heappages".to_vec()])?;
     }
     let initial =
@@ -204,21 +213,41 @@ pub fn replay(mut artifact: Artifact, rpc: Option<Rpc>) -> Result<Replay> {
     // Complete-key hints acquire :code and :heappages in at most one call each.
     let wasm = proof::with_key_hint(b":code", || initial.storage(b":code"))
         .map_err(|e| Error::Invalid(db.failure.lock().take().unwrap_or(e)))?
-        .ok_or_else(|| {
-            Error::Invalid("no authenticated parent :code; state may be pruned".into())
-        })?;
+        .ok_or_else(|| Error::Invalid("no authenticated parent :code".into()))?;
     let heap_pages = proof::with_key_hint(b":heappages", || initial.storage(b":heappages"))
         .map_err(|e| Error::Invalid(db.failure.lock().take().unwrap_or(e)))?
         .map(|b| u64::decode(&mut &b[..]).map_err(|e| Error::Invalid(format!(":heappages: {e}"))))
         .transpose()?;
-    // Reuse compiled modules across follow blocks. Trie overlays and recorders remain fresh.
-    static EXECUTOR: OnceLock<Executor> = OnceLock::new();
-    let executor = EXECUTOR.get_or_init(|| {
-        Executor::builder()
-            .with_max_runtime_instances(2)
-            .with_allow_missing_host_functions(false)
-            .build()
-    });
+    let executor = &session.executor;
+    if rpc.is_some() {
+        eprintln!(
+            "replay #{number}: acquiring proofs ({} in flight, batched keys)",
+            rpc.as_ref().map_or(1, Rpc::parallelism)
+        );
+        let mut hints = session.hints.lock().clone();
+        hints.extend(storage_hints(&artifact.metadata));
+        db.prefetch(&hints.into_iter().collect::<Vec<_>>())?;
+    }
+    eprintln!("replay #{number}: compiling/loading runtime and discovering state");
+    if rpc.is_some() && session.speculative_discovery {
+        db.speculative.store(true, Ordering::SeqCst);
+        for _ in 0..8 {
+            let _ = execute(
+                &db,
+                root,
+                &wasm,
+                heap_pages,
+                executor,
+                &block,
+                &Capture::new(),
+            );
+            if !db.acquire_pending()? {
+                break;
+            }
+        }
+        db.speculative.store(false, Ordering::SeqCst);
+        db.failure.lock().take();
+    }
     execute(
         &db,
         root,
@@ -229,27 +258,28 @@ pub fn replay(mut artifact: Artifact, rpc: Option<Rpc>) -> Result<Replay> {
         &Capture::new(),
     )?;
     db.online.store(false, Ordering::SeqCst);
-    let before = rpc.as_ref().map_or(0, Rpc::count);
     let capture = Capture::new();
-    let proof_bytes = execute(&db, root, &wasm, heap_pages, executor, &block, &capture)?;
+    let (proof_bytes, computed_state_root) = without_rpc(rpc.as_ref(), || {
+        execute(&db, root, &wasm, heap_pages, executor, &block, &capture)
+    })?;
     let rpc_count = rpc.as_ref().map_or(0, Rpc::count);
-    if rpc_count != before {
-        return Err(Error::Invalid("measured run used RPC".into()));
-    }
     let d = capture.0.lock();
     let capture = ReplayCapture {
         block_hash: format!("{:?}", artifact.block_hash),
         parent_hash: format!("{:?}", parent.hash()),
-        events: serde_json::from_value(serde_json::to_value(&d.events)?)?,
-        spans: serde_json::from_value(serde_json::to_value(&d.spans)?)?,
+        events: d.events.clone(),
+        spans: d.spans.iter().map(capture::Span::to_model).collect(),
         transitions: d.transitions.clone(),
         duration_ns: d.spans.iter().filter_map(|s| s.end_ns).max().unwrap_or(0),
     };
+    db.persist()?;
     artifact.proof_nodes = db.export();
     Ok(Replay {
         capture,
         block_number: number,
-        root_check: true,
+        root_check: computed_state_root == *block.header.state_root(),
+        computed_state_root,
+        expected_state_root: *block.header.state_root(),
         rpc_count,
         measured_rpc_count: 0,
         proof_bytes,
@@ -266,7 +296,8 @@ fn execute(
     executor: &Executor,
     block: &Block,
     capture: &Capture,
-) -> Result<usize> {
+) -> Result<(usize, H256)> {
+    let _abort_guard = sp_panic_handler::AbortGuard::never_abort();
     let recorder = Recorder::<Blake2Hasher>::default();
     capture.0.lock().recorder = Some(recorder.clone());
     let backend = TracedBackend::new(db.clone(), root, recorder.clone());
@@ -280,31 +311,105 @@ fn execute(
         hash: sp_io::hashing::blake2_256(wasm).to_vec(),
     };
     let dispatch = tracing::Dispatch::new(capture.clone());
-    let result = tracing::dispatcher::with_default(&dispatch, || {
-        let span = tracing::info_span!(target: "frame_trace_replay", "replay");
-        let _entered = span.enter();
-        StateMachine::new(
-            &backend,
-            &mut overlay,
-            executor,
-            "Core_execute_block",
-            &block.encode(),
-            &mut extensions,
-            &code,
-            CallContext::Onchain { import: true },
-        )
-        .set_parent_hash(*block.header.parent_hash())
-        .execute()
-    });
+    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        tracing::dispatcher::with_default(&dispatch, || {
+            let span = tracing::info_span!(target: "frame_trace_replay", "replay");
+            let _entered = span.enter();
+            StateMachine::new(
+                &backend,
+                &mut overlay,
+                executor,
+                "Core_execute_block",
+                &block.encode(),
+                &mut extensions,
+                &code,
+                CallContext::Onchain { import: true },
+            )
+            .set_parent_hash(*block.header.parent_hash())
+            .execute()
+        })
+    }));
     if let Some(failure) = db.failure.lock().take() {
         return Err(Error::Invalid(failure));
     }
-    result.map_err(|e| Error::Execution(e.to_string()))?;
-    Ok(recorder.estimate_encoded_size())
+    result
+        .map_err(|e| {
+            Error::Execution(
+                e.downcast_ref::<String>()
+                    .cloned()
+                    .or_else(|| e.downcast_ref::<&str>().map(|s| (*s).to_owned()))
+                    .unwrap_or_else(|| "executor panicked".into()),
+            )
+        })?
+        .map_err(|e| Error::Execution(e.to_string()))?;
+    let computed = capture
+        .0
+        .lock()
+        .events
+        .iter()
+        .rev()
+        .find(|e| e.target == "state" && e.fields.get("method").is_some_and(|s| s == "StorageRoot"))
+        .and_then(|e| e.fields.get("storage_root"))
+        .and_then(|s| {
+            format!("0x{}", s.trim_start_matches("0x"))
+                .parse::<H256>()
+                .ok()
+        })
+        .ok_or_else(|| Error::Execution("runtime did not report a computed state root".into()))?;
+    if computed != *block.header.state_root() {
+        return Err(Error::Execution(format!(
+            "state root mismatch: computed {computed:?}, header {:?}",
+            block.header.state_root()
+        )));
+    }
+    Ok((recorder.estimate_encoded_size(), computed))
 }
 
 /// Hash a fetched SDK header directly, so best-head polling cannot race a separate number lookup.
 pub fn header_hash(header: &Value) -> Result<String> {
     let header: Header = serde_json::from_value(header.clone())?;
     Ok(format!("{:?}", header.hash()))
+}
+
+fn without_rpc<T>(rpc: Option<&Rpc>, run: impl FnOnce() -> Result<T>) -> Result<T> {
+    let before = rpc.map_or(0, Rpc::count);
+    let result = run();
+    if rpc.map_or(0, Rpc::count) != before {
+        return Err(Error::Invalid("measured run used RPC".into()));
+    }
+    result
+}
+
+/// Metadata is only a source of speculative key hints; authentication always comes from trie traversal.
+fn storage_hints(metadata: &str) -> Vec<Vec<u8>> {
+    use frame_metadata::{RuntimeMetadata, RuntimeMetadataPrefixed};
+    let Ok(bytes) = unhex(metadata) else {
+        return Vec::new();
+    };
+    let Ok(RuntimeMetadataPrefixed(_, metadata)) = RuntimeMetadataPrefixed::decode(&mut &bytes[..])
+    else {
+        return Vec::new();
+    };
+    let mut keys = Vec::new();
+    macro_rules! hints {
+        ($md:expr) => {
+            for pallet in $md.pallets {
+                if let Some(storage) = pallet.storage {
+                    for entry in storage.entries {
+                        let mut key =
+                            sp_crypto_hashing::twox_128(storage.prefix.as_bytes()).to_vec();
+                        key.extend(sp_crypto_hashing::twox_128(entry.name.as_bytes()));
+                        keys.push(key);
+                    }
+                }
+            }
+        };
+    }
+    match metadata {
+        RuntimeMetadata::V14(md) => hints!(md),
+        RuntimeMetadata::V15(md) => hints!(md),
+        RuntimeMetadata::V16(md) => hints!(md),
+        _ => {}
+    }
+    keys
 }

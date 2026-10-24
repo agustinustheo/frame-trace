@@ -12,7 +12,7 @@ use std::{
 
 type Requests = Arc<Mutex<Vec<Value>>>;
 fn server(
-    handler: impl Fn(&Value) -> Value + Send + 'static,
+    handler: impl Fn(&Value) -> Value + Send + Sync + 'static,
 ) -> (Rpc, Requests, Arc<AtomicBool>, thread::JoinHandle<()>) {
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     listener.set_nonblocking(true).unwrap();
@@ -21,7 +21,9 @@ fn server(
     let captured = requests.clone();
     let stop = Arc::new(AtomicBool::new(false));
     let stopped = stop.clone();
+    let handler = Arc::new(handler);
     let worker = thread::spawn(move || {
+        let mut workers = Vec::new();
         while !stopped.load(Ordering::SeqCst) {
             let (mut stream, _) = match listener.accept() {
                 Ok(s) => s,
@@ -31,39 +33,46 @@ fn server(
                 }
                 Err(e) => panic!("accept: {e}"),
             };
-            // Accepted sockets inherit O_NONBLOCK on macOS. Use blocking request/response I/O.
-            stream.set_nonblocking(false).unwrap();
-            stream
-                .set_read_timeout(Some(std::time::Duration::from_secs(10)))
-                .unwrap();
-            stream
-                .set_write_timeout(Some(std::time::Duration::from_secs(10)))
-                .unwrap();
-            let mut reader = BufReader::new(stream.try_clone().unwrap());
-            let mut len = 0;
-            loop {
-                let mut line = String::new();
-                reader.read_line(&mut line).unwrap();
-                if line == "\r\n" {
-                    break;
+            let handler = handler.clone();
+            let captured = captured.clone();
+            workers.push(thread::spawn(move || {
+                // Accepted sockets inherit O_NONBLOCK on macOS. Use blocking request/response I/O.
+                stream.set_nonblocking(false).unwrap();
+                stream
+                    .set_read_timeout(Some(std::time::Duration::from_secs(10)))
+                    .unwrap();
+                stream
+                    .set_write_timeout(Some(std::time::Duration::from_secs(10)))
+                    .unwrap();
+                let mut reader = BufReader::new(stream.try_clone().unwrap());
+                let mut len = 0;
+                loop {
+                    let mut line = String::new();
+                    reader.read_line(&mut line).unwrap();
+                    if line == "\r\n" {
+                        break;
+                    }
+                    if let Some(value) = line.to_lowercase().strip_prefix("content-length:") {
+                        len = value.trim().parse().unwrap();
+                    }
                 }
-                if let Some(value) = line.to_lowercase().strip_prefix("content-length:") {
-                    len = value.trim().parse().unwrap();
-                }
-            }
-            let mut bytes = vec![0; len];
-            reader.read_exact(&mut bytes).unwrap();
-            let request: Value = serde_json::from_slice(&bytes).unwrap();
-            captured.lock().unwrap().push(request.clone());
-            let result = handler(&request);
-            let body = json!({"jsonrpc":"2.0","id":request["id"],"result":result}).to_string();
-            write!(
-                stream,
-                "HTTP/1.1 200 OK\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}",
-                body.len(),
-                body
-            )
-            .unwrap();
+                let mut bytes = vec![0; len];
+                reader.read_exact(&mut bytes).unwrap();
+                let request: Value = serde_json::from_slice(&bytes).unwrap();
+                captured.lock().unwrap().push(request.clone());
+                let result = handler(&request);
+                let body = json!({"jsonrpc":"2.0","id":request["id"],"result":result}).to_string();
+                write!(
+                    stream,
+                    "HTTP/1.1 200 OK\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}",
+                    body.len(),
+                    body
+                )
+                .unwrap();
+            }));
+        }
+        for worker in workers {
+            worker.join().unwrap();
         }
     });
     (Rpc::new(&url).unwrap(), requests, stop, worker)
@@ -271,9 +280,16 @@ fn online_acquisition_pins_context_and_measures_with_zero_rpc() {
     let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/replay/people-transfer");
     let artifact = Artifact::load(&path).unwrap();
     let expected = artifact.clone();
+    let mut memory = sp_trie::MemoryDB::<Blake2Hasher>::default();
+    for node in &artifact.proof_nodes {
+        HashDB::insert(&mut memory, EMPTY_PREFIX, &unhex(node).unwrap());
+    }
+    let parent_header: Header = serde_json::from_value(artifact.parent_header.clone()).unwrap();
+    let trie =
+        sp_state_machine::TrieBackendBuilder::new(memory, *parent_header.state_root()).build();
     let parent = artifact.block["header"]["parentHash"].clone();
-    let (rpc, requests, halt, worker) =
-        server(move |request| match request["method"].as_str().unwrap() {
+    let (rpc, requests, halt, worker) = server(move |request| {
+        match request["method"].as_str().unwrap() {
             "chain_getBlockHash" => {
                 assert_eq!(request["params"], json!([2]));
                 json!(artifact.block_hash)
@@ -292,23 +308,246 @@ fn online_acquisition_pins_context_and_measures_with_zero_rpc() {
             }
             "state_getMetadata" => {
                 assert_eq!(request["params"], json!([parent]));
-                json!(artifact.metadata)
+                json!("") // No speculative hints: exercise real execution-driven demand paging.
             }
             "state_getReadProof" => {
                 assert_eq!(request["params"][1], parent);
-                json!({"at":parent,"proof":artifact.proof_nodes})
+                let keys: Vec<_> = request["params"][0]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|v| unhex(v.as_str().unwrap()).unwrap())
+                    .collect();
+                let proof = sp_state_machine::prove_read_on_trie_backend(&trie, &keys).unwrap();
+                json!({"at":parent,"proof":proof.into_iter_nodes().map(|n| rpc::hex0(&n)).collect::<Vec<_>>()})
             }
             method => panic!("unexpected RPC {method}"),
-        });
-    let result = online(&rpc, "2").unwrap();
+        }
+    });
+    let session = ReplaySession::new(None)
+        .unwrap()
+        .with_speculative_discovery(false);
+    let result = online_with_session(&rpc, "2", &session).unwrap();
     assert!(result.root_check);
     assert_eq!(result.measured_rpc_count, 0);
-    assert_eq!(result.rpc_count, 6);
-    assert_eq!(result.artifact.block_hash, expected.block_hash);
-    assert_eq!(
-        result.artifact.proof_nodes.len(),
-        expected.proof_nodes.len()
+    assert!(
+        result.rpc_count > 10,
+        "must demand page multiple requested paths"
     );
-    assert_eq!(requests.lock().unwrap().len(), 6);
+    assert_eq!(result.artifact.block_hash, expected.block_hash);
+    assert_eq!(requests.lock().unwrap().len(), result.rpc_count);
+    let offline = replay(result.artifact, None).unwrap();
+    assert_eq!(offline.expected_state_root, offline.computed_state_root);
+    stop(halt, worker);
+}
+
+#[test]
+fn measured_run_rpc_guard_detects_network_activity() {
+    let (rpc, requests, halt, worker) = server(|_| json!(null));
+    without_rpc(Some(&rpc), || Ok(())).unwrap();
+    let error = without_rpc(Some(&rpc), || rpc.call("chain_getHeader", json!([])))
+        .unwrap_err()
+        .to_string();
+    assert!(error.contains("measured run used RPC"), "{error}");
+    assert_eq!(requests.lock().unwrap().len(), 1);
+    stop(halt, worker);
+}
+
+#[test]
+fn proof_prefetch_batches_keys_and_bounds_parallel_requests() {
+    use std::sync::atomic::AtomicUsize;
+    let active = Arc::new(AtomicUsize::new(0));
+    let peak = Arc::new(AtomicUsize::new(0));
+    let (a, p) = (active.clone(), peak.clone());
+    let parent = H256::repeat_byte(11);
+    let (rpc, requests, halt, worker) = server(move |request| {
+        let n = a.fetch_add(1, Ordering::SeqCst) + 1;
+        p.fetch_max(n, Ordering::SeqCst);
+        assert!(request["params"][0].as_array().unwrap().len() <= 32);
+        thread::sleep(std::time::Duration::from_millis(50));
+        a.fetch_sub(1, Ordering::SeqCst);
+        json!({"at":parent,"proof":[]})
+    });
+    let db = ProofDb::new(Some(rpc), parent);
+    db.prefetch(
+        &(0u32..300)
+            .map(|n| n.to_le_bytes().to_vec())
+            .collect::<Vec<_>>(),
+    )
+    .unwrap();
+    assert_eq!(requests.lock().unwrap().len(), 10);
+    assert!((2..=8).contains(&peak.load(Ordering::SeqCst)));
+    stop(halt, worker);
+}
+
+#[test]
+fn shared_nodes_are_reauthenticated_at_each_blocks_root() {
+    let session = ReplaySession::new(None).unwrap();
+    let mut seed = sp_state_machine::TestExternalities::<Blake2Hasher>::default();
+    seed.execute_with(|| sp_io::storage::set(b"key", b"value"));
+    seed.commit_all().unwrap();
+    let (raw, root) = seed.into_raw_snapshot();
+    let nodes: Vec<_> = raw.into_iter().map(|(_, (node, _))| node).collect();
+    let rpc = Rpc::new("http://127.0.0.1:1").unwrap();
+    let first = ProofDb::with_session(Some(rpc.clone()), H256::repeat_byte(1), session.clone());
+    first.insert_nodes(nodes);
+    let second = ProofDb::with_session(Some(rpc.clone()), H256::repeat_byte(2), session);
+    let backend = TracedBackend::new(second, root, Recorder::default());
+    assert_eq!(backend.storage(b"key").unwrap(), Some(b"value".to_vec()));
+    assert_eq!(rpc.count(), 0);
+    // The same nodes cannot authenticate a different root.
+    let backend = TracedBackend::new(first.clone(), H256::repeat_byte(99), Recorder::default());
+    first.online.store(false, Ordering::SeqCst);
+    assert!(backend.storage(b"key").is_err());
+    assert!(
+        first
+            .failure
+            .lock()
+            .as_ref()
+            .unwrap()
+            .contains("missing/invalid")
+    );
+}
+
+#[test]
+fn unknown_host_import_error_names_the_import() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/replay/people-transfer");
+    let artifact = Artifact::load(&path).unwrap();
+    let (block, parent) = artifact.validate().unwrap();
+    let db = ProofDb::new(None, parent.hash());
+    db.insert_nodes(artifact.proof_nodes.iter().map(|s| unhex(s).unwrap()));
+    let wasm = wat::parse_str(
+        r#"(module
+        (import "env" "ext_frame_trace_unknown_version_1" (func))
+        (memory (export "memory") 1)
+        (global (export "__heap_base") i32 (i32.const 1024))
+        (func (export "Core_execute_block") (param i32 i32) (result i64) i64.const 0))"#,
+    )
+    .unwrap();
+    let session = ReplaySession::new(None).unwrap();
+    let error = execute(
+        &db,
+        *parent.state_root(),
+        &wasm,
+        None,
+        &session.executor,
+        &block,
+        &Capture::new(),
+    )
+    .unwrap_err()
+    .to_string();
+    assert!(
+        error.contains("ext_frame_trace_unknown_version_1"),
+        "{error}"
+    );
+}
+
+#[test]
+fn stalled_websocket_handshake_has_deadline_and_can_be_cancelled() {
+    use std::time::{Duration, Instant};
+    for cancelled in [false, true] {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("ws://{}", listener.local_addr().unwrap());
+        let token = rpc::CancellationToken::new();
+        let rpc = Rpc::with_options(&url, 1, Duration::from_millis(300), token.clone()).unwrap();
+        let node = thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            stream.set_nonblocking(false).unwrap();
+            let mut buffer = Vec::new();
+            let _ = stream.read_to_end(&mut buffer); // client dropping the cancelled future closes it
+        });
+        let cancellation = thread::spawn(move || {
+            if cancelled {
+                thread::sleep(Duration::from_millis(50));
+                token.cancel();
+            }
+        });
+        let start = Instant::now();
+        let error = rpc
+            .call("chain_getHeader", json!([]))
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains(if cancelled { "cancelled" } else { "deadline" }),
+            "{error}"
+        );
+        assert!(start.elapsed() < Duration::from_secs(1));
+        cancellation.join().unwrap();
+        node.join().unwrap();
+    }
+}
+
+#[test]
+fn persistent_node_cache_reuses_nodes_and_reports_corrupt_file_path() {
+    use sp_state_machine::TrieBackendStorage;
+    let dir = std::env::temp_dir().join(format!("frame-trace-node-cache-{}", std::process::id()));
+    let session = ReplaySession::new(Some(&dir)).unwrap();
+    let bytes = vec![1, 2, 3, 4];
+    let hash = H256::from(sp_io::hashing::blake2_256(&bytes));
+    let rpc = Rpc::new("http://127.0.0.1:1").unwrap();
+    let first = ProofDb::with_session(Some(rpc.clone()), H256::repeat_byte(1), session);
+    first.insert_nodes([bytes.clone()]);
+    first.persist().unwrap();
+    let second = ProofDb::with_session(
+        Some(rpc.clone()),
+        H256::repeat_byte(2),
+        ReplaySession::new(Some(&dir)).unwrap(),
+    );
+    assert_eq!(
+        TrieBackendStorage::get(&second, &hash, EMPTY_PREFIX).unwrap(),
+        Some(bytes)
+    );
+    assert_eq!(rpc.count(), 0);
+    let path = dir.join("nodes").join(format!("{hash:x}"));
+    std::fs::write(&path, b"corrupt").unwrap();
+    let third = ProofDb::with_session(
+        Some(rpc),
+        H256::repeat_byte(3),
+        ReplaySession::new(Some(&dir)).unwrap(),
+    );
+    let error = TrieBackendStorage::get(&third, &hash, EMPTY_PREFIX).unwrap_err();
+    assert!(error.contains(path.to_str().unwrap()) && error.contains("invalid"));
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn branch_proofs_batch_all_immediate_sibling_paths() {
+    let mut seed = sp_state_machine::TestExternalities::<Blake2Hasher>::default();
+    seed.execute_with(|| {
+        for key in 0u8..=255 {
+            sp_io::storage::set(&[key, 1], &[key; 80]);
+        }
+    });
+    seed.commit_all().unwrap();
+    let (raw, root) = seed.into_raw_snapshot();
+    let mut memory = sp_trie::MemoryDB::<Blake2Hasher>::default();
+    for (_, (node, _)) in raw {
+        HashDB::insert(&mut memory, EMPTY_PREFIX, &node);
+    }
+    let trie = sp_state_machine::TrieBackendBuilder::new(memory, root).build();
+    let parent = H256::repeat_byte(12);
+    let (rpc, requests, halt, worker) = server(move |request| {
+        let keys: Vec<_> = request["params"][0]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|v| unhex(v.as_str().unwrap()).unwrap())
+            .collect();
+        let proof = sp_state_machine::prove_read_on_trie_backend(&trie, &keys).unwrap();
+        json!({"at":parent,"proof":proof.into_iter_nodes().map(|n| rpc::hex0(&n)).collect::<Vec<_>>()})
+    });
+    let db = ProofDb::new(Some(rpc), parent);
+    sp_state_machine::TrieBackendStorage::get(&db, &root, EMPTY_PREFIX)
+        .unwrap()
+        .unwrap();
+    let requests = requests.lock().unwrap();
+    let keys = requests[0]["params"][0].as_array().unwrap();
+    assert_eq!(keys.len(), 17);
+    for nibble in 0..16 {
+        assert!(keys.contains(&json!(rpc::hex0(&[nibble << 4]))));
+    }
+    assert_eq!(proof::sibling_paths(&[0xa0], true).len(), 16);
+    assert!(proof::sibling_paths(&[0xa0], true).contains(&vec![0xaf]));
+    drop(requests);
     stop(halt, worker);
 }

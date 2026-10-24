@@ -16,6 +16,7 @@ opentelemetry-otlp.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+frame-trace-replay.workspace = true
 opentelemetry_sdk = { workspace = true, features = ["testing"] }
 
 [lints]

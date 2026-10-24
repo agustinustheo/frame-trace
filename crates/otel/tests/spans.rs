@@ -351,7 +351,7 @@ fn measured_intervals_and_runtime_parent_tree() {
     let dispatch = by_name(&spans, "dispatch");
     assert_eq!(
         dispatch.parent_span_id,
-        by_name(&spans, "execute_block").span_context.span_id()
+        by_name(&spans, "unsegmented").span_context.span_id()
     );
     let op = by_name(&spans, "get <unknown>");
     assert_eq!(op.parent_span_id, dispatch.span_context.span_id());
@@ -368,4 +368,131 @@ fn measured_intervals_and_runtime_parent_tree() {
         by_name(&spans, "get <unknown>").parent_span_id,
         by_name(&spans, "unsegmented").span_context.span_id()
     );
+}
+
+#[test]
+fn traced_batch_keeps_named_extrinsic_runtime_and_ops_in_one_tree() {
+    let replay = frame_trace_replay::offline(
+        &std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/replay/people-traced"),
+    )
+    .unwrap();
+    let metadata = Metadata::from_hex(&replay.artifact.metadata).unwrap();
+    let block = annotate(
+        &TracedBlock::from_replay(&replay.capture).unwrap(),
+        Some(&metadata),
+    );
+    let spans = export(&block, Timing::default());
+    let ids: std::collections::HashMap<_, _> = spans
+        .iter()
+        .map(|s| (s.span_context.span_id(), s))
+        .collect();
+    let phase = spans
+        .iter()
+        .find(|s| s.name.contains("Utility.batch") && s.name.starts_with("extrinsic"))
+        .unwrap();
+    assert!(attr(phase, "frame.storage.ops").is_some());
+    let batch = by_name(&spans, "batch");
+    let mut current = batch;
+    let mut found = false;
+    for _ in 0..spans.len() {
+        if current.span_context.span_id() == phase.span_context.span_id() {
+            found = true;
+            break;
+        }
+        current = ids.get(&current.parent_span_id).unwrap();
+    }
+    assert!(
+        found,
+        "batch must descend from the named Utility.batch phase"
+    );
+    assert!(
+        spans.iter().any(|s| attr(s, "db.operation.name").is_some()
+            && s.parent_span_id == batch.span_context.span_id())
+            || spans.iter().any(|s| s.name.contains("transfer_keep_alive")
+                && s.parent_span_id == batch.span_context.span_id())
+    );
+    for span in &spans {
+        if attr(span, "frame.proof.marginal_bytes").is_some() {
+            assert_eq!(span.name, "apply_extrinsic");
+        }
+        if span.name == "apply_extrinsic" {
+            let parent = ids[&span.parent_span_id];
+            assert_eq!(attr(parent, "frame.phase"), Some("apply_extrinsic".into()));
+            assert!(
+                spans
+                    .iter()
+                    .any(|s| s.parent_span_id == span.span_context.span_id())
+            );
+        }
+    }
+    for phase in block.phases.iter().filter(|p| p.extrinsic_index.is_some()) {
+        let exported = by_name(&spans, &phase.label);
+        assert!(
+            spans
+                .iter()
+                .any(|s| s.parent_span_id == exported.span_context.span_id())
+        );
+    }
+}
+
+#[test]
+fn measured_hooks_descend_from_the_corresponding_phase() {
+    use frame_trace_model::{MeasuredTiming, RuntimeSpan};
+    let mut block = synthetic_block(1);
+    block.timing = Some(MeasuredTiming {
+        start_ns: 0,
+        duration_ns: 100,
+    });
+    let original = block.phases[0].clone();
+    block.phases = ["initialization", "finalization"]
+        .iter()
+        .enumerate()
+        .map(|(i, kind)| {
+            let mut phase = original.clone();
+            phase.kind = kind;
+            phase.label = (*kind).into();
+            phase.ops[0].parent_span = Some(i as u64 + 1);
+            phase.ops[0].timing = Some(MeasuredTiming {
+                start_ns: i as u64 * 50 + 5,
+                duration_ns: 10,
+            });
+            phase
+        })
+        .collect();
+    block.runtime_spans = ["on_initialize", "on_finalize"]
+        .iter()
+        .enumerate()
+        .map(|(i, name)| RuntimeSpan {
+            id: i as u64 + 1,
+            parent_id: None,
+            name: (*name).into(),
+            target: "runtime".into(),
+            wasm: true,
+            fields: Default::default(),
+            start_ns: i as u64 * 50,
+            end_ns: Some(i as u64 * 50 + 40),
+            duration_ns: 40,
+            enters: 1,
+            proof_start_bytes: 0,
+            proof_end_bytes: 5,
+        })
+        .collect();
+    let spans = export(&block, Timing::default());
+    for (name, phase) in [
+        ("on_initialize", "initialization"),
+        ("on_finalize", "finalization"),
+    ] {
+        let hook = by_name(&spans, name);
+        assert_eq!(
+            hook.parent_span_id,
+            by_name(&spans, phase).span_context.span_id()
+        );
+        assert!(
+            spans
+                .iter()
+                .any(|s| s.parent_span_id == hook.span_context.span_id())
+        );
+        assert!(attr(hook, "frame.proof.marginal_bytes").is_none());
+    }
 }

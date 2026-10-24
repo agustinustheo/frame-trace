@@ -17,6 +17,7 @@ use std::time::Instant;
 type Trie = TrieBackend<ProofDb, H>;
 pub struct TracedBackend {
     pub trie: Trie,
+    db: ProofDb,
 }
 impl std::fmt::Debug for TracedBackend {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -26,6 +27,7 @@ impl std::fmt::Debug for TracedBackend {
 impl TracedBackend {
     pub fn new(db: ProofDb, root: H256, recorder: Recorder<H>) -> Self {
         Self {
+            db: db.clone(),
             trie: TrieBackendBuilder::new(db, root)
                 .with_recorder(recorder)
                 .build(),
@@ -47,7 +49,11 @@ impl StorageIterator<H> for Iter {
         };
         tracing::trace!(target: "frame_trace_backend", method = "BackendIterNextKey",
             result = ?result, child_info = %self.child.as_ref().map(|c| hex0(c.storage_key())).unwrap_or_default(), duration_ns = start.elapsed().as_nanos() as u64);
-        result
+        if b.db.speculative.load(std::sync::atomic::Ordering::SeqCst) {
+            result.filter(Result::is_ok)
+        } else {
+            result
+        }
     }
     fn next_pair(&mut self, b: &TracedBackend) -> Option<Result<(Vec<u8>, Vec<u8>), String>> {
         let start = Instant::now();
@@ -56,7 +62,11 @@ impl StorageIterator<H> for Iter {
             None => self.inner.next_pair(&b.trie),
         };
         tracing::trace!(target: "frame_trace_backend", method = "BackendIterNextPair", child_info = %self.child.as_ref().map(|c| hex0(c.storage_key())).unwrap_or_default(), duration_ns = start.elapsed().as_nanos() as u64);
-        result
+        if b.db.speculative.load(std::sync::atomic::Ordering::SeqCst) {
+            result.filter(Result::is_ok)
+        } else {
+            result
+        }
     }
     fn was_complete(&self) -> bool {
         self.inner.was_complete()
@@ -68,13 +78,19 @@ impl Backend<H> for TracedBackend {
     type TrieBackendStorage = ProofDb;
     type RawIter = Iter;
     fn storage(&self, k: &[u8]) -> Result<Option<Vec<u8>>, String> {
-        with_key_hint(k, || self.trie.storage(k))
+        self.db.remember_key(k);
+        self.db
+            .speculative_value(with_key_hint(k, || self.trie.storage(k)))
     }
     fn storage_hash(&self, k: &[u8]) -> Result<Option<H256>, String> {
-        with_key_hint(k, || self.trie.storage_hash(k))
+        self.db.remember_key(k);
+        self.db
+            .speculative_value(with_key_hint(k, || self.trie.storage_hash(k)))
     }
     fn closest_merkle_value(&self, k: &[u8]) -> Result<Option<MerkleValue<H256>>, String> {
-        with_key_hint(k, || self.trie.closest_merkle_value(k))
+        self.db.remember_key(k);
+        self.db
+            .speculative_value(with_key_hint(k, || self.trie.closest_merkle_value(k)))
     }
     fn child_closest_merkle_value(
         &self,
@@ -101,7 +117,7 @@ impl Backend<H> for TracedBackend {
         let result = self.trie.next_storage_key(k);
         tracing::trace!(target: "frame_trace_backend", method = "BackendNextKey", key = %hex0(k),
             result = ?result.as_ref().map(|k| k.as_deref().map(hex0)), duration_ns = start.elapsed().as_nanos() as u64);
-        result
+        self.db.speculative_value(result)
     }
     fn next_child_storage_key(&self, c: &ChildInfo, k: &[u8]) -> Result<Option<Vec<u8>>, String> {
         let start = Instant::now();
@@ -109,7 +125,7 @@ impl Backend<H> for TracedBackend {
         let result = with_child(c, || self.trie.next_child_storage_key(c, k));
         tracing::trace!(target: "frame_trace_backend", method = "BackendChildNextKey", key = %hex0(k),
             child_info = %hex0(c.storage_key()), result = ?result, duration_ns = start.elapsed().as_nanos() as u64);
-        result
+        self.db.speculative_value(result)
     }
     fn raw_iter(&self, args: IterArgs) -> Result<Iter, String> {
         let child = args.child_info.clone();

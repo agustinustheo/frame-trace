@@ -87,11 +87,13 @@ impl TracedBlock {
             ..Default::default()
         };
         let mut block = Self::from_trace(&trace)?;
+        let spans: std::collections::HashMap<_, _> =
+            capture.spans.iter().map(|s| (s.id, s)).collect();
         for op in &mut block.ops {
             let event = &capture.events[op.event_index];
             let host = event
                 .parent_id
-                .and_then(|id| capture.spans.iter().find(|s| s.id == id))
+                .and_then(|id| spans.get(&id).copied())
                 .filter(|s| event.target == "state" && s.target.starts_with("sp_io::"));
             // Ext emits its event at the END of a host call. Native host spans give the full
             // interval even for runtimes built without Wasm tracing. Backend durations describe
