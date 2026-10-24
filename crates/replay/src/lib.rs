@@ -61,9 +61,11 @@ pub enum Error {
     #[error("invalid replay input: {0}")]
     Invalid(String),
     #[error(
-        "runtime execution failed (root mismatch, unsupported host function, or invalid block/call): {0}"
+        "runtime execution failed (root mismatch, unsupported host function, or invalid block): {0}"
     )]
     Execution(String),
+    #[error("runtime rejected the call input: {0}")]
+    CallExecution(String),
     #[error("artifact I/O: {0}")]
     Io(#[from] std::io::Error),
     #[error("artifact JSON: {0}")]
@@ -448,9 +450,22 @@ fn execute_method(
     if let Some(failure) = db.failure.lock().take() {
         return Err(db.take_error(failure));
     }
+    let execution_error = |text: String| {
+        if method == "Core_execute_block" {
+            Error::Execution(text)
+        } else {
+            Error::CallExecution(
+                text.lines()
+                    .take_while(|l| !l.to_ascii_lowercase().contains("backtrace"))
+                    .take_while(|l| !l.trim_start().starts_with("0:"))
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            )
+        }
+    };
     let output = result
         .map_err(|e| {
-            Error::Execution(
+            execution_error(
                 e.downcast_ref::<String>()
                     .cloned()
                     .or_else(|| e.downcast_ref::<&str>().map(|s| (*s).to_owned()))
@@ -462,7 +477,7 @@ fn execute_method(
             if text.contains("Exported method") && text.contains("not found") {
                 Error::MethodNotFound(method.into())
             } else {
-                Error::Execution(text)
+                execution_error(text)
             }
         })?;
     Ok((recorder.estimate_encoded_size(), output))

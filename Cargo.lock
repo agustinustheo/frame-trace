@@ -2041,6 +2041,7 @@ dependencies = [
  "frame-trace-model",
  "frame-trace-otel",
  "frame-trace-replay",
+ "serde",
  "serde_json",
 ]
 

@@ -214,8 +214,8 @@ pub fn record_block(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) 
         if let Some(matched) = call.oracle_match {
             attrs.push(KeyValue::new("frame.call.oracle_match", matched));
         }
-        if let Some(source) = call.oracle_source {
-            attrs.push(KeyValue::new("frame.call.oracle_source", source));
+        if let Some(source) = &call.oracle_source {
+            attrs.push(KeyValue::new("frame.call.oracle_source", source.clone()));
         }
     }
     attrs.extend(stats_attributes(&block.totals));
@@ -267,8 +267,8 @@ fn record_measured(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) -
         if let Some(matched) = call.oracle_match {
             attrs.push(KeyValue::new("frame.call.oracle_match", matched));
         }
-        if let Some(source) = call.oracle_source {
-            attrs.push(KeyValue::new("frame.call.oracle_source", source));
+        if let Some(source) = &call.oracle_source {
+            attrs.push(KeyValue::new("frame.call.oracle_source", source.clone()));
         }
     }
     attrs.extend(stats_attributes(&block.totals));
@@ -390,7 +390,7 @@ fn record_measured(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) -
             };
         let mut attrs = vec![
             KeyValue::new("frame.timing", "measured"),
-            KeyValue::new("frame.phase", phase.kind),
+            KeyValue::new("frame.phase", phase.kind.clone()),
         ];
         attrs.push(KeyValue::new(
             "frame.phase.timing_available",
@@ -495,7 +495,7 @@ fn record_phase(
     let slots = phase.seq_span().unwrap_or(0..0);
     let mut attrs = vec![
         KeyValue::new("frame.timing", "synthetic"),
-        KeyValue::new("frame.phase", phase.kind),
+        KeyValue::new("frame.phase", phase.kind.clone()),
     ];
     if let Some(index) = phase.extrinsic_index {
         attrs.push(KeyValue::new("frame.extrinsic.index", i64::from(index)));
@@ -541,19 +541,27 @@ fn op_attributes(op: &AnnotatedOp, extrinsic_index: Option<u32>) -> Vec<KeyValue
             },
         ),
         KeyValue::new("db.system.name", DB_SYSTEM),
-        KeyValue::new("db.operation.name", op.op),
+        KeyValue::new("db.operation.name", op.op.clone()),
         KeyValue::new("frame.storage.item", op.item.clone()),
         KeyValue::new("frame.storage.key", op.key.clone()),
         KeyValue::new("frame.storage.seq", count(op.seq)),
         KeyValue::new("frame.storage.duplicate_read", op.duplicate_read),
         KeyValue::new("frame.storage.key_complete", op.key_complete),
     ];
+    if let Some(origin) = &op.origin {
+        attrs.push(KeyValue::new("frame.storage.origin", origin.clone()));
+    }
+    if let Some(bytes) = op.proof_bytes_added {
+        attrs.push(KeyValue::new("frame.storage.proof_bytes", count(bytes)));
+    }
     let collection = op.pallet.as_deref().unwrap_or_else(|| {
         if op.child_trie.is_some() {
             "child_trie"
         } else if op.item.starts_with(':') {
             "well_known"
-        } else if matches!(op.op, "storage_root" | "iteration" | "next_key") || op.key == "0x" {
+        } else if matches!(op.op.as_str(), "storage_root" | "iteration" | "next_key")
+            || op.key == "0x"
+        {
             "state"
         } else {
             "unknown"

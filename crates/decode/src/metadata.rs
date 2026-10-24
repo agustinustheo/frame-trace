@@ -132,9 +132,21 @@ impl Metadata {
     /// Resolve a pallet crate via metadata type paths (including aliased runtime names).
     /// Multiple instances list all candidate runtime names.
     pub fn pallet_for_crate(&self, krate: &str) -> Option<String> {
+        let names = self.pallets_for_crate(krate);
+        if names.is_empty() {
+            None
+        } else {
+            Some(names.join(" / "))
+        }
+    }
+
+    /// Matching instances in AllPalletsWithSystem (pallet index) order.
+    pub fn pallets_for_crate(&self, krate: &str) -> Vec<String> {
         let mut names = Vec::new();
         with_runtime!(&self.runtime, md => {
-            for pallet in &md.pallets {
+            let mut pallets: Vec<_> = md.pallets.iter().collect();
+            pallets.sort_by_key(|p| p.index);
+            for pallet in pallets {
                 let ids = pallet.calls.iter().map(|c| c.ty.id)
                     .chain(pallet.event.iter().map(|e| e.ty.id))
                     .chain(pallet.error.iter().map(|e| e.ty.id));
@@ -144,11 +156,7 @@ impl Metadata {
                 }
             }
         });
-        if names.is_empty() {
-            None
-        } else {
-            Some(names.join(" / "))
-        }
+        names
     }
 
     /// Metadata version (14, 15 or 16).
@@ -269,8 +277,22 @@ impl Metadata {
         let mut output = Vec::new();
         for ((name, ty), value) in inputs.into_iter().zip(values) {
             let value = json_value(value)?;
-            scale_value::scale::encode_as_type(&value, ty, self.types(), &mut output)
-                .map_err(|e| Error::RuntimeApi(format!("argument {name}: {e}")))?;
+            scale_value::scale::encode_as_type(&value, ty, self.types(), &mut output).map_err(
+                |e| {
+                    let expected = self
+                        .types()
+                        .resolve(ty)
+                        .map(|t| {
+                            if t.path.segments.is_empty() {
+                                format!("{:?}", t.type_def)
+                            } else {
+                                t.path.segments.join("::")
+                            }
+                        })
+                        .unwrap_or_else(|| format!("type {ty}"));
+                    Error::RuntimeApi(format!("argument {name}: expected {expected}: {e}"))
+                },
+            )?;
         }
         Ok(output)
     }

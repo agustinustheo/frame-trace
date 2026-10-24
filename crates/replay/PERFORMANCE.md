@@ -271,3 +271,95 @@ labelled recorded (unverified). The nonce fixture was refreshed to include local
 executed metadata dependencies. Original People/block artifacts still need explicit
 unauthenticated metadata fallback for their historical names because they did not
 record those additional metadata-only proof paths.
+
+## Round 4 (5a1963e working tree)
+
+Rust **1.93.0** `fmt --all -- --check`, `clippy --workspace --all-targets
+--locked -- -D warnings`, and `test --workspace --locked --no-fail-fast` passed.
+Exact distinct counts: **139 passed, 0 failed, 1 ignored; 0 doctests**.
+CLI **33** (9 unit + 24 integration), decode **17** (4 unit + 13 integration),
+model **19** (11 unit + 8 integration), OTel **11**, replay **59** (41 unit +
+7 call integration + 11 block integration). The public-network block test remains
+ignored. Subprocess executions are included only in their parent test case.
+
+Metadata execution was captured rather than assumed pure. The People fixture's
+V16 export makes **11 backend reads of 7 distinct keys**, including constants
+backed by storage. Cache entries retain code hash and those dependency values;
+each new root authenticates the values, and changes regenerate metadata. A pure
+export has no dependencies and reuses by code hash alone. Iteration conservatively
+requires the same state root. Tests exercise changed values, root-independent
+reuse, two real People parent states, and fresh offline metadata execution after
+exporting dependencies from a cache hit.
+
+Three People block artifacts were extended with authenticated metadata-call
+nodes from a local E1 chain. Original hashes and independently recorded ordered
+oracles remain unchanged. All three now produce names without a fallback or RPC.
+Their total compressed growth is **2,490 bytes**; all 17 compressed replay files
+now total **11,153,408 bytes**. The temporary local node exited through the E1
+wrapper's cleanup path.
+
+The final batch JSON/summary has **518 ops**, **312 reads**: **231 overlay**,
+**47 backend warm**, **34 backend cold**. Its **203 duplicates** split into
+**177 overlay / 26 warm / 0 cold**. Alice's **48 batch reads** split **42 / 5 / 1**;
+her 47 duplicates split 42 overlay / 5 warm. The batch's 146 reads split
+115 overlay / 26 warm / 5 cold. The execution proof and sum of per-op attribution
+both equal **6,586 bytes**, with zero unattributed bytes. Per-phase bytes are
+initialization **3,490**, inherents **634**, batch's own work **827**, nested
+post-inherents **686**, finalization **949**. Thus the containing apply-extrinsic
+span's 1,513 bytes includes 686 bytes attributed separately to post-inherents.
+`System::Account` contributes **332 proof bytes** across the block. Iteration is
+counted separately from writes. A recorder-rollback regression retains block-wide
+warmth while allowing positive marginal growth when a proof path is reintroduced.
+
+Raw validation logs, saved batch JSON, replay-free summary/report output, and live
+measurement logs are retained in `/tmp/frame-trace-round4/` on this host.
+
+### Before follow window
+
+Command: `/tmp/frame-trace-round4/before follow --rpc wss://westend-asset-hub-rpc.polkadot.io --cache-dir /tmp/frame-trace-round4/before-cache`. Window **120.028 seconds**;
+**18 completed blocks**, 9.0 blocks/minute;
+heights **18564661–18564709**
+(sampling can skip heights). Excluding the first two startup completions:
+**16 warm samples**, median **9.336 seconds/block**,
+range **8.061–11.568 seconds**. Median RPC
+calls **37**, sequential proof rounds **16**;
+warm operation range **550–696**.
+First warm example: **#18564669**, `0x714c27abe54816a11a80b5feaad9c4c7bdb5eb99eabd8dca64821a5fa3cae7f4`,
+**9.010 seconds**. Exit **0**, SIGINT shutdown **0.150 seconds**.
+
+### After follow window
+
+Command: `/Users/theo/Projects/parity/frame-trace/target/debug/frame-trace follow --rpc wss://westend-asset-hub-rpc.polkadot.io --cache-dir /tmp/frame-trace-round4/after-cache`. Window **120.060 seconds**;
+**17 completed blocks**, 8.5 blocks/minute;
+heights **18564718–18564742**
+(sampling can skip heights). Excluding the first two startup completions:
+**15 warm samples**, median **9.439 seconds/block**,
+range **5.641–11.757 seconds**. Median RPC
+calls **38**, sequential proof rounds **16**;
+warm operation range **550–768**.
+First warm example: **#18564720**, `0x761454b7f5a678cb71e010867c1e3ecacc41d60d7835b32bba19e46ce970c324`,
+**8.453 seconds**. Exit **0**, SIGINT shutdown **0.200 seconds**.
+
+Both runs used the macOS arm64 host, Rust 1.93.0 development executables, two
+workers, eight proof slots, finalized heads, and separate initially empty cache
+directories. The baseline executable was preserved from the clean 5a1963e checkout
+before edits. Windows ran sequentially with compilation, tests, and fixture replay
+stopped. All **35 completed blocks** passed the real root check and made **zero
+measured RPC calls**. Finalized-head availability and block contents differed.
+The observed **9.336 → 9.439 seconds/block** and **18 → 17 completions** do **not**
+demonstrate an end-to-end speedup. Metadata reuse removes repeated runtime
+metadata generation, but still authenticates storage dependencies and does not
+remove other sequential proof fetches. New accounting also adds tracing overhead.
+
+Both clients exited normally on SIGINT. The local node, all test/mock processes,
+and benchmark clients have stopped. No commit or push was made.
+
+The final live `report --last 2 --proof-concurrency 2` smoke check replays
+two finalized Westend blocks concurrently using the warmed after-cache: **1,102
+operations**, **183,374 attributed proof bytes**, **0 unattributed bytes**. Both
+roots pass with zero measured RPC calls. Files: `live-report.json`,
+`live-report.txt`, `live-report.log`. Workers fork the shared RPC transport to
+isolate their measured-run counters; the CLI regression also schedules two
+authenticated fixture replays concurrently and checks both zero-RPC guards.
+The complete workspace suite was rerun after this correction: the exact count
+remains **139 passed, 0 failed, 1 ignored; 0 doctests**.

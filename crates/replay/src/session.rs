@@ -8,9 +8,16 @@ use std::{
     sync::{Arc, OnceLock},
 };
 
-// Code hash indexes decoded metadata; retain proof dependencies per state root so saved
-// artifacts can regenerate it offline even when this session skips repeated metadata calls.
-type MetadataCache = BTreeMap<H256, BTreeMap<H256, (String, Vec<Vec<u8>>)>>;
+/// Metadata dependencies are authenticated again at each new state root. Pure metadata
+/// exports have an empty dependency list and reuse solely by code hash.
+type MetadataRead = (Vec<u8>, Option<Vec<u8>>, Option<H256>);
+#[derive(Clone)]
+pub(crate) struct MetadataEntry {
+    pub metadata: String,
+    pub reads: Vec<MetadataRead>,
+    pub iteration_root: Option<H256>,
+}
+type MetadataCache = BTreeMap<H256, MetadataEntry>;
 
 const MAX_SHARED_BYTES: usize = 256 * 1024 * 1024;
 #[derive(Default)]
@@ -43,6 +50,8 @@ pub struct ReplaySession {
     pub(crate) speculative_discovery: bool,
     pub(crate) metadata: Arc<Mutex<MetadataCache>>,
     pub(crate) rpc_metadata_fallback: bool,
+    #[cfg(test)]
+    pub(crate) metadata_runs: Arc<std::sync::atomic::AtomicUsize>,
     cache_base: PathBuf,
     cache_max_bytes: u64,
     disk_index: Arc<Mutex<DiskIndex>>,
@@ -81,6 +90,8 @@ impl ReplaySession {
             speculative_discovery: true,
             metadata: Default::default(),
             rpc_metadata_fallback: false,
+            #[cfg(test)]
+            metadata_runs: Default::default(),
             #[cfg(test)]
             executor: Arc::new(
                 Executor::builder()
@@ -248,7 +259,16 @@ impl DiskIndex {
         let changed = self.directories.get(dir) != Some(&modified);
         if changed {
             self.directories.insert(dir.to_owned(), modified);
-            for entry in std::fs::read_dir(dir)? {
+            let entries = match std::fs::read_dir(dir) {
+                Ok(entries) => entries,
+                // Another session may evict a directory between metadata and read_dir.
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                    self.directories.remove(dir);
+                    return Ok(());
+                }
+                Err(e) => return Err(e),
+            };
+            for entry in entries {
                 let entry = entry?;
                 let path = entry.path();
                 if self.files.contains_key(&path) || self.directories.contains_key(&path) {

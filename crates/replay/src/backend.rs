@@ -18,6 +18,7 @@ type Trie = TrieBackend<ProofDb, H>;
 pub struct TracedBackend {
     pub trie: Trie,
     db: ProofDb,
+    recorder: Recorder<H>,
 }
 impl std::fmt::Debug for TracedBackend {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -25,9 +26,23 @@ impl std::fmt::Debug for TracedBackend {
     }
 }
 impl TracedBackend {
+    fn read_event(
+        &self,
+        key: &[u8],
+        child: Option<&ChildInfo>,
+        before: usize,
+        value: Option<H256>,
+    ) {
+        tracing::trace!(target: "frame_trace_backend", method = "BackendRead", key = %hex0(key),
+            child_info = %child.map(|c| hex0(c.storage_key())).unwrap_or_default(),
+            value_hash = %value.map(|h| format!("{h:?}")).unwrap_or_else(|| "none".into()),
+            proof_bytes_added = self.recorder.estimate_encoded_size().saturating_sub(before));
+    }
+
     pub fn new(db: ProofDb, root: H256, recorder: Recorder<H>) -> Self {
         Self {
             db: db.clone(),
+            recorder: recorder.clone(),
             trie: TrieBackendBuilder::new(db, root)
                 .with_recorder(recorder)
                 .build(),
@@ -80,13 +95,30 @@ impl Backend<H> for TracedBackend {
     type RawIter = Iter;
     fn storage(&self, k: &[u8]) -> Result<Option<Vec<u8>>, String> {
         self.db.remember_key(k);
-        self.db
-            .speculative_value(with_key_hint(k, || self.trie.storage(k)))
+        let before = self.recorder.estimate_encoded_size();
+        let result = self
+            .db
+            .speculative_value(with_key_hint(k, || self.trie.storage(k)));
+        self.read_event(
+            k,
+            None,
+            before,
+            result
+                .as_ref()
+                .ok()
+                .and_then(|v| v.as_ref())
+                .map(|v| H256::from(sp_io::hashing::blake2_256(v))),
+        );
+        result
     }
     fn storage_hash(&self, k: &[u8]) -> Result<Option<H256>, String> {
         self.db.remember_key(k);
-        self.db
-            .speculative_value(with_key_hint(k, || self.trie.storage_hash(k)))
+        let before = self.recorder.estimate_encoded_size();
+        let result = self
+            .db
+            .speculative_value(with_key_hint(k, || self.trie.storage_hash(k)));
+        self.read_event(k, None, before, result.as_ref().ok().copied().flatten());
+        result
     }
     fn closest_merkle_value(&self, k: &[u8]) -> Result<Option<MerkleValue<H256>>, String> {
         self.db.remember_key(k);
@@ -104,14 +136,29 @@ impl Backend<H> for TracedBackend {
         })
     }
     fn child_storage(&self, c: &ChildInfo, k: &[u8]) -> Result<Option<Vec<u8>>, String> {
+        let before = self.recorder.estimate_encoded_size();
         self.trie.storage(c.prefixed_storage_key().as_slice())?;
-        with_child(c, || with_key_hint(k, || self.trie.child_storage(c, k)))
+        let result = with_child(c, || with_key_hint(k, || self.trie.child_storage(c, k)));
+        self.read_event(
+            k,
+            Some(c),
+            before,
+            result
+                .as_ref()
+                .ok()
+                .and_then(|v| v.as_ref())
+                .map(|v| H256::from(sp_io::hashing::blake2_256(v))),
+        );
+        result
     }
     fn child_storage_hash(&self, c: &ChildInfo, k: &[u8]) -> Result<Option<H256>, String> {
+        let before = self.recorder.estimate_encoded_size();
         self.trie.storage(c.prefixed_storage_key().as_slice())?;
-        with_child(c, || {
+        let result = with_child(c, || {
             with_key_hint(k, || self.trie.child_storage_hash(c, k))
-        })
+        });
+        self.read_event(k, Some(c), before, result.as_ref().ok().copied().flatten());
+        result
     }
     fn next_storage_key(&self, k: &[u8]) -> Result<Option<Vec<u8>>, String> {
         let start = Instant::now();

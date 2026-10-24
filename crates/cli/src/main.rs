@@ -8,6 +8,7 @@ use frame_trace_decode::{AnnotatedBlock, annotate};
 
 mod call;
 mod follow;
+mod report;
 mod source;
 mod summary;
 
@@ -20,6 +21,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Aggregate saved block JSON files or a finalized block range.
+    Report(report::ReportArgs),
     /// Trace a runtime API call against authenticated state proofs.
     Call(call::CallArgs),
     /// Trace one block: export it over OTLP and/or write it as JSON.
@@ -76,6 +79,7 @@ impl std::error::Error for OracleMismatch {}
 
 fn run() -> Result<()> {
     match Cli::parse().command {
+        Command::Report(args) => report::run(args),
         Command::Block(args) => block(args),
         Command::Call(args) => call::run(args),
         Command::Follow(args) => follow(args),
@@ -107,6 +111,9 @@ fn block(args: BlockArgs) -> Result<()> {
 }
 
 fn load(args: &source::SourceArgs) -> Result<AnnotatedBlock> {
+    if let Some(path) = &args.from_json {
+        return report::read_trace(path);
+    }
     let loaded = source::load(args)?;
     let traced = loaded.traced;
     if loaded.metadata.is_none() {
@@ -125,6 +132,7 @@ fn load(args: &source::SourceArgs) -> Result<AnnotatedBlock> {
         );
     }
     block.block_number = loaded.block_number;
+    block.execution = loaded.execution;
     Ok(block)
 }
 
@@ -185,8 +193,8 @@ struct FollowArgs {
     /// Combined disk cache limit in bytes; active runtime modules remain pinned.
     #[arg(long, default_value_t = 1073741824)]
     cache_max_bytes: u64,
-    /// Allow UNAUTHENTICATED RPC metadata if local metadata execution is impossible.
-    #[arg(long)]
+    /// Allow UNAUTHENTICATED metadata: RPC online, stored artifact metadata offline.
+    #[arg(long = "unauthenticated-metadata", alias = "rpc-metadata-fallback")]
     rpc_metadata_fallback: bool,
 }
 

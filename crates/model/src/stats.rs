@@ -2,12 +2,12 @@
 
 use std::collections::HashSet;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 
 use crate::op::StorageOp;
 
 /// Storage totals for a phase or a whole block.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Stats {
     /// Ops, including ones that are neither reads nor writes (storage root).
     pub ops: usize,

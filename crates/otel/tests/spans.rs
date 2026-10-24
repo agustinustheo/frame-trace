@@ -188,7 +188,9 @@ fn synthetic_block(ops: usize) -> AnnotatedBlock {
         timing: None,
         parent_span: None,
         seq,
-        op: "get",
+        op: "get".into(),
+        origin: None,
+        proof_bytes_added: None,
         child_trie: None,
         child_trie_truncated: false,
         key: "0x00".into(),
@@ -204,6 +206,7 @@ fn synthetic_block(ops: usize) -> AnnotatedBlock {
         duplicate_read: seq > 0,
     };
     AnnotatedBlock {
+        execution: None,
         call: None,
         runtime_spans: Vec::new(),
         timing: None,
@@ -213,7 +216,9 @@ fn synthetic_block(ops: usize) -> AnnotatedBlock {
         skipped_events: 0,
         totals: Stats::default(),
         phases: vec![AnnotatedPhase {
-            kind: "unsegmented",
+            kind: "unsegmented".into(),
+            wall_time: None,
+            signed: None,
             extrinsic_index: None,
             call: None,
             call_error: None,
@@ -458,7 +463,7 @@ fn measured_hooks_descend_from_the_corresponding_phase() {
         .enumerate()
         .map(|(i, kind)| {
             let mut phase = original.clone();
-            phase.kind = kind;
+            phase.kind = kind.to_string();
             phase.label = (*kind).into();
             phase.ops[0].parent_span = Some(i as u64 + 1);
             phase.ops[0].timing = Some(MeasuredTiming {
@@ -514,18 +519,18 @@ fn measured_phases_without_ops_use_only_real_runtime_bounds() {
         duration_ns: 100,
     });
     let mut init = block.phases[0].clone();
-    init.kind = "initialization";
+    init.kind = "initialization".into();
     init.label = "initialization".into();
     let mut ext = init.clone();
-    ext.kind = "apply_extrinsic";
+    ext.kind = "apply_extrinsic".into();
     ext.label = "extrinsic".into();
     ext.extrinsic_index = Some(0);
     let mut nested = init.clone();
-    nested.kind = "post_inherents";
+    nested.kind = "post_inherents".into();
     nested.label = "post inherents".into();
     ext.post_inherents = Some(Box::new(nested));
     let mut empty = init.clone();
-    empty.kind = "finalization";
+    empty.kind = "finalization".into();
     empty.label = "untimed finalization".into();
     block.phases = vec![init, ext, empty];
     block.runtime_spans = [("on_initialize", 30, 40), ("on_poll", 50, 60)]
@@ -643,11 +648,31 @@ fn hook_names_resolve_pallet_metadata_and_fall_back_to_crates() {
     let asset_md = Metadata::from_hex(&artifact.metadata).unwrap();
     let candidates = asset_md.pallet_for_crate("pallet_assets").unwrap();
     assert!(candidates.contains(" / "), "{candidates}");
-    traced.runtime_spans[0].target = "pallet_assets::pallet".into();
+    for span in &mut traced.runtime_spans[..3] {
+        span.target = "pallet_assets::pallet".into();
+        span.name = "on_initialize".into();
+    }
+    let instances = annotate(&traced, Some(&asset_md));
     assert_eq!(
-        annotate(&traced, Some(&asset_md)).runtime_spans[0].name,
-        format!("on_initialize: {candidates}")
+        instances.runtime_spans[..3]
+            .iter()
+            .map(|s| s.name.as_str())
+            .collect::<Vec<_>>(),
+        [
+            "on_initialize: Assets",
+            "on_initialize: ForeignAssets",
+            "on_initialize: PoolAssets"
+        ]
     );
+    let people = frame_trace_replay::Artifact::load(
+        &std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/replay/people-traced"),
+    )
+    .unwrap();
+    let people_md = Metadata::from_hex(&people.metadata).unwrap();
+    let instances = annotate(&traced, Some(&people_md));
+    assert_eq!(instances.runtime_spans[0].name, "on_initialize: Assets");
+    assert_eq!(instances.runtime_spans[1].name, "on_initialize: PoolAssets");
 }
 
 #[test]
@@ -740,7 +765,7 @@ fn runtime_call_root_and_empty_calls_export_one_trace_with_explicit_semantics() 
             result: "0x00000000".into(),
             decoded: Some("0".into()),
             oracle_match: Some(true),
-            oracle_source: Some("live"),
+            oracle_source: Some("live".into()),
             proof_bytes: 1234,
             state_root: "0xab".into(),
         });
@@ -761,5 +786,37 @@ fn runtime_call_root_and_empty_calls_export_one_trace_with_explicit_semantics() 
                 .all(|s| s.span_context.trace_id() == root.span_context.trace_id())
         );
         assert_eq!(spans.len(), span_count(&trace));
+    }
+}
+
+#[test]
+fn observed_read_origins_and_proof_bytes_are_otlp_attributes() {
+    let mut block = synthetic_block(3);
+    for (op, origin) in
+        block.phases[0]
+            .ops
+            .iter_mut()
+            .zip(["overlay", "backend_warm", "backend_cold"])
+    {
+        op.origin = Some(origin.into());
+        op.proof_bytes_added = Some(if origin == "backend_cold" { 100 } else { 0 });
+    }
+    let spans = export(&block, Timing::default());
+    for origin in ["overlay", "backend_warm", "backend_cold"] {
+        let span = spans
+            .iter()
+            .find(|s| attr(s, "frame.storage.origin") == Some(origin.into()))
+            .unwrap();
+        assert_eq!(
+            attr(span, "frame.storage.proof_bytes"),
+            Some(
+                if origin == "backend_cold" {
+                    100i64
+                } else {
+                    0i64
+                }
+                .into()
+            )
+        );
     }
 }

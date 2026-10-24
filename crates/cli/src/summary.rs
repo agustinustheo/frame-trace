@@ -22,10 +22,7 @@ pub fn render(block: &AnnotatedBlock, top: usize) -> String {
         )
     };
     out += &format!("Storage per phase\n{}\n\n", phases(block));
-    out += &format!(
-        "Top {top} storage items by reads + writes\n{}\n\n",
-        items(block, top)
-    );
+    out += &crate::report::render(&crate::report::aggregate(std::slice::from_ref(block)), top);
     out += &format!(
         "Duplicate reads per phase (top {top} each)\n{}\n",
         duplicates(block, top)
@@ -41,117 +38,92 @@ fn phases(block: &AnnotatedBlock) -> Table {
             "ops",
             "reads",
             "writes",
-            "keys",
-            "bytes read",
-            "bytes written",
-            "dup reads",
+            "proof B",
+            "storage µs",
+            "wall µs",
         ],
     );
     for phase in &block.phases {
-        table.add_row(stats_row(phase.label.clone(), &phase.stats));
+        table.add_row(phase_row(phase, phase.label.clone()));
         // Runs inside the extrinsic (between its checks and its own work); not in its row.
         if let Some(nested) = &phase.post_inherents {
-            table.add_row(stats_row(format!("  └ {}", nested.label), &nested.stats));
+            table.add_row(phase_row(nested, format!("  └ {}", nested.label)));
         }
     }
-    table.add_row(stats_row("total".into(), &block.totals));
+    let mut total = stats_row("total".into(), &block.totals);
+    let tally = crate::report::Tally::of(block.all_phases().flat_map(|p| &p.ops));
+    total.extend([
+        tally.proof_bytes.to_string(),
+        format!("{:.1}", tally.storage_ns as f64 / 1000.0),
+        block.timing.map_or_else(
+            || "?".into(),
+            |t| format!("{:.1}", t.duration_ns as f64 / 1000.0),
+        ),
+    ]);
+    table.add_row(total);
     table
 }
 
+fn phase_row(phase: &frame_trace_decode::AnnotatedPhase, label: String) -> Vec<String> {
+    let mut row = stats_row(label, &phase.stats);
+    let t = crate::report::Tally::of(&phase.ops);
+    row.extend([
+        t.proof_bytes.to_string(),
+        format!("{:.1}", t.storage_ns as f64 / 1000.0),
+        phase.wall_time.as_ref().map_or_else(
+            || "?".into(),
+            |t| format!("{:.1}", t.duration_ns as f64 / 1000.0),
+        ),
+    ]);
+    row
+}
 fn stats_row(label: String, s: &Stats) -> Vec<String> {
     let mut row = vec![label];
-    row.extend(
-        [
-            s.ops,
-            s.reads,
-            s.writes,
-            s.distinct_keys,
-            s.bytes_read,
-            s.bytes_written,
-            s.duplicate_reads,
-        ]
-        .map(|n| n.to_string()),
-    );
+    row.extend([s.ops, s.reads, s.writes].map(|n| n.to_string()));
     row
 }
 
-#[derive(Default)]
-struct ItemTally {
-    reads: usize,
-    writes: usize,
-    duplicate_reads: usize,
-    bytes_read: usize,
-    bytes_written: usize,
-}
-
-fn items(block: &AnnotatedBlock, top: usize) -> Table {
-    let mut tally: BTreeMap<&str, ItemTally> = BTreeMap::new();
-    for op in block.all_phases().flat_map(|p| &p.ops) {
-        let t = tally.entry(op.item.as_str()).or_default();
-        let len = op.value_len.unwrap_or(0);
-        match op.op {
-            "get" | "exists" | "hash" => {
-                t.reads += 1;
-                t.bytes_read += len;
-                t.duplicate_reads += usize::from(op.duplicate_read);
-            }
-            "storage_root" | "index_transaction" | "renew_transaction_index" => {}
-            _ => {
-                t.writes += 1;
-                t.bytes_written += len;
-            }
-        }
-    }
-    let mut rows: Vec<_> = tally
-        .into_iter()
-        .filter(|(_, t)| t.reads + t.writes > 0)
-        .collect();
-    rows.sort_by(|a, b| {
-        (b.1.reads + b.1.writes)
-            .cmp(&(a.1.reads + a.1.writes))
-            .then(a.0.cmp(b.0))
-    });
-
+fn duplicates(block: &AnnotatedBlock, top: usize) -> Table {
     let mut table = table(
-        1,
+        2,
         &[
-            "item",
-            "reads",
-            "writes",
+            "phase",
+            "key",
             "dup reads",
-            "bytes read",
-            "bytes written",
+            "overlay",
+            "warm",
+            "cold",
+            "unknown",
         ],
     );
-    for (item, t) in rows.into_iter().take(top) {
-        table.add_row(vec![
-            item.to_owned(),
-            t.reads.to_string(),
-            t.writes.to_string(),
-            t.duplicate_reads.to_string(),
-            t.bytes_read.to_string(),
-            t.bytes_written.to_string(),
-        ]);
-    }
-    table
-}
-
-fn duplicates(block: &AnnotatedBlock, top: usize) -> Table {
-    let mut table = table(2, &["phase", "key", "dup reads"]);
     for phase in block.all_phases() {
         // Group by key identity (child trie, raw key), whatever read method was used: names
         // can be shared by different keys (`<unknown>`, undecoded map keys).
-        let mut counts: BTreeMap<(Option<&str>, &str), (&AnnotatedOp, usize)> = BTreeMap::new();
+        type DuplicateRows<'a> =
+            BTreeMap<(Option<&'a str>, &'a str), (&'a AnnotatedOp, [usize; 5])>;
+        let mut counts: DuplicateRows<'_> = BTreeMap::new();
         for op in phase.ops.iter().filter(|op| op.duplicate_read) {
             counts
                 .entry((op.child_trie.as_deref(), op.key.as_str()))
-                .or_insert((op, 0))
-                .1 += 1;
+                .or_insert((op, [0; 5]));
+            let counts = &mut counts
+                .get_mut(&(op.child_trie.as_deref(), op.key.as_str()))
+                .expect("inserted")
+                .1;
+            counts[0] += 1;
+            counts[match op.origin.as_deref() {
+                Some("overlay") => 1,
+                Some("backend_warm") => 2,
+                Some("backend_cold") => 3,
+                _ => 4,
+            }] += 1;
         }
         let mut rows: Vec<_> = counts.into_values().collect();
-        rows.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.seq.cmp(&b.0.seq)));
+        rows.sort_by(|a, b| b.1[0].cmp(&a.1[0]).then(a.0.seq.cmp(&b.0.seq)));
         for (op, n) in rows.into_iter().take(top) {
-            table.add_row(vec![phase.label.clone(), key_name(op), n.to_string()]);
+            let mut row = vec![phase.label.clone(), key_name(op)];
+            row.extend(n.map(|n| n.to_string()));
+            table.add_row(row);
         }
     }
     table
@@ -170,7 +142,7 @@ fn key_name(op: &AnnotatedOp) -> String {
 
 /// A table with the given header; columns after the first `text_columns` hold numbers and are
 /// right-aligned.
-fn table(text_columns: usize, header: &[&str]) -> Table {
+pub(crate) fn table(text_columns: usize, header: &[&str]) -> Table {
     let mut table = Table::new();
     table
         .load_style(comfy_table::presets::UTF8_FULL_CONDENSED)

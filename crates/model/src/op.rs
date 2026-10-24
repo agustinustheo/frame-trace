@@ -115,6 +115,10 @@ impl std::fmt::Display for OpKind {
 pub struct StorageOp {
     /// Measured local replay interval, absent for legacy JSON.
     pub timing: Option<crate::MeasuredTiming>,
+    /// Observed overlay/backend origin; absent for legacy sources.
+    pub origin: Option<String>,
+    /// Marginal recorder growth, absent when no recorder was observed.
+    pub proof_bytes_added: Option<usize>,
     /// Parent in the observed span tree.
     pub parent_span: Option<u64>,
     /// Position in the block's op list (0-based).
@@ -153,6 +157,8 @@ impl StorageOp {
     fn new(kind: OpKind) -> Self {
         Self {
             timing: None,
+            origin: None,
+            proof_bytes_added: None,
             parent_span: None,
             seq: 0,
             event_index: 0,

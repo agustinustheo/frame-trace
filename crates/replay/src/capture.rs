@@ -1,6 +1,11 @@
 use parking_lot::Mutex;
 use serde::Serialize;
-use std::{collections::BTreeMap, fmt, sync::Arc, time::Instant};
+use std::{
+    collections::{BTreeMap, HashSet},
+    fmt,
+    sync::Arc,
+    time::Instant,
+};
 use tracing::{
     Metadata, Subscriber,
     field::{Field, Visit},
@@ -72,6 +77,9 @@ pub struct Data {
     pub events: Vec<Event>,
     pub transitions: Vec<frame_trace_model::SpanTransition>,
     stack: Vec<u64>,
+    last_proof_bytes: usize,
+    pending_read: Option<(Option<u64>, bool)>,
+    seen_nodes: HashSet<Vec<u8>>,
     metadata: Vec<&'static Metadata<'static>>,
     pub recorder: Option<sp_trie::recorder::Recorder<sp_core::Blake2Hasher>>,
 }
@@ -86,6 +94,9 @@ impl Capture {
             events: Vec::new(),
             transitions: Vec::new(),
             stack: Vec::new(),
+            last_proof_bytes: 0,
+            pending_read: None,
+            seen_nodes: HashSet::new(),
             metadata: Vec::new(),
             recorder: None,
         })))
@@ -165,6 +176,62 @@ impl Subscriber for Capture {
             .parent()
             .map(Id::into_u64)
             .or_else(|| d.stack.last().copied());
+        let proof = d.recorder.as_ref().map(|r| r.estimate_encoded_size());
+        let method = fields.0.get("method").cloned().unwrap_or_default();
+        if method == "BackendRead" {
+            let added = fields
+                .0
+                .get("proof_bytes_added")
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(0);
+            let cold = if added > 0 {
+                let proof = d.recorder.as_ref().map(|r| r.to_storage_proof());
+                let mut cold = false;
+                if let Some(proof) = proof {
+                    for node in proof.iter_nodes() {
+                        cold |= d.seen_nodes.insert(node.clone());
+                    }
+                }
+                cold
+            } else {
+                false
+            };
+            d.pending_read = Some((parent_id, cold));
+        } else if !matches!(method.as_str(), "" | "Core_execute_block")
+            && (event.metadata().target() == "state" || method.starts_with("Backend"))
+            && let Some(proof) = proof
+        {
+            fields.0.insert(
+                "proof_bytes_added".into(),
+                proof.saturating_sub(d.last_proof_bytes).to_string(),
+            );
+            if proof > d.last_proof_bytes {
+                let nodes = d.recorder.as_ref().map(|r| r.to_storage_proof());
+                if let Some(nodes) = nodes {
+                    d.seen_nodes.extend(nodes.into_iter_nodes());
+                }
+            }
+            d.last_proof_bytes = proof;
+            if matches!(
+                method.as_str(),
+                "Get" | "Exists" | "Hash" | "ChildGet" | "ChildExists" | "ChildHash"
+            ) {
+                let origin = match d.pending_read.take() {
+                    Some((parent, cold)) if parent == parent_id => {
+                        if cold {
+                            "backend_cold"
+                        } else {
+                            "backend_warm"
+                        }
+                    }
+                    _ => "overlay",
+                };
+                fields.0.insert("origin".into(), origin.into());
+            }
+        }
+        if event.metadata().target() == "state" {
+            d.pending_read = None;
+        }
         let at_ns = d.start.elapsed().as_nanos() as u64;
         let seq = d.events.len();
         d.events.push(Event {
@@ -219,6 +286,9 @@ impl Subscriber for Capture {
         }
         s.end_ns = Some(now);
         s.proof_end_bytes = proof_size;
+        if proof_size < d.last_proof_bytes {
+            d.last_proof_bytes = proof_size;
+        }
     }
     fn clone_span(&self, id: &Id) -> Id {
         id.clone()

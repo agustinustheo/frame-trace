@@ -102,7 +102,17 @@ fn offline_calls_reject_wrong_result_state_and_missing_proofs() {
     assert!(call::replay(artifact, None, &session, false).is_err());
     let mut artifact = original.clone();
     artifact.call.as_mut().unwrap().data = "0xff".into();
-    assert!(call::replay(artifact, None, &session, false).is_err());
+    let error = call::replay(artifact, None, &session, false)
+        .unwrap_err()
+        .to_string();
+    assert!(
+        error.contains("runtime rejected the call input:"),
+        "{error}"
+    );
+    assert!(
+        !error.contains("root") && !error.contains("backtrace"),
+        "{error}"
+    );
     assert!(frame_trace_replay::replay(original.clone(), None).is_err());
     assert!(call::replay(original, None, &session, true).is_err());
 }

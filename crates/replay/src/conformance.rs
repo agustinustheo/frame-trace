@@ -164,3 +164,129 @@ fn missing_export_reports_runtime_api_method_without_metadata() {
         "runtime API method MissingApi_method not found"
     );
 }
+
+#[test]
+fn read_origins_observe_backend_access_recorder_warmth_and_overlay_for_all_read_kinds() {
+    let mut seed = sp_state_machine::TestExternalities::<Blake2Hasher>::default();
+    seed.execute_with(|| {
+        sp_io::storage::set(b"key", b"value");
+        sp_io::default_child_storage::set(b"child", b"key", b"value");
+    });
+    seed.commit_all().unwrap();
+    let (raw, root) = seed.into_raw_snapshot();
+    let db = ProofDb::new(None, H256::zero());
+    db.insert_nodes(raw.into_iter().map(|(_, (node, _))| node));
+    let recorder = Recorder::default();
+    let backend = TracedBackend::new(db, root, recorder.clone());
+    let mut overlay = OverlayedChanges::default();
+    let mut ext = sp_state_machine::Ext::new(&mut overlay, &backend, None);
+    let capture = Capture::new();
+    capture.0.lock().recorder = Some(recorder.clone());
+    tracing::dispatcher::with_default(&tracing::Dispatch::new(capture.clone()), || {
+        sp_externalities::set_and_run_with_externalities(&mut ext, || {
+            let _ = sp_io::storage::get(b"key");
+            let _ = sp_io::storage::get(b"key");
+            let _ = sp_io::storage::exists(b"key");
+            let _ = sp_externalities::with_externalities(|ext| ext.storage_hash(b"key"));
+            sp_io::storage::set(b"key", b"overlay");
+            let _ = sp_io::storage::get(b"key");
+            let _ = sp_io::storage::exists(b"key");
+            let _ = sp_externalities::with_externalities(|ext| ext.storage_hash(b"key"));
+            let _ = sp_io::default_child_storage::get(b"child", b"key");
+            let _ = sp_io::default_child_storage::exists(b"child", b"key");
+            let _ = sp_externalities::with_externalities(|ext| {
+                ext.child_storage_hash(&sp_core::storage::ChildInfo::new_default(b"child"), b"key")
+            });
+            sp_io::default_child_storage::set(b"child", b"key", b"overlay");
+            let _ = sp_io::default_child_storage::get(b"child", b"key");
+            let _ = sp_io::default_child_storage::exists(b"child", b"key");
+            let _ = sp_externalities::with_externalities(|ext| {
+                ext.child_storage_hash(&sp_core::storage::ChildInfo::new_default(b"child"), b"key")
+            });
+        });
+    });
+    let d = capture.0.lock();
+    let reads: Vec<_> = d
+        .events
+        .iter()
+        .filter(|e| e.fields.contains_key("origin"))
+        .collect();
+    assert_eq!(reads.len(), 13);
+    let origins: Vec<_> = reads.iter().map(|e| e.fields["origin"].as_str()).collect();
+    assert_eq!(
+        origins,
+        [
+            "backend_cold",
+            "backend_warm",
+            "backend_warm",
+            "backend_warm",
+            "overlay",
+            "overlay",
+            "overlay",
+            "backend_cold",
+            "backend_warm",
+            "backend_warm",
+            "overlay",
+            "overlay",
+            "overlay"
+        ]
+    );
+    let proof: usize = d
+        .events
+        .iter()
+        .filter(|e| e.fields.get("method").is_some_and(|m| m != "BackendRead"))
+        .filter_map(|e| e.fields.get("proof_bytes_added"))
+        .map(|n| n.parse::<usize>().unwrap())
+        .sum();
+    assert_eq!(proof, recorder.estimate_encoded_size());
+    assert!(
+        reads[0].fields["proof_bytes_added"]
+            .parse::<usize>()
+            .unwrap()
+            > 0
+    );
+}
+
+#[test]
+fn recorder_rollback_keeps_block_lifetime_warmth_but_reports_new_marginal_growth() {
+    let mut seed = sp_state_machine::TestExternalities::<Blake2Hasher>::default();
+    seed.execute_with(|| sp_io::storage::set(b"key", b"value"));
+    seed.commit_all().unwrap();
+    let (raw, root) = seed.into_raw_snapshot();
+    let db = ProofDb::new(None, H256::zero());
+    db.insert_nodes(raw.into_iter().map(|(_, (node, _))| node));
+    let recorder = Recorder::default();
+    let backend = TracedBackend::new(db, root, recorder.clone());
+    let mut overlay = OverlayedChanges::default();
+    let mut extensions = Extensions::default();
+    extensions.register(ProofSizeExt::new(recorder.clone()));
+    let mut ext = sp_state_machine::Ext::new(&mut overlay, &backend, Some(&mut extensions));
+    let capture = Capture::new();
+    capture.0.lock().recorder = Some(recorder.clone());
+    tracing::dispatcher::with_default(&tracing::Dispatch::new(capture.clone()), || {
+        sp_externalities::set_and_run_with_externalities(&mut ext, || {
+            // The SDK ignores runtime proof transactions; emulate an executor/host
+            // recorder transaction to exercise actual recorder shrinkage as well.
+            recorder.start_transaction();
+            sp_io::storage::start_transaction();
+            let _ = sp_io::storage::get(b"key");
+            recorder.rollback_transaction().unwrap();
+            sp_io::storage::rollback_transaction();
+            let _ = sp_io::storage::get(b"key");
+        });
+    });
+    let d = capture.0.lock();
+    let reads: Vec<_> = d
+        .events
+        .iter()
+        .filter(|e| e.fields.get("method").is_some_and(|m| m == "Get"))
+        .collect();
+    assert_eq!(reads[0].fields["origin"], "backend_cold");
+    assert_eq!(reads[1].fields["origin"], "backend_warm");
+    assert!(
+        reads[1].fields["proof_bytes_added"]
+            .parse::<usize>()
+            .unwrap()
+            > 0
+    );
+}

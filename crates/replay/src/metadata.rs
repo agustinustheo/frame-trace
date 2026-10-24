@@ -1,5 +1,6 @@
 //! Metadata used for names and JSON arguments must come from authenticated code/state.
 use crate::*;
+use std::collections::BTreeMap;
 
 fn negotiate(mut run: impl FnMut(&str, &[u8]) -> Result<Vec<u8>>) -> Result<String> {
     for version in [16u32, 15] {
@@ -37,18 +38,34 @@ pub(crate) fn load(
     state: &Header,
 ) -> Result<()> {
     let hash = H256::from(sp_io::hashing::blake2_256(wasm));
-    if let Some((metadata, nodes)) = session
-        .metadata
-        .lock()
-        .get(&hash)
-        .and_then(|roots| roots.get(state.state_root()))
-        .cloned()
-    {
-        db.retain_nodes(&nodes);
-        artifact.metadata = metadata;
-        return Ok(());
+    let cached = session.metadata.lock().get(&hash).cloned();
+    if let Some(entry) = cached {
+        use sp_state_machine::Backend;
+        let backend = TracedBackend::new(db.clone(), *state.state_root(), Default::default());
+        let validation = entry.matches(*state.state_root(), |key, child| {
+            match child {
+                Some(child) => backend
+                    .child_storage_hash(&sp_core::storage::ChildInfo::new_default(child), key),
+                None => backend.storage_hash(key),
+            }
+            .map_err(|e| db.take_error(e))
+        });
+        let valid = match validation {
+            Err(error) if error.is_transient() || matches!(error, Error::Cancelled) => {
+                return Err(error);
+            }
+            other => other.unwrap_or(false),
+        };
+        db.failure.lock().take();
+        if valid {
+            artifact.metadata = entry.metadata;
+            return Ok(());
+        }
     }
+    #[cfg(test)]
+    session.metadata_runs.fetch_add(1, Ordering::Relaxed);
     let executor = session.executor_for(wasm);
+    let capture = Capture::new();
     let result = negotiate(|method, data| {
         execute_method(
             db,
@@ -60,7 +77,7 @@ pub(crate) fn load(
             data,
             state.hash(),
             CallContext::Offchain,
-            &Capture::new(),
+            &capture,
         )
         .map(|(_, output)| output)
     });
@@ -68,15 +85,49 @@ pub(crate) fn load(
     db.failure.lock().take();
     match result {
         Ok(metadata) => {
+            let events = &capture.0.lock().events;
+            let mut reads = BTreeMap::new();
+            let mut iteration = false;
+            for event in events {
+                let method = event
+                    .fields
+                    .get("method")
+                    .map(String::as_str)
+                    .unwrap_or_default();
+                if method == "BackendRead" {
+                    let key = unhex(&event.fields["key"])?;
+                    let child = event
+                        .fields
+                        .get("child_info")
+                        .filter(|c| !c.is_empty())
+                        .map(|c| unhex(c))
+                        .transpose()?;
+                    let value = event
+                        .fields
+                        .get("value_hash")
+                        .filter(|v| *v != "none")
+                        .map(|v| v.parse::<H256>().map_err(|e| Error::Invalid(e.to_string())))
+                        .transpose()?;
+                    reads.insert((key, child), value);
+                } else if method.starts_with("Backend") {
+                    iteration = true;
+                }
+            }
             let mut cache = session.metadata.lock();
             if cache.len() >= 4 {
                 cache.clear();
             }
-            let roots = cache.entry(hash).or_default();
-            if roots.len() >= 3 {
-                roots.clear();
-            }
-            roots.insert(*state.state_root(), (metadata.clone(), db.used_nodes()));
+            cache.insert(
+                hash,
+                session::MetadataEntry {
+                    metadata: metadata.clone(),
+                    reads: reads
+                        .into_iter()
+                        .map(|((key, child), value)| (key, child, value))
+                        .collect(),
+                    iteration_root: iteration.then_some(*state.state_root()),
+                },
+            );
             artifact.metadata = metadata;
         }
         Err(error) if error.is_transient() || matches!(error, Error::Cancelled) => {
@@ -84,7 +135,7 @@ pub(crate) fn load(
         }
         Err(error) if session.rpc_metadata_fallback => {
             eprintln!(
-                "warning: local metadata unavailable ({error}); RPC METADATA FALLBACK (UNAUTHENTICATED)"
+                "warning: local metadata unavailable ({error}); UNAUTHENTICATED METADATA (RPC online; stored artifact offline)"
             );
             artifact.metadata = match db.rpc() {
                 Some(rpc) => metadata_result(rpc.call("state_getMetadata", json!([state.hash()])))?,
@@ -138,5 +189,99 @@ mod tests {
             .expect("legacy"),
             rpc::hex0(b"v14")
         );
+    }
+}
+
+impl session::MetadataEntry {
+    fn matches(
+        &self,
+        root: H256,
+        mut read: impl FnMut(&[u8], Option<&[u8]>) -> Result<Option<H256>>,
+    ) -> Result<bool> {
+        if self.iteration_root.is_some_and(|r| r != root) {
+            return Ok(false);
+        }
+        for (key, child, expected) in &self.reads {
+            if read(key, child.as_deref())? != *expected {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+}
+
+#[cfg(test)]
+mod cache_tests {
+    use super::*;
+    #[test]
+    fn dependency_values_invalidate_metadata_but_state_roots_do_not() {
+        let mut entry = session::MetadataEntry {
+            metadata: "metadata".into(),
+            reads: vec![],
+            iteration_root: None,
+        };
+        assert!(
+            entry
+                .matches(H256::repeat_byte(2), |_, _| panic!(
+                    "pure metadata should not read storage"
+                ))
+                .unwrap()
+        );
+        entry
+            .reads
+            .push((b"key".to_vec(), None, Some(H256::repeat_byte(1))));
+        assert!(
+            entry
+                .matches(H256::repeat_byte(3), |_, _| Ok(Some(H256::repeat_byte(1))))
+                .unwrap()
+        );
+        assert!(
+            !entry
+                .matches(H256::repeat_byte(3), |_, _| Ok(Some(H256::repeat_byte(2))))
+                .unwrap()
+        );
+        assert!(
+            !entry
+                .matches(H256::repeat_byte(3), |_, _| Ok(None))
+                .unwrap()
+        );
+        entry.iteration_root = Some(H256::repeat_byte(4));
+        assert!(
+            !entry
+                .matches(H256::repeat_byte(3), |_, _| panic!(
+                    "root must invalidate iteration"
+                ))
+                .unwrap()
+        );
+    }
+    #[test]
+    fn people_metadata_storage_reads_are_captured_and_reused_across_blocks() {
+        let base = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/replay");
+        let session = ReplaySession::new(None).unwrap();
+        for name in ["people-transfer", "people-kill-prefix"] {
+            let mut artifact = Artifact::load(&base.join(name)).unwrap();
+            let state: Header = serde_json::from_value(artifact.parent_header.clone()).unwrap();
+            let db = open_db(&artifact, None, &session, &state).unwrap();
+            let (wasm, heap) = runtime_code(&db, *state.state_root()).unwrap();
+            load(&mut artifact, &db, &wasm, heap, &session, &state).unwrap();
+            assert!(!artifact.metadata.is_empty());
+            artifact.proof_nodes = db.export();
+            let fresh = ReplaySession::new(None).unwrap();
+            let db = open_db(&artifact, None, &fresh, &state).unwrap();
+            let (wasm, heap) = runtime_code(&db, *state.state_root()).unwrap();
+            load(&mut artifact, &db, &wasm, heap, &fresh, &state).unwrap();
+            assert!(
+                !artifact.metadata.is_empty(),
+                "cache-hit save retains metadata proofs"
+            );
+        }
+        assert_eq!(session.metadata_runs.load(Ordering::Relaxed), 1);
+        let cache = session.metadata.lock();
+        let entry = cache.values().next().unwrap();
+        assert!(
+            !entry.reads.is_empty(),
+            "People metadata constants read storage"
+        );
+        assert!(entry.iteration_root.is_none());
     }
 }

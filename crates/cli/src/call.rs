@@ -53,8 +53,8 @@ pub struct CallArgs {
     /// Combined disk cache limit in bytes; active runtime modules remain pinned.
     #[arg(long, default_value_t = 1073741824)]
     cache_max_bytes: u64,
-    /// Allow UNAUTHENTICATED RPC metadata if local metadata execution is impossible.
-    #[arg(long)]
+    /// Allow UNAUTHENTICATED metadata: RPC online, stored artifact metadata offline.
+    #[arg(long = "unauthenticated-metadata", alias = "rpc-metadata-fallback")]
     rpc_metadata_fallback: bool,
 }
 
@@ -152,9 +152,9 @@ pub fn run(args: CallArgs) -> Result<()> {
         oracle_match: replay.oracle_match,
         oracle_source: replay.oracle_match.map(|_| {
             if args.offline.is_some() {
-                "recorded (unverified)"
+                "recorded (unverified)".into()
             } else {
-                "live"
+                "live".into()
             }
         }),
         proof_bytes: replay.proof_bytes,
@@ -164,7 +164,7 @@ pub fn run(args: CallArgs) -> Result<()> {
             .into(),
     });
     for phase in &mut trace.phases {
-        phase.kind = "call";
+        phase.kind = "call".into();
         phase.label = context.method.clone();
     }
     eprintln!(
@@ -183,7 +183,7 @@ pub fn run(args: CallArgs) -> Result<()> {
             "state_call oracle: {}{}",
             if matched { "MATCH" } else { "MISMATCH" },
             if args.offline.is_some() {
-                " (recorded (unverified))"
+                " (recorded; unverified)"
             } else {
                 ""
             }

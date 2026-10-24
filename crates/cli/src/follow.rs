@@ -279,6 +279,7 @@ pub fn run(args: FollowArgs) -> Result<()> {
                         )?;
                         let mut block = annotate(&loaded.traced, loaded.metadata.as_ref());
                         block.block_number = loaded.block_number;
+                        block.execution = loaded.execution;
                         if let Some(endpoint) = &otlp {
                             frame_trace_otel::export_otlp(&block, endpoint, Timing::default())?;
                         }

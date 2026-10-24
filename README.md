@@ -103,20 +103,28 @@ not standalone extrinsic proof sizes.
 Names require metadata V14 or newer. Metadata for calls **and block names** comes
 from local execution of the authenticated runtime against the selected state:
 `Metadata_metadata_at_version(16)`, then 15, then legacy `Metadata_metadata` (V14).
-The cache is indexed by authenticated code hash and retains state-root proof
-dependencies for self-contained offline replay. RPC `state_getMetadata` is never
+The cache is indexed by authenticated code hash and captured storage dependency values.
+Each new state root authenticates those values before reuse; an export with no
+storage reads reuses solely by code hash. Metadata constants in the People runtime
+do read storage, so treating metadata as code-only would be incorrect. A changed
+value regenerates metadata. Iteration dependencies conservatively retain the state
+root. Saved artifacts retain the current state’s metadata execution proofs, including
+after a cache hit, for self-contained offline replay. RPC `state_getMetadata` is never
 queried by default. If local metadata execution is impossible, replay uses unnamed
-storage/hex results; `--args` requires API types. Explicit `--rpc-metadata-fallback`
+storage/hex results; `--args` requires API types. Explicit `--unauthenticated-metadata`
 permits **unauthenticated** RPC metadata (or stored metadata offline) and labels
-that fallback prominently. Legacy artifacts without metadata execution proofs may
-need that flag to recover their old names. Metadata transport cancellation and
+that fallback prominently. The three People block fixtures include metadata execution proofs and need no fallback.
+The old `--rpc-metadata-fallback` spelling remains an alias. Metadata transport cancellation and
 exhausted retries propagate as errors.
 Caught replay-execution panics return clean errors without the default panic text;
 panics outside that execution scope still use the normal panic hook.
 
 Hook spans are named `on_initialize: Balances` (also `on_finalize`, `on_idle` and
-`on_poll`). Metadata type paths resolve the pallet's runtime name; multi-instance
-mappings list all candidate names. Missing mappings use the crate name in CamelCase
+`on_poll`). Metadata type paths resolve the pallet's runtime name. The n-th hook of a crate
+is assigned to the n-th matching pallet instance in metadata pallet index order
+(AllPalletsWithSystem): for example `on_initialize: Assets`, then
+`on_initialize: PoolAssets`. This uses observed hook order; missing/incomplete
+hook tracing can make instance attribution incomplete. Missing mappings use the crate name in CamelCase
 with `pallet_` removed (for example `Aura` and `CumulusXcmpQueue`).
 `frame.runtime.target` is retained.
 Every storage op has `db.collection.name`: the decoded pallet (including prefixed
@@ -212,3 +220,83 @@ A separate `storage` command is deferred: these calls already expose authenticat
 storage reads and their execution proof sizes. A direct storage query's extra value
 would be per-key trie depth/node accounting, which is not yet exposed by the shared
 recorder. Raw storage values and a standalone trie-depth view remain future work.
+
+
+## Read origins, proof accounting, and saved summaries
+
+```sh
+target/release/frame-trace block --offline fixtures/replay/people-traced --json batch.json
+target/release/frame-trace summary --from-json batch.json --top 10
+```
+
+Every measured `get`, `exists`, and `hash` (including child reads) has an `origin`:
+`overlay` means the SDK externalities returned without invoking the trie backend;
+`backend_warm` means a backend call used only trie nodes already recorded during
+this execution; `backend_cold` means it introduced new nodes. Backend markers are
+matched to the immediately following synchronous externalities read, within its
+observed host span. This observes backend access, rather than inferring it from a
+repeated key or zero proof growth. Recorder node sets establish warmth, including
+across recorder transaction rollback. It says nothing about physical disk I/O,
+OS/database caches, RPC acquisition, or whether removing a read would be safe.
+A fresh measured recorder excludes earlier runtime loading and metadata execution.
+Legacy `state_traceBlock` JSON lacks this evidence and reports unknown origins.
+
+`proof_bytes_added` is positive growth of the SDK recorder's encoded-size estimate
+at ordered storage-operation events. The first operation to introduce shared trie
+nodes gets their bytes; later users get zero. Backend iteration events can introduce
+nodes inside an enclosing prefix clear, so those events receive the bytes and the
+outer event gets only subsequent growth. No nested double counting is added.
+Recorder shrinkage at transaction boundaries resets the growth baseline: a path
+reintroduced after rollback can be warm yet add proof bytes again. Therefore sums
+in rollback-heavy blocks can exceed the final execution proof. Internal work without
+a storage event is charged to the next event, or reported as unattributed if it
+happens after the last event. These are marginal estimates, not standalone item or
+extrinsic proofs, PoV size, or network bytes. `execution` in block JSON records the
+root-check result, final proof bytes, RPC calls, and acquisition rounds separately.
+
+Summary splits duplicate reads by origin and reports real backend calls alongside
+overlay hits. It aggregates marginal proof bytes by storage item, phase, and
+extrinsic, ranks items by proof bytes, and counts `next_key`/backend iterator
+attempts in an **iteration** column. Attempts are neither writes nor proof of a
+returned or deleted key. Byte columns sum known value lengths; an overlay read
+still contributes logical bytes. Duplicate scope remains the same full key within
+a phase, including repeats after writes.
+
+Each phase exports `wall_time` with `start_ns`, `end_ns`, `duration_ns`, and `source`.
+`runtime_span` bounds enclose the measured executive/hook spans defining that phase;
+`storage_envelope` bounds enclose only observed storage calls when runtime spans
+are unavailable. The latter excludes unobserved compute before/after those calls.
+Untimed input has null bounds. Parent extrinsic bounds can include nested
+`post_inherents`; its operations, proof bytes, and storage time are counted separately. Storage
+time is the union of operation intervals, including nested backend intervals once.
+These timings include instrumentation on the replay machine, not node latency.
+
+## Reports across blocks
+
+```sh
+target/release/frame-trace report blocks/*.json --top 10 --json report.json
+target/release/frame-trace report --rpc wss://westend-asset-hub-rpc.polkadot.io \
+  --from 18563569 --to 18563608 --cache-dir .trace-cache --json range.json
+target/release/frame-trace report --rpc wss://westend-asset-hub-rpc.polkadot.io \
+  --last 20 --concurrency 2 --proof-concurrency 4
+```
+
+`report` accepts saved `block --json` files (also repeatable `--from-json FILE`)
+or a non-genesis, finalized inclusive range of at most 10,000 blocks. `--last K`
+anchors once to the finalized head. Live requests pin each block hash and reuse
+proof, compiled-runtime, and metadata caches. Two block workers run by default
+(configurable 1–4); proof RPC concurrency is a separate shared bound. Historical
+ranges may require archive state. Repeated input block hashes and call traces are
+rejected. Saved inputs do no replay and require no RPC client.
+
+Short terminal tables and complete JSON show phase shares of operations, unioned
+storage time and attributed proof bytes; per-item origins, writes, iteration,
+logical bytes, proof bytes and duplicates; observed hook/pallet totals; and
+extrinsic-type count, median and nearest-rank p95 operations, marginal proof bytes,
+and storage time. JSON additionally includes observed extrinsic wall-time
+statistics when runtime span bounds exist. Inherents and signed extrinsics have
+separate phase groups when the extrinsic bytes identify them. Missing origins are counted as unknown; `proof_ops_observed` distinguishes
+missing proof evidence from a measured zero. Runtime wall-time distributions are
+null without defining runtime spans. Old saved output is never assigned an inferred
+origin or proof measurement. Avoid combining different chains with
+the same pallet/call names unless that grouping is intentional.

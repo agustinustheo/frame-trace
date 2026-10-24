@@ -70,6 +70,9 @@ frame-trace call    --rpc wss://… [--at finalized] --method AccountNonceApi_ac
 frame-trace call    --offline <artifact-dir> [--summary] [--otlp …]
 frame-trace follow  --rpc wss://… [--otlp …]                    # trace each new block
 frame-trace summary --rpc … --block …                            # terminal tables: top items, duplicate reads, per extrinsic
+frame-trace summary --from-json block.json                       # no replay
+frame-trace report  blocks/*.json --json report.json               # aggregate saved traces
+frame-trace report  --rpc wss://… --last 20                        # finalized range, shared caches
 ```
 
 ## Phases

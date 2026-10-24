@@ -136,6 +136,11 @@ impl TracedBlock {
                 }
             });
             op.parent_span = event.parent_id;
+            op.origin = event.fields.get("origin").cloned();
+            op.proof_bytes_added = event
+                .fields
+                .get("proof_bytes_added")
+                .and_then(|s| s.parse().ok());
         }
         block.runtime_spans = capture.spans.clone();
         block.timing = Some(MeasuredTiming {

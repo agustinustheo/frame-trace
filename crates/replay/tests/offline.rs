@@ -20,6 +20,8 @@ fn keyed_events(events: &[ReplayEvent]) -> Vec<BTreeMap<String, String>> {
         .map(|e| {
             let mut fields = e.fields.clone();
             fields.remove("ext_id");
+            fields.remove("origin");
+            fields.remove("proof_bytes_added");
             fields
         })
         .collect()
@@ -52,16 +54,10 @@ fn keyed_phases(block: &TracedBlock) -> Vec<(PhaseKind, Vec<(OpKind, String)>)> 
         .collect()
 }
 fn check(name: &str, wasm: bool) {
-    // Legacy artifacts predate metadata execution proofs; explicitly permit their recorded
-    // decoding metadata. New artifacts are tested without this fallback in calls.rs.
-    let result = frame_trace_replay::replay_with_session(
-        Artifact::load(&fixture(name)).unwrap(),
-        None,
-        &frame_trace_replay::ReplaySession::new(None)
-            .unwrap()
-            .with_rpc_metadata_fallback(true),
-    )
-    .unwrap();
+    let result = replay(Artifact::load(&fixture(name)).unwrap(), None).unwrap();
+    if name.starts_with("people-") {
+        assert!(!result.artifact.metadata.is_empty());
+    }
     assert!(result.root_check);
     assert_eq!((result.rpc_count, result.measured_rpc_count), (0, 0));
     assert!(result.proof_bytes > 0);

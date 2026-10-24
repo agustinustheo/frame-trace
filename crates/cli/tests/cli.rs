@@ -269,7 +269,7 @@ fn offline_block_reports_root_and_writes_measured_named_json() {
         "block",
         "--offline",
         &fixture("replay/people-transfer"),
-        "--rpc-metadata-fallback",
+        "--unauthenticated-metadata",
         "--json",
         path.to_str().unwrap(),
     ]);
@@ -588,7 +588,7 @@ fn help_describes_best_concurrency_cache_and_otlp_default() {
         "32 keys",
         "compiled Wasm",
         "cache limit",
-        "--rpc-metadata-fallback",
+        "--unauthenticated-metadata",
     ] {
         assert!(text.contains(word), "{text}");
     }
@@ -610,7 +610,7 @@ fn call_offline_exports_measured_named_ops_and_self_contained_round_trip() {
         "call",
         "--offline",
         &fixture("replay/call-people-nonce"),
-        "--rpc-metadata-fallback",
+        "--unauthenticated-metadata",
         "--json",
         "-",
         "--save",
@@ -645,7 +645,7 @@ fn call_offline_exports_measured_named_ops_and_self_contained_round_trip() {
         "--offline",
         dir.to_str().unwrap(),
         "--summary",
-        "--rpc-metadata-fallback",
+        "--unauthenticated-metadata",
     ]);
     assert!(
         repeated.status.success(),
@@ -721,7 +721,7 @@ fn call_public_offline_decodes_result_and_labels_recorded_oracle() {
     assert_eq!(json["call"]["oracle_source"], "recorded (unverified)");
     assert!(
         String::from_utf8_lossy(&out.stderr)
-            .contains("state_call oracle: MATCH (recorded (unverified))")
+            .contains("state_call oracle: MATCH (recorded; unverified)")
     );
 }
 
@@ -786,6 +786,11 @@ fn local_metadata_rejects_unknown_method_and_wrong_argument_types() {
             "{\"account\":\"wrong type\"}",
             "--args: cannot encode",
         ),
+        (
+            "AccountNonceApi_account_nonce",
+            "{\"account\":42}",
+            "argument account: expected sp_core::crypto::AccountId32",
+        ),
     ] {
         let out = run(&[
             "call", "--rpc", &node.url, "--method", method, "--args", args,
@@ -811,7 +816,7 @@ fn oracle_mismatch_exits_three_after_emitting_parseable_json_and_summary_to_stde
     assert_eq!(json["call"]["oracle_match"], false);
     assert_eq!(json["call"]["oracle_source"], "live");
     assert!(
-        stderr.contains("MISMATCH") && stderr.contains("Top 15 storage items"),
+        stderr.contains("MISMATCH") && stderr.contains("Top items by proof bytes"),
         "{stderr}"
     );
 }
@@ -878,4 +883,109 @@ fn mock_handler_assertions_are_reported_and_propagated_to_the_test_thread() {
         frame_trace_replay::Error::RpcResponse { code: -32099, .. }
     ));
     assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| drop(node))).is_err());
+}
+
+#[test]
+fn saved_block_json_drives_summary_and_multiblock_reports_without_replay() {
+    let path = std::env::temp_dir().join(format!("frame-report-{}.json", std::process::id()));
+    let path2 = path.with_extension("second.json");
+    let output = run(&[
+        "block",
+        "--from-file",
+        &fixture("model/two-extrinsics.json"),
+        "--json",
+        path.to_str().unwrap(),
+    ]);
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let mut block: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    let count = block["totals"]["ops"].as_u64().unwrap();
+    block["block_hash"] = "another block".into();
+    std::fs::write(&path2, serde_json::to_vec(&block).unwrap()).unwrap();
+    let summary = run(&["summary", "--from-json", path.to_str().unwrap()]);
+    assert!(
+        summary.status.success(),
+        "{}",
+        String::from_utf8_lossy(&summary.stderr)
+    );
+    assert!(summary.stderr.is_empty(), "summary should not replay");
+    let report = run(&[
+        "report",
+        path.to_str().unwrap(),
+        path2.to_str().unwrap(),
+        "--json",
+        "-",
+    ]);
+    assert!(
+        report.status.success(),
+        "{}",
+        String::from_utf8_lossy(&report.stderr)
+    );
+    let json: serde_json::Value = serde_json::from_slice(&report.stdout).unwrap();
+    assert_eq!(json["blocks"], 2);
+    assert_eq!(json["totals"]["ops"], count * 2);
+    let duplicate = run(&[
+        "report",
+        "--from-json",
+        path.to_str().unwrap(),
+        "--from-json",
+        path.to_str().unwrap(),
+    ]);
+    assert!(!duplicate.status.success());
+    assert!(String::from_utf8_lossy(&duplicate.stderr).contains("duplicate block hash"));
+    for p in [path, path2] {
+        std::fs::remove_file(p).unwrap();
+    }
+}
+
+#[test]
+fn report_last_pins_finalized_hash_and_exports_replay_statistics() {
+    let _guard = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    let artifact = frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
+        "replay/people-transfer",
+    )))
+    .unwrap();
+    let other = frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
+        "replay/people-kill-prefix",
+    )))
+    .unwrap();
+    // The mock aliases height 7 to the transfer fixture and height 8 to the kill
+    // fixture; both pinned hashes and their execution proofs remain authentic.
+    // This exercises concurrent scheduling independently of chain ancestry.
+    let node = MockNode::new(move |request| {
+        use serde_json::json;
+        let method = request["method"].as_str().unwrap();
+        if method == "chain_getFinalizedHead" {
+            return json!({"result":other.block_hash});
+        }
+        if method == "chain_getBlockHash" {
+            return json!({"result":if request["params"][0] == 7 {artifact.block_hash} else {other.block_hash}});
+        }
+        let at = if method == "state_getReadProof" {
+            &request["params"][1]
+        } else {
+            &request["params"][0]
+        };
+        let first =
+            *at == json!(artifact.block_hash) || *at == artifact.block["header"]["parentHash"];
+        artifact_rpc(if first { &artifact } else { &other }, request)
+    });
+    let out = run(&["report", "--rpc", &node.url, "--last", "2", "--json", "-"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["blocks"], 2);
+    assert!(json["totals"]["backend_cold"].as_u64().unwrap() > 0);
+    assert_eq!(json["execution_proof_bytes"], 6479 + 6867);
+    assert_eq!(json["totals"]["proof_bytes"], 6479 + 6867);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(stderr.matches("root check: PASS").count(), 2);
+    assert_eq!(stderr.matches("(measured: 0)").count(), 2);
 }

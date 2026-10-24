@@ -13,10 +13,13 @@ pub struct SourceArgs {
     #[arg(
         long,
         value_name = "TRACE.json",
-        required_unless_present_any = ["rpc", "offline"],
-        conflicts_with_all = ["rpc", "offline"]
+        required_unless_present_any = ["rpc", "offline", "from_json"],
+        conflicts_with_all = ["rpc", "offline", "from_json"]
     )]
     pub from_file: Option<PathBuf>,
+    /// Saved block --json output; summary reads this without replay.
+    #[arg(long, value_name = "FILE", conflicts_with_all = ["rpc", "offline", "from_file", "save", "metadata", "block"])]
+    pub from_json: Option<PathBuf>,
     /// Runtime metadata of the block's runtime: SCALE bytes (`.scale`), or hex as returned by
     /// `state_getMetadata` (`.hex`, or the JSON-RPC response).
     #[arg(long, value_name = "FILE", requires = "from_file")]
@@ -47,8 +50,8 @@ pub struct SourceArgs {
     /// Combined disk cache limit in bytes; active runtime modules remain pinned.
     #[arg(long, default_value_t = 1073741824)]
     pub cache_max_bytes: u64,
-    /// Allow UNAUTHENTICATED RPC metadata if local metadata execution is impossible.
-    #[arg(long)]
+    /// Allow UNAUTHENTICATED metadata: RPC online, stored artifact metadata offline.
+    #[arg(long = "unauthenticated-metadata", alias = "rpc-metadata-fallback")]
     pub rpc_metadata_fallback: bool,
 }
 
@@ -57,6 +60,7 @@ pub struct Loaded {
     pub traced: frame_trace_model::TracedBlock,
     pub metadata: Option<Metadata>,
     pub block_number: Option<u64>,
+    pub execution: Option<frame_trace_decode::ExecutionInfo>,
 }
 
 pub fn load(args: &SourceArgs) -> Result<Loaded> {
@@ -124,6 +128,7 @@ mod file {
                 .with_context(|| format!("converting trace from {}", trace_path.display()))?,
             metadata,
             block_number: None,
+            execution: None,
         })
     }
 
@@ -190,5 +195,12 @@ pub fn replay_loaded(replay: frame_trace_replay::Replay, save: Option<&Path>) ->
         traced: frame_trace_model::TracedBlock::from_replay(&replay.capture)?,
         metadata,
         block_number: Some(replay.block_number),
+        execution: Some(frame_trace_decode::ExecutionInfo {
+            root_check: replay.root_check,
+            proof_bytes: replay.proof_bytes,
+            rpc_calls: replay.rpc_count,
+            measured_rpc_calls: replay.measured_rpc_count,
+            proof_rounds: replay.proof_round_trips,
+        }),
     })
 }

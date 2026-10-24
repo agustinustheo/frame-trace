@@ -1,13 +1,16 @@
 //! A traced block with names: the form the exporters and the CLI consume.
 
 use frame_trace_model::{Phase, PrintedBytes, Stats, StorageOp, TracedBlock};
-use serde::Serialize;
+use parity_scale_codec::Decode;
+use serde::{Deserialize, Serialize};
 
 use crate::{KeyName, Metadata, key::well_known};
 
 /// A [`TracedBlock`] with every key and extrinsic named. Serialises to the `--json` output.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnnotatedBlock {
+    #[serde(default)]
+    pub execution: Option<ExecutionInfo>,
     /// Runtime API context, absent for block traces.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub call: Option<AnnotatedCall>,
@@ -31,23 +34,29 @@ pub struct AnnotatedBlock {
 }
 
 /// One authenticated runtime API execution. Block root checks do not apply to calls.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnnotatedCall {
     pub method: String,
     pub data: String,
     pub result: String,
     pub decoded: Option<String>,
     pub oracle_match: Option<bool>,
-    pub oracle_source: Option<&'static str>,
+    pub oracle_source: Option<String>,
     pub proof_bytes: usize,
     pub state_root: String,
 }
 
 /// One phase with its ops.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnnotatedPhase {
+    /// Measured phase bounds (including compute), absent if no defining spans exist.
+    #[serde(default)]
+    pub wall_time: Option<PhaseTiming>,
+    /// Whether the encoded extrinsic is signed; absent when bytes are unavailable.
+    #[serde(default)]
+    pub signed: Option<bool>,
     /// `initialization`, `apply_extrinsic`, `finalization` or `unsegmented`.
-    pub kind: &'static str,
+    pub kind: String,
     /// Extrinsic index for `apply_extrinsic`.
     pub extrinsic_index: Option<u32>,
     /// `Pallet.call` of the extrinsic, when its bytes were in the trace and decoded.
@@ -89,8 +98,12 @@ impl AnnotatedPhase {
 }
 
 /// One storage op with its key named.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnnotatedOp {
+    #[serde(default)]
+    pub origin: Option<String>,
+    #[serde(default)]
+    pub proof_bytes_added: Option<usize>,
     /// Measured local replay interval.
     pub timing: Option<frame_trace_model::MeasuredTiming>,
     /// Parent capture span ID.
@@ -98,7 +111,7 @@ pub struct AnnotatedOp {
     /// Position in the block.
     pub seq: usize,
     /// Operation name (`get`, `put`, ...).
-    pub op: &'static str,
+    pub op: String,
     /// Child trie storage key (hex, `0x`-prefixed), if the op is on a child trie.
     pub child_trie: Option<String>,
     /// The node printed the child trie key truncated (`<head>...<tail>` in `child_trie`).
@@ -132,7 +145,9 @@ pub struct AnnotatedOp {
 /// Names the keys and extrinsics of `block`. Without metadata, keys outside the well-known set
 /// are `<unknown>` and extrinsics are unnamed.
 pub fn annotate(block: &TracedBlock, metadata: Option<&Metadata>) -> AnnotatedBlock {
+    let mut hooks = std::collections::BTreeMap::<(String, String), usize>::new();
     AnnotatedBlock {
+        execution: None,
         call: None,
         runtime_spans: block
             .runtime_spans
@@ -144,9 +159,11 @@ pub fn annotate(block: &TracedBlock, metadata: Option<&Metadata>) -> AnnotatedBl
                     "on_initialize" | "on_finalize" | "on_idle" | "on_poll"
                 ) {
                     let krate = span.target.split("::").next().unwrap_or(&span.target);
+                    let occurrence = hooks.entry((span.name.clone(), krate.into())).or_default();
                     let pallet = metadata
-                        .and_then(|md| md.pallet_for_crate(krate))
+                        .and_then(|md| md.pallets_for_crate(krate).get(*occurrence).cloned())
                         .unwrap_or_else(|| crate_label(krate));
+                    *occurrence += 1;
                     if krate != "runtime" && !krate.is_empty() {
                         span.name = format!("{}: {pallet}", span.name);
                     }
@@ -186,7 +203,13 @@ fn annotate_phase(
         None => phase.kind.to_string(),
     };
     AnnotatedPhase {
-        kind: phase.kind.name(),
+        wall_time: phase_bounds(block, phase),
+        signed: phase.extrinsic.as_ref().and_then(|bytes| {
+            let mut cursor = bytes.as_slice();
+            parity_scale_codec::Compact::<u32>::decode(&mut cursor).ok()?;
+            cursor.first().map(|b| b & 0x80 != 0)
+        }),
+        kind: phase.kind.name().into(),
         extrinsic_index: phase.kind.extrinsic_index(),
         call,
         call_error,
@@ -229,9 +252,11 @@ fn annotate_op(op: &StorageOp, metadata: Option<&Metadata>) -> AnnotatedOp {
     };
     AnnotatedOp {
         timing: op.timing,
+        origin: op.origin.clone(),
+        proof_bytes_added: op.proof_bytes_added,
         parent_span: op.parent_span,
         seq: op.seq,
-        op: op.kind.as_str(),
+        op: op.kind.as_str().into(),
         child_trie: op.child_trie.as_ref().map(PrintedBytes::to_hex),
         child_trie_truncated: op
             .child_trie
@@ -272,5 +297,114 @@ mod naming_tests {
         assert_eq!(crate_label("pallet_aura"), "Aura");
         assert_eq!(crate_label("cumulus_pallet_xcmp_queue"), "CumulusXcmpQueue");
         assert_eq!(crate_label("unknown_runtime_crate"), "UnknownRuntimeCrate");
+    }
+}
+
+/// Explicit offsets on the replay clock. Duration includes compute and instrumentation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PhaseTiming {
+    pub start_ns: u64,
+    pub end_ns: u64,
+    pub duration_ns: u64,
+    /// runtime_span includes observed executive/hook spans; storage_envelope has only calls.
+    pub source: String,
+}
+fn phase_bounds(block: &TracedBlock, phase: &Phase) -> Option<PhaseTiming> {
+    let mut extrinsic = 0;
+    let mut bounds: Option<(u64, u64)> = None;
+    for span in &block.runtime_spans {
+        let matches = match span.name.as_str() {
+            "apply_extrinsic" => {
+                let i = extrinsic;
+                extrinsic += 1;
+                phase.kind.extrinsic_index() == Some(i)
+            }
+            "initialize_block" | "init_block" | "initial_checks" | "on_initialize" => {
+                phase.kind.name() == "initialization"
+            }
+            "finalize_block" | "final_checks" | "on_finalize" | "on_idle" => {
+                phase.kind.name() == "finalization"
+            }
+            "inherents_applied" => phase.kind.name() == "post_inherents",
+            _ => false,
+        };
+        if matches && let Some(end) = span.end_ns {
+            bounds = Some(bounds.map_or((span.start_ns, end), |(lo, hi)| {
+                (lo.min(span.start_ns), hi.max(end))
+            }));
+        }
+    }
+    let source = if bounds.is_some() {
+        "runtime_span"
+    } else {
+        "storage_envelope"
+    };
+    // Include native calls outside executive wrappers as well. The explicit interval
+    // is the envelope of observed evidence, never a fabricated full-phase timer.
+    for timing in block.phase_ops(phase).filter_map(|op| op.timing) {
+        let end = timing.start_ns.saturating_add(timing.duration_ns);
+        bounds = Some(bounds.map_or((timing.start_ns, end), |(lo, hi)| {
+            (lo.min(timing.start_ns), hi.max(end))
+        }));
+    }
+    bounds.map(|(start_ns, end_ns)| PhaseTiming {
+        start_ns,
+        end_ns,
+        duration_ns: end_ns.saturating_sub(start_ns),
+        source: source.into(),
+    })
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecutionInfo {
+    pub root_check: bool,
+    pub proof_bytes: usize,
+    pub rpc_calls: usize,
+    pub measured_rpc_calls: usize,
+    pub proof_rounds: usize,
+}
+
+#[cfg(test)]
+mod phase_timing_tests {
+    #![allow(clippy::unwrap_used)]
+    use super::*;
+    #[test]
+    fn phase_json_has_explicit_bounds_and_marks_storage_only_envelopes() {
+        let raw = frame_trace_model::rpc::parse_trace_block(include_str!(
+            "../../../fixtures/model/two-extrinsics.json"
+        ))
+        .unwrap();
+        let mut block = TracedBlock::from_trace(&raw).unwrap();
+        for op in &mut block.ops {
+            op.timing = Some(frame_trace_model::MeasuredTiming {
+                start_ns: 10 + op.seq as u64 * 10,
+                duration_ns: 5,
+            });
+        }
+        block.runtime_spans = vec![frame_trace_model::RuntimeSpan {
+            id: 1,
+            parent_id: None,
+            name: "init_block".into(),
+            target: "runtime".into(),
+            wasm: true,
+            fields: Default::default(),
+            start_ns: 1,
+            end_ns: Some(99),
+            duration_ns: 98,
+            enters: 1,
+            proof_start_bytes: 0,
+            proof_end_bytes: 0,
+        }];
+        let named = annotate(&block, None);
+        let init = named.phases[0].wall_time.as_ref().unwrap();
+        assert_eq!((init.start_ns, init.end_ns, init.duration_ns), (1, 99, 98));
+        assert_eq!(init.source, "runtime_span");
+        let other = named.phases[1].wall_time.as_ref().unwrap();
+        assert_eq!(other.duration_ns, other.end_ns - other.start_ns);
+        assert_eq!(other.source, "storage_envelope");
+        let json = serde_json::to_value(&named).unwrap();
+        assert_eq!(json["phases"][0]["wall_time"]["end_ns"], 99);
+        let loaded: AnnotatedBlock = serde_json::from_value(json).unwrap();
+        assert_eq!(loaded.phases[0].wall_time.as_ref().unwrap().duration_ns, 98);
     }
 }

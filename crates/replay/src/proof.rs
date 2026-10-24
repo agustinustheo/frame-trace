@@ -96,23 +96,6 @@ impl ProofDb {
             round_trips: Default::default(),
         }
     }
-    pub fn used_nodes(&self) -> Vec<Vec<u8>> {
-        let used = self.used.lock();
-        self.nodes
-            .lock()
-            .iter()
-            .filter(|(h, _)| used.contains(h))
-            .map(|(_, node)| node.clone())
-            .collect()
-    }
-    pub fn retain_nodes(&self, nodes: &[Vec<u8>]) {
-        self.insert_nodes(nodes.iter().cloned());
-        self.used.lock().extend(
-            nodes
-                .iter()
-                .map(|node| H256::from(sp_io::hashing::blake2_256(node))),
-        );
-    }
     pub fn rpc(&self) -> Option<&Rpc> {
         self.rpc.as_ref()
     }

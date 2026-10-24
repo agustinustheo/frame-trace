@@ -8,14 +8,14 @@ once under `blobs/<blake2-256>.zst`; fixture metadata/node strings use `blob:<ha
 The loader bounds decompression and verifies each blob's content hash before
 rehydrating hex. No arbitrary reference paths are accepted. `Artifact::save`
 always writes self-contained artifacts. The seventeen compressed files, including call artifacts, blobs,
-oracles and the public reference, total 11,150,918 bytes (10.63 MiB). Sharing the
+oracles and the public reference, total 11,153,408 bytes (10.63 MiB). Sharing the
 Westend Wasm as raw blob bytes also reduces the original public block artifact.
 
 | Directory | Block | Source | Artifact bytes |
 | --- | --- | --- | ---: |
-| `people-transfer` | 2 / `ea56e9d6…` | E2 untraced People, signed transfer | 7,882 |
-| `people-kill-prefix` | 8 / `7d99aaa1…` | E2 untraced People, sudo kill_prefix | 8,368 |
-| `people-traced` | 4 / `06618995…` | E2 traced People, three-transfer batch | 4,115,093 |
+| `people-transfer` | 2 / `ea56e9d6…` | E2 untraced People, signed transfer | 8,563 |
+| `people-kill-prefix` | 8 / `7d99aaa1…` | E2 untraced People, sudo kill_prefix | 9,114 |
+| `people-traced` | 4 / `06618995…` | E2 traced People, three-transfer batch | 4,116,156 |
 | `westend-asset-hub` | 18,558,320 / `4c0d1d57…` | Public Westend Asset Hub, two inherents | 275,788 |
 
 The local `oracle.json.zst` files are E2's independent `state_traceBlock` RPC
@@ -79,6 +79,18 @@ Round 3 added `call-westend-dryrun` at Westend Asset Hub #18,563,012, recorded
 exercises the executor-backed runtime-version reader. Its oracle is recorded
 (unverified), as with every offline oracle. Both this fixture and the refreshed
 `call-westend-nonce` retain metadata-execution dependencies and re-derive V16
-locally without RPC or fallback. Original People and block fixtures predate those
-metadata-only proofs; naming tests explicitly opt into their recorded metadata
-with `with_rpc_metadata_fallback(true)` / `--rpc-metadata-fallback`.
+locally without RPC or fallback. Round 4 extends `people-traced`, `people-transfer`, and `people-kill-prefix`
+with metadata-only proof nodes. A fresh local E1 traced People chain executed
+`Metadata_metadata_at_version(16)` while loading metadata for a saved
+`Metadata_metadata_versions` call at genesis. Small dependency proof nodes were
+merged into the existing artifacts; original block/parent hashes and independent
+ordered oracles remain unchanged. Every needed node is re-authenticated by
+traversing each original parent root; fresh offline sessions regenerate V16 names
+without any fallback or RPC. The transferred nodes cover unchanged constants
+(including NetworkSuffix/Parameters); unrelated large runtime-loading nodes were
+excluded. Artifact sizes are now 8,563 / 9,114 / 4,116,156 bytes for transfer,
+kill-prefix / traced batch. Local regeneration used E1 `run-node.py`,
+`/tmp/pm-audit/e1/people-traced.json`, and the documented omni-node binary. The
+runtime source/Binary/Wasm provenance remains E1’s. `--unauthenticated-metadata`
+(`--rpc-metadata-fallback` alias) explicitly allows stored metadata for older
+artifacts that still lack execution dependencies; output labels it unauthenticated.
