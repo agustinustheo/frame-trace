@@ -196,7 +196,11 @@ impl Rpc {
                         if error["code"] == 429 || lower.contains("too many requests") {
                             return Err(Error::TransientRpc(message));
                         }
-                        return Err(Error::Rpc(message));
+                        return Err(Error::RpcResponse {
+                            method: method.into(),
+                            code: error["code"].as_i64().unwrap_or(-32603),
+                            message: error["message"].as_str().unwrap_or(&text).into(),
+                        });
                     }
                     return body
                         .get("result")

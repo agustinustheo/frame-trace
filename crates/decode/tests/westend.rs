@@ -422,3 +422,21 @@ fn runtime_api_json_args_and_complete_results() {
             .is_err()
     );
 }
+
+#[test]
+fn api_wrong_types_and_missing_method_are_user_errors() {
+    let md = westend(16);
+    let error = md
+        .encode_runtime_args("AccountNonceApi_account_nonc", &serde_json::json!([]))
+        .unwrap_err()
+        .to_string();
+    assert!(error.starts_with("runtime API method") && error.contains("did you mean"));
+    let error = md
+        .encode_runtime_args(
+            "AccountNonceApi_account_nonce",
+            &serde_json::json!(["wrong"]),
+        )
+        .unwrap_err()
+        .to_string();
+    assert!(!error.starts_with("invalid metadata:"));
+}

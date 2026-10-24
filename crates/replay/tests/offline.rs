@@ -1,7 +1,7 @@
 //! Real signed blocks and the public parachain execute without a node or any network access.
 #![allow(clippy::unwrap_used)]
 use frame_trace_model::{OpKind, PhaseKind, ReplayEvent, TracedBlock, rpc::parse_trace_block};
-use frame_trace_replay::{Artifact, Error, offline, replay};
+use frame_trace_replay::{Artifact, Error, replay};
 use serde_json::Value;
 use std::{collections::BTreeMap, path::PathBuf};
 
@@ -52,7 +52,16 @@ fn keyed_phases(block: &TracedBlock) -> Vec<(PhaseKind, Vec<(OpKind, String)>)> 
         .collect()
 }
 fn check(name: &str, wasm: bool) {
-    let result = offline(&fixture(name)).unwrap();
+    // Legacy artifacts predate metadata execution proofs; explicitly permit their recorded
+    // decoding metadata. New artifacts are tested without this fallback in calls.rs.
+    let result = frame_trace_replay::replay_with_session(
+        Artifact::load(&fixture(name)).unwrap(),
+        None,
+        &frame_trace_replay::ReplaySession::new(None)
+            .unwrap()
+            .with_rpc_metadata_fallback(true),
+    )
+    .unwrap();
     assert!(result.root_check);
     assert_eq!((result.rpc_count, result.measured_rpc_count), (0, 0));
     assert!(result.proof_bytes > 0);

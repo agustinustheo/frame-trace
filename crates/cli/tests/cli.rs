@@ -260,7 +260,7 @@ fn child_trie_keys_are_named_and_grouped_by_key() {
 
 #[test]
 fn offline_block_reports_root_and_writes_measured_named_json() {
-    let _serial = REPLAY_TEST_LOCK.lock().unwrap();
+    let _serial = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
     let path = std::env::temp_dir().join(format!(
         "frame-trace-offline-cli-{}.json",
         std::process::id()
@@ -269,6 +269,7 @@ fn offline_block_reports_root_and_writes_measured_named_json() {
         "block",
         "--offline",
         &fixture("replay/people-transfer"),
+        "--rpc-metadata-fallback",
         "--json",
         path.to_str().unwrap(),
     ]);
@@ -338,9 +339,14 @@ impl MockNode {
                     }
                     let mut raw = vec![0; len]; if reader.read_exact(&mut raw).is_err() { return; }
                     let request: serde_json::Value = serde_json::from_slice(&raw).unwrap();
-                    let mut body = handler(&request); body["jsonrpc"] = "2.0".into(); body["id"] = request["id"].clone();
+                    let response = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| handler(&request)));
+                    let mut body = match &response {
+                        Ok(body) => body.clone(),
+                        Err(payload) => serde_json::json!({"error":{"code":-32099,"message":format!("mock handler assertion failed: {}", payload.downcast_ref::<String>().map(String::as_str).or_else(|| payload.downcast_ref::<&str>().copied()).unwrap_or("panic"))}}),
+                    }; body["jsonrpc"] = "2.0".into(); body["id"] = request["id"].clone();
                     let body = body.to_string();
                     let _ = write!(stream, "HTTP/1.1 200 OK\r\ncontent-type: application/json\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}", body.len());
+                    if let Err(payload) = response { std::panic::resume_unwind(payload); }
                 }));
             }
             for worker in workers {
@@ -357,8 +363,11 @@ impl MockNode {
 impl Drop for MockNode {
     fn drop(&mut self) {
         self.stop.store(true, std::sync::atomic::Ordering::SeqCst);
-        if let Some(worker) = self.worker.take() {
-            worker.join().unwrap();
+        if let Some(worker) = self.worker.take()
+            && let Err(payload) = worker.join()
+            && !std::thread::panicking()
+        {
+            std::panic::resume_unwind(payload);
         }
     }
 }
@@ -382,8 +391,8 @@ fn artifact_rpc(
 }
 
 #[test]
-fn cli_save_then_offline_and_summary_survive_unsupported_metadata() {
-    let _serial = REPLAY_TEST_LOCK.lock().unwrap();
+fn cli_save_then_offline_ignores_unauthenticated_rpc_metadata() {
+    let _serial = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
     let artifact = frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
         "replay/people-transfer",
     )))
@@ -402,7 +411,7 @@ fn cli_save_then_offline_and_summary_survive_unsupported_metadata() {
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(output.status.success(), "{stderr}");
     assert!(
-        stderr.contains("root check: PASS") && stderr.contains("unsupported metadata version V13"),
+        stderr.contains("root check: PASS") && !stderr.contains("unsupported metadata version V13"),
         "{stderr}"
     );
     drop(node); // The round trip must work after the mock node has stopped.
@@ -423,7 +432,7 @@ fn cli_save_then_offline_and_summary_survive_unsupported_metadata() {
 
 #[test]
 fn follow_mock_node_retries_failed_blocks_observes_new_heads_and_cancels() {
-    let _serial = REPLAY_TEST_LOCK.lock().unwrap();
+    let _serial = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
     use std::{
         process::Stdio,
         sync::{
@@ -450,7 +459,9 @@ fn follow_mock_node_retries_failed_blocks_observes_new_heads_and_cancels() {
         if request["method"] == "chain_getBlock" && request["params"][0] == new_hash {
             return serde_json::json!({"result": null});
         }
-        if request["method"] == "state_getMetadata" && attempts.fetch_add(1, Ordering::SeqCst) < 4 {
+        if request["method"] == "state_getRuntimeVersion"
+            && attempts.fetch_add(1, Ordering::SeqCst) < 4
+        {
             return serde_json::json!({"error":{"code":429,"message":"too many requests"}});
         }
         if request["method"] == "chain_getFinalizedHead" && advance.load(Ordering::SeqCst) > 0 {
@@ -568,6 +579,19 @@ fn help_describes_best_concurrency_cache_and_otlp_default() {
     ] {
         assert!(text.contains(word), "{text}");
     }
+    let output = run(&["call", "--help"]);
+    let text = String::from_utf8_lossy(&output.stdout);
+    for word in [
+        "stdout",
+        "--json",
+        "OTLP/HTTP",
+        "32 keys",
+        "compiled Wasm",
+        "cache limit",
+        "--rpc-metadata-fallback",
+    ] {
+        assert!(text.contains(word), "{text}");
+    }
     let output = run(&["follow", "--help"]);
     let text = String::from_utf8_lossy(&output.stdout);
     assert!(
@@ -579,13 +603,14 @@ fn help_describes_best_concurrency_cache_and_otlp_default() {
 
 #[test]
 fn call_offline_exports_measured_named_ops_and_self_contained_round_trip() {
-    let _guard = REPLAY_TEST_LOCK.lock().unwrap();
+    let _guard = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
     let dir =
         std::env::temp_dir().join(format!("frame-trace-call-roundtrip-{}", std::process::id()));
     let out = run(&[
         "call",
         "--offline",
         &fixture("replay/call-people-nonce"),
+        "--rpc-metadata-fallback",
         "--json",
         "-",
         "--save",
@@ -611,7 +636,17 @@ fn call_offline_exports_measured_named_ops_and_self_contained_round_trip() {
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(stderr.contains("root check: NOT APPLICABLE"));
     assert!(stderr.contains("RPC calls: 0 (measured: 0)"));
-    let repeated = run(&["call", "--offline", dir.to_str().unwrap(), "--summary"]);
+    assert!(
+        stderr.contains("V14 metadata has no runtime API types")
+            && !stderr.contains("invalid metadata:")
+    );
+    let repeated = run(&[
+        "call",
+        "--offline",
+        dir.to_str().unwrap(),
+        "--summary",
+        "--rpc-metadata-fallback",
+    ]);
     assert!(
         repeated.status.success(),
         "{}",
@@ -667,7 +702,7 @@ fn call_arguments_require_one_input_mode_and_offline_cannot_contact_rpc() {
 
 #[test]
 fn call_public_offline_decodes_result_and_labels_recorded_oracle() {
-    let _guard = REPLAY_TEST_LOCK.lock().unwrap();
+    let _guard = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
     let out = run(&[
         "call",
         "--offline",
@@ -683,5 +718,164 @@ fn call_public_offline_decodes_result_and_labels_recorded_oracle() {
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
     assert_eq!(json["call"]["decoded"], "520");
     assert_eq!(json["call"]["oracle_match"], true);
-    assert!(String::from_utf8_lossy(&out.stderr).contains("state_call oracle: MATCH (recorded)"));
+    assert_eq!(json["call"]["oracle_source"], "recorded (unverified)");
+    assert!(
+        String::from_utf8_lossy(&out.stderr)
+            .contains("state_call oracle: MATCH (recorded (unverified))")
+    );
+}
+
+fn call_node(mismatch: bool) -> MockNode {
+    let artifact = frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
+        "replay/call-westend-nonce",
+    )))
+    .unwrap();
+    MockNode::new(move |request| {
+        let result = match request["method"].as_str().unwrap() {
+            "chain_getHeader" => artifact.parent_header.clone(),
+            "chain_getBlockHash" | "chain_getFinalizedHead" => {
+                serde_json::json!(artifact.block_hash)
+            }
+            "state_getRuntimeVersion" => artifact.runtime_version.clone(),
+            "state_getReadProof" => {
+                serde_json::json!({"at":artifact.block_hash,"proof":artifact.proof_nodes})
+            }
+            "state_call" => serde_json::json!(if mismatch { "0xffffffff" } else { "0x08020000" }),
+            method => panic!("unexpected method {method}; metadata must execute locally"),
+        };
+        serde_json::json!({"result":result})
+    })
+}
+
+#[test]
+fn malformed_args_and_bad_data_are_identified_before_connecting() {
+    for (flag, value, expected) in [
+        ("--args", "{", "--args: malformed JSON"),
+        ("--data", "0xz", "--data: invalid SCALE hex"),
+    ] {
+        let out = run(&[
+            "call",
+            "--rpc",
+            "http://127.0.0.1:1",
+            "--method",
+            "Unknown_method",
+            flag,
+            value,
+        ]);
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert_eq!(out.status.code(), Some(1));
+        assert!(
+            stderr.contains(expected) && !stderr.contains("invalid metadata:"),
+            "{stderr}"
+        );
+    }
+}
+
+#[test]
+fn local_metadata_rejects_unknown_method_and_wrong_argument_types() {
+    let _serial = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    let node = call_node(false);
+    for (method, args, expected) in [
+        (
+            "AccountNonceApi_account_nonc",
+            "[]",
+            "did you mean AccountNonceApi_account_nonce?",
+        ),
+        (
+            "AccountNonceApi_account_nonce",
+            "{\"account\":\"wrong type\"}",
+            "--args: cannot encode",
+        ),
+    ] {
+        let out = run(&[
+            "call", "--rpc", &node.url, "--method", method, "--args", args,
+        ]);
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert_eq!(out.status.code(), Some(1), "{stderr}");
+        assert!(
+            stderr.contains(expected) && !stderr.contains("invalid metadata:"),
+            "{stderr}"
+        );
+    }
+}
+
+#[test]
+fn oracle_mismatch_exits_three_after_emitting_parseable_json_and_summary_to_stderr() {
+    let _serial = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    let node = call_node(true);
+    let out = run(&["call", "--rpc", &node.url, "--method", "AccountNonceApi_account_nonce", "--args",
+        &serde_json::json!({"account":frame_trace_replay::rpc::unhex("d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d").unwrap()}).to_string(), "--oracle", "--json", "-", "--summary"]);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(3), "{stderr}");
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["call"]["oracle_match"], false);
+    assert_eq!(json["call"]["oracle_source"], "live");
+    assert!(
+        stderr.contains("MISMATCH") && stderr.contains("Top 15 storage items"),
+        "{stderr}"
+    );
+}
+
+#[test]
+fn metadata_results_have_bounded_hex_preview_and_full_json() {
+    let _serial = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    let node = call_node(false);
+    let out = run(&[
+        "call",
+        "--rpc",
+        &node.url,
+        "--method",
+        "Metadata_metadata",
+        "--data",
+        "0x",
+        "--json",
+        "-",
+    ]);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "{stderr}");
+    assert!(
+        stderr.len() < 3000 && stderr.contains("full value in --json"),
+        "stderr bytes {}",
+        stderr.len()
+    );
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    let decoded = json["call"]["decoded"].as_str().unwrap();
+    assert!(decoded.contains("0x") && decoded.len() > 100_000);
+}
+
+#[test]
+fn unknown_block_hash_reports_block_not_found() {
+    let node = MockNode::new(|_| serde_json::json!({"result":null}));
+    let out = run(&[
+        "call",
+        "--rpc",
+        &node.url,
+        "--at",
+        &format!("0x{}", "ff".repeat(32)),
+        "--method",
+        "Metadata_metadata_versions",
+        "--data",
+        "0x",
+    ]);
+    assert!(String::from_utf8_lossy(&out.stderr).contains("block not found"));
+    assert_eq!(out.status.code(), Some(1));
+}
+
+#[test]
+fn mock_handler_assertions_are_reported_and_propagated_to_the_test_thread() {
+    let node = MockNode::new(|_| panic!("handler invariant"));
+    let rpc = frame_trace_replay::rpc::Rpc::new(&node.url).unwrap();
+    let error = rpc
+        .call("chain_getHeader", serde_json::json!([]))
+        .unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("mock handler assertion failed: handler invariant")
+    );
+    assert!(matches!(
+        error,
+        frame_trace_replay::Error::RpcResponse { code: -32099, .. }
+    ));
+    assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| drop(node))).is_err());
 }

@@ -373,9 +373,16 @@ fn measured_intervals_and_runtime_parent_tree() {
 
 #[test]
 fn traced_batch_keeps_named_extrinsic_runtime_and_ops_in_one_tree() {
-    let replay = frame_trace_replay::offline(
-        &std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../fixtures/replay/people-traced"),
+    let replay = frame_trace_replay::replay_with_session(
+        frame_trace_replay::Artifact::load(
+            &std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../fixtures/replay/people-traced"),
+        )
+        .unwrap(),
+        None,
+        &frame_trace_replay::ReplaySession::new(None)
+            .unwrap()
+            .with_rpc_metadata_fallback(true),
     )
     .unwrap();
     let metadata = Metadata::from_hex(&replay.artifact.metadata).unwrap();
@@ -627,9 +634,19 @@ fn hook_names_resolve_pallet_metadata_and_fall_back_to_crates() {
         );
     }
     let fallback = annotate(&traced, None);
+    assert_eq!(fallback.runtime_spans[0].name, "on_initialize: Balances");
+    let artifact = frame_trace_replay::Artifact::load(
+        &std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fixtures/replay/call-westend-nonce"),
+    )
+    .unwrap();
+    let asset_md = Metadata::from_hex(&artifact.metadata).unwrap();
+    let candidates = asset_md.pallet_for_crate("pallet_assets").unwrap();
+    assert!(candidates.contains(" / "), "{candidates}");
+    traced.runtime_spans[0].target = "pallet_assets::pallet".into();
     assert_eq!(
-        fallback.runtime_spans[0].name,
-        "on_initialize: pallet_balances"
+        annotate(&traced, Some(&asset_md)).runtime_spans[0].name,
+        format!("on_initialize: {candidates}")
     );
 }
 
@@ -723,6 +740,7 @@ fn runtime_call_root_and_empty_calls_export_one_trace_with_explicit_semantics() 
             result: "0x00000000".into(),
             decoded: Some("0".into()),
             oracle_match: Some(true),
+            oracle_source: Some("live"),
             proof_bytes: 1234,
             state_root: "0xab".into(),
         });
@@ -735,6 +753,7 @@ fn runtime_call_root_and_empty_calls_export_one_trace_with_explicit_semantics() 
             Some("not_applicable".into())
         );
         assert_eq!(attr(root, "frame.call.oracle_match"), Some(true.into()));
+        assert_eq!(attr(root, "frame.call.oracle_source"), Some("live".into()));
         assert_eq!(attr(root, "frame.proof.bytes"), Some(1234i64.into()));
         assert!(
             spans

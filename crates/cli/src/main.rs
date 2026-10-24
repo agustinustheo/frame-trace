@@ -6,8 +6,6 @@ use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
 use frame_trace_decode::{AnnotatedBlock, annotate};
 
-use frame_trace_otel::Timing;
-
 mod call;
 mod follow;
 mod source;
@@ -53,7 +51,30 @@ struct SummaryArgs {
     top: usize,
 }
 
-fn main() -> Result<()> {
+fn main() -> std::process::ExitCode {
+    match run() {
+        Ok(()) => std::process::ExitCode::SUCCESS,
+        Err(error) => {
+            eprintln!("Error: {error:#}");
+            std::process::ExitCode::from(if error.downcast_ref::<OracleMismatch>().is_some() {
+                3
+            } else {
+                1
+            })
+        }
+    }
+}
+
+#[derive(Debug)]
+struct OracleMismatch;
+impl std::fmt::Display for OracleMismatch {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("state_call oracle MISMATCH")
+    }
+}
+impl std::error::Error for OracleMismatch {}
+
+fn run() -> Result<()> {
     match Cli::parse().command {
         Command::Block(args) => block(args),
         Command::Call(args) => call::run(args),
@@ -68,14 +89,7 @@ fn main() -> Result<()> {
 
 fn block(args: BlockArgs) -> Result<()> {
     let block = load(&args.source)?;
-    if let Some(path) = &args.json {
-        write_json(&block, path)?;
-    }
-    if let Some(endpoint) = &args.otlp {
-        let spans = frame_trace_otel::export_otlp(&block, endpoint, Timing::default())
-            .with_context(|| format!("exporting to {endpoint}"))?;
-        eprintln!("exported {spans} spans to {endpoint}");
-    }
+    emit(&block, args.json.as_deref(), args.otlp.as_deref(), None)?;
     if args.json.is_none() && args.otlp.is_none() {
         let t = &block.totals;
         println!(
@@ -96,7 +110,7 @@ fn load(args: &source::SourceArgs) -> Result<AnnotatedBlock> {
     let loaded = source::load(args)?;
     let traced = loaded.traced;
     if loaded.metadata.is_none() {
-        eprintln!("warning: no --metadata given, storage keys and extrinsics will not be named");
+        eprintln!("notice: metadata unavailable; storage keys and extrinsics will not be named");
     }
     let mut block = annotate(&traced, loaded.metadata.as_ref());
     let undecoded = block
@@ -114,12 +128,38 @@ fn load(args: &source::SourceArgs) -> Result<AnnotatedBlock> {
     Ok(block)
 }
 
-fn write_json(block: &AnnotatedBlock, path: &PathBuf) -> Result<()> {
+fn write_json(block: &AnnotatedBlock, path: &std::path::Path) -> Result<()> {
     let json = serde_json::to_string_pretty(block)?;
     if path.as_os_str() == "-" {
         writeln!(std::io::stdout(), "{json}")?;
     } else {
         fs::write(path, json).with_context(|| format!("writing {}", path.display()))?;
+    }
+    Ok(())
+}
+
+/// Shared JSON/OTLP/terminal output for call and block traces.
+fn emit(
+    trace: &AnnotatedBlock,
+    json: Option<&std::path::Path>,
+    otlp: Option<&str>,
+    top: Option<usize>,
+) -> Result<()> {
+    if let Some(path) = json {
+        write_json(trace, path)?;
+    }
+    if let Some(endpoint) = otlp {
+        let spans = frame_trace_otel::export_otlp(trace, endpoint, Default::default())
+            .with_context(|| format!("exporting to {endpoint}"))?;
+        eprintln!("exported {spans} spans to {endpoint}");
+    }
+    if let Some(top) = top {
+        let summary = summary::render(trace, top);
+        if json.is_some_and(|p| p.as_os_str() == "-") {
+            eprint!("{summary}");
+        } else {
+            print!("{summary}");
+        }
     }
     Ok(())
 }
@@ -142,9 +182,12 @@ struct FollowArgs {
     /// Persistent proof-node and compiled Wasm cache directory.
     #[arg(long, value_name = "DIR")]
     cache_dir: Option<PathBuf>,
-    /// Combined proof-node and Wasm disk cache limit; evict oldest files after each replay.
+    /// Combined disk cache limit in bytes; active runtime modules remain pinned.
     #[arg(long, default_value_t = 1073741824)]
     cache_max_bytes: u64,
+    /// Allow UNAUTHENTICATED RPC metadata if local metadata execution is impossible.
+    #[arg(long)]
+    rpc_metadata_fallback: bool,
 }
 
 fn follow(args: FollowArgs) -> Result<()> {

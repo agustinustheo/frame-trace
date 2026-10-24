@@ -69,3 +69,98 @@ fn captures_keyless_child_iteration_and_overlay_accesses() {
             .any(|s| s.name == "next_key_version_1" && s.duration_ns > 0)
     );
 }
+
+#[test]
+fn call_and_import_expose_different_proof_size_policies() {
+    let wasm = wat::parse_str(r#"(module
+        (import "env" "ext_storage_proof_size_storage_proof_size_version_1" (func $size (result i64)))
+        (memory (export "memory") 1)
+        (global (export "__heap_base") i32 (i32.const 1024))
+        (func (export "Probe_size") (param i32 i32) (result i64)
+            (i64.store (i32.const 8) (call $size))
+            (i64.const 34359738376)))"#).unwrap();
+    let session = ReplaySession::new(None).unwrap();
+    let db = ProofDb::new(None, H256::zero());
+    for (context, expected) in [
+        (CallContext::Offchain, u64::MAX),
+        (CallContext::Onchain { import: true }, 0),
+    ] {
+        let (bytes, output) = execute_method(
+            &db,
+            H256::zero(),
+            &wasm,
+            None,
+            &session.executor,
+            "Probe_size",
+            &[],
+            H256::zero(),
+            context,
+            &Capture::new(),
+        )
+        .unwrap();
+        assert_eq!(output, expected.to_le_bytes());
+        assert_eq!(bytes, 0);
+    }
+}
+
+#[test]
+fn runtime_version_host_call_has_executor_backed_reader_for_calls_and_import() {
+    let wasm = wat::parse_str(
+        r#"(module
+        (import "env" "ext_misc_runtime_version_version_1" (func $version (param i64) (result i64)))
+        (memory (export "memory") 1)
+        (global (export "__heap_base") i32 (i32.const 1024))
+        (func (export "Probe_version") (param i32 i32) (result i64)
+            (call $version (i64.const 0))))"#,
+    )
+    .unwrap();
+    let session = ReplaySession::new(None).unwrap();
+    let db = ProofDb::new(None, H256::zero());
+    for context in [CallContext::Offchain, CallContext::Onchain { import: true }] {
+        let (_, output) = execute_method(
+            &db,
+            H256::zero(),
+            &wasm,
+            None,
+            &session.executor,
+            "Probe_version",
+            &[],
+            H256::zero(),
+            context,
+            &Capture::new(),
+        )
+        .unwrap();
+        // Invalid/empty code returns Option::None rather than trapping on a missing extension.
+        assert_eq!(output, [0]);
+    }
+}
+
+#[test]
+fn missing_export_reports_runtime_api_method_without_metadata() {
+    let wasm = wat::parse_str(
+        r#"(module
+        (memory (export "memory") 1)
+        (global (export "__heap_base") i32 (i32.const 1024))
+        (func (export "Probe_exists") (param i32 i32) (result i64) (i64.const 0)))"#,
+    )
+    .unwrap();
+    let session = ReplaySession::new(None).unwrap();
+    let error = execute_method(
+        &ProofDb::new(None, H256::zero()),
+        H256::zero(),
+        &wasm,
+        None,
+        &session.executor,
+        "MissingApi_method",
+        &[],
+        H256::zero(),
+        CallContext::Offchain,
+        &Capture::new(),
+    )
+    .unwrap_err();
+    assert!(matches!(error, Error::MethodNotFound(_)), "{error}");
+    assert_eq!(
+        error.to_string(),
+        "runtime API method MissingApi_method not found"
+    );
+}

@@ -44,9 +44,12 @@ pub struct SourceArgs {
     /// Persistent authenticated proof nodes and compiled Wasm cache directory.
     #[arg(long, value_name = "DIR")]
     pub cache_dir: Option<PathBuf>,
-    /// Combined proof-node and Wasm disk cache limit; evict oldest files after each replay.
+    /// Combined disk cache limit in bytes; active runtime modules remain pinned.
     #[arg(long, default_value_t = 1073741824)]
     pub cache_max_bytes: u64,
+    /// Allow UNAUTHENTICATED RPC metadata if local metadata execution is impossible.
+    #[arg(long)]
+    pub rpc_metadata_fallback: bool,
 }
 
 /// A block trace and what is needed to decode it.
@@ -66,7 +69,8 @@ pub fn load(args: &SourceArgs) -> Result<Loaded> {
                     &frame_trace_replay::ReplaySession::with_cache_max_bytes(
                         args.cache_dir.as_deref(),
                         args.cache_max_bytes,
-                    )?,
+                    )?
+                    .with_rpc_metadata_fallback(args.rpc_metadata_fallback),
                 )
             })
             .map_err(|e| anyhow::anyhow!("{}: {e}", dir.join("artifact.json.zst").display()))
@@ -93,7 +97,8 @@ pub fn load(args: &SourceArgs) -> Result<Loaded> {
                 &frame_trace_replay::ReplaySession::with_cache_max_bytes(
                     args.cache_dir.as_deref(),
                     args.cache_max_bytes,
-                )?,
+                )?
+                .with_rpc_metadata_fallback(args.rpc_metadata_fallback),
             )
             .inspect_err(|_| {
                 eprintln!("root check: NOT VERIFIED; RPC calls: {}", rpc.count());
@@ -168,13 +173,17 @@ pub fn replay_loaded(replay: frame_trace_replay::Replay, save: Option<&Path>) ->
         "state root: computed {:?}; header {:?}",
         replay.computed_state_root, replay.expected_state_root
     );
-    let metadata = match Metadata::from_hex(&replay.artifact.metadata) {
-        Ok(metadata) => Some(metadata),
-        Err(error) => {
-            eprintln!(
-                "warning: metadata decoding failed: {error}; continuing with undecoded names (names require metadata V14+)"
-            );
-            None
+    let metadata = if replay.artifact.metadata.is_empty() {
+        None
+    } else {
+        match Metadata::from_hex(&replay.artifact.metadata) {
+            Ok(metadata) => Some(metadata),
+            Err(error) => {
+                eprintln!(
+                    "warning: metadata decoding failed: {error}; continuing with undecoded names (names require metadata V14+)"
+                );
+                None
+            }
         }
     };
     Ok(Loaded {

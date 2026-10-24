@@ -214,6 +214,9 @@ pub fn record_block(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) 
         if let Some(matched) = call.oracle_match {
             attrs.push(KeyValue::new("frame.call.oracle_match", matched));
         }
+        if let Some(source) = call.oracle_source {
+            attrs.push(KeyValue::new("frame.call.oracle_source", source));
+        }
     }
     attrs.extend(stats_attributes(&block.totals));
     let root = tracer
@@ -263,6 +266,9 @@ fn record_measured(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) -
         attrs.push(KeyValue::new("frame.proof.bytes", count(call.proof_bytes)));
         if let Some(matched) = call.oracle_match {
             attrs.push(KeyValue::new("frame.call.oracle_match", matched));
+        }
+        if let Some(source) = call.oracle_source {
+            attrs.push(KeyValue::new("frame.call.oracle_source", source));
         }
     }
     attrs.extend(stats_attributes(&block.totals));

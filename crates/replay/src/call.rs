@@ -41,7 +41,7 @@ pub struct CallReplay {
 }
 
 /// Acquire a call context. The selected block's own header/root/code are used, even at upgrades.
-/// Encoding JSON arguments can use the returned metadata before proof acquisition starts.
+/// Call authenticate_metadata before encoding JSON arguments; preparation performs no metadata RPC.
 pub fn prepare(rpc: &Rpc, selector: &str, method: &str) -> Result<Artifact> {
     let hash = match selector {
         "best" => None,
@@ -65,6 +65,9 @@ pub fn prepare(rpc: &Rpc, selector: &str, method: &str) -> Result<Artifact> {
         "chain_getHeader",
         hash.as_ref().map_or_else(|| json!([]), |h| json!([h])),
     )?;
+    if header.is_null() {
+        return Err(Error::Invalid(format!("block not found: {selector}")));
+    }
     let parsed: Header = serde_json::from_value(header.clone())
         .map_err(|e| Error::Rpc(format!("chain_getHeader: {e}")))?;
     let block_hash = parsed.hash();
@@ -90,7 +93,7 @@ pub fn prepare(rpc: &Rpc, selector: &str, method: &str) -> Result<Artifact> {
         block: json!({"header": header, "extrinsics": []}),
         parent_header: header,
         runtime_version: rpc.call("state_getRuntimeVersion", json!([block_hash]))?,
-        metadata: call_metadata(rpc, block_hash)?,
+        metadata: String::new(),
         proof_nodes: Vec::new(),
     })
 }
@@ -102,21 +105,9 @@ pub fn replay(
     session: &ReplaySession,
     oracle: bool,
 ) -> Result<CallReplay> {
-    let result = replay_inner(artifact, rpc, session, oracle);
-    let maintenance = session.prune_disk_cache();
-    match result {
-        Ok(replay) => {
-            maintenance?;
-            Ok(replay)
-        }
-        Err(error) => {
-            if let Err(cache_error) = maintenance {
-                eprintln!("warning: cache eviction: {cache_error}");
-            }
-            Err(error)
-        }
-    }
+    with_maintenance(session, || replay_inner(artifact, rpc, session, oracle))
 }
+
 fn replay_inner(
     mut artifact: Artifact,
     rpc: Option<Rpc>,
@@ -130,32 +121,24 @@ fn replay_inner(
     if oracle && rpc.is_none() {
         return Err(Error::Invalid("a live oracle requires RPC".into()));
     }
+    let root = *state.state_root();
+    let db = open_db(&artifact, rpc.clone(), session, &state)?;
+    let (wasm, heap_pages) = runtime_code(&db, root)?;
+    metadata::load(&mut artifact, &db, &wasm, heap_pages, session, &state)?;
+    db.mark_bootstrap();
     let call = artifact
         .call
         .as_ref()
         .ok_or_else(|| Error::Invalid("missing call".into()))?;
     let input = unhex(&call.data)?;
-    let root = *state.state_root();
-    let db = ProofDb::with_session(rpc.clone(), state.hash(), session.clone());
-    db.set_root(root);
-    db.insert_nodes(
-        artifact
-            .proof_nodes
-            .iter()
-            .map(|s| unhex(s))
-            .collect::<Result<Vec<_>>>()?,
-    );
-    if rpc.is_some() && session.nodes.lock().nodes.is_empty() {
-        db.fetch(None, &[b":code".to_vec(), b":heappages".to_vec()])?;
-    }
-    let (wasm, heap_pages) = runtime_code(&db, root)?;
+    let executor = session.executor_for(&wasm);
     let run = |capture: &Capture| {
         execute_method(
             &db,
             root,
             &wasm,
             heap_pages,
-            &session.executor,
+            &executor,
             &call.method,
             &input,
             state.hash(),
@@ -169,9 +152,8 @@ fn replay_inner(
         state.number()
     );
     run(&Capture::new())?;
-    db.online.store(false, Ordering::SeqCst);
     let capture = Capture::new();
-    let (proof_bytes, output) = without_rpc(rpc.as_ref(), || run(&capture))?;
+    let (proof_bytes, output) = measured_run(&db, rpc.as_ref(), || run(&capture))?;
     if call
         .result
         .as_ref()
@@ -202,8 +184,7 @@ fn replay_inner(
         .ok_or_else(|| Error::Invalid("missing call".into()))?;
     call.result = Some(hex0(&output));
     call.oracle = oracle_output.as_ref().map(|bytes| hex0(bytes));
-    db.persist()?;
-    artifact.proof_nodes = db.export();
+    persist_export(&db, &mut artifact)?;
     Ok(CallReplay {
         capture,
         block_number: u64::from(*state.number()),
@@ -217,41 +198,18 @@ fn replay_inner(
     })
 }
 
-// Most nodes default state_getMetadata to V14, which has no runtime API types.
-fn call_metadata(rpc: &Rpc, hash: H256) -> Result<String> {
-    let fallback = metadata_result(rpc.call("state_getMetadata", json!([hash])))?;
-    for version in [16u32, 15] {
-        let result = rpc.call(
-            "state_call",
-            json!([
-                "Metadata_metadata_at_version",
-                hex0(&version.encode()),
-                hash
-            ]),
-        );
-        let value = match result {
-            Ok(value) => value,
-            Err(Error::Rpc(message))
-                if message.contains("not found") || message.contains("-32601") =>
-            {
-                break;
-            }
-            Err(Error::Unavailable(_)) => break,
-            Err(error) => return Err(error),
-        };
-        let text = value
-            .as_str()
-            .ok_or_else(|| Error::Rpc("metadata state_call: non-string result".into()))?;
-        let bytes = unhex(text)?;
-        let mut cursor = bytes.as_slice();
-        let decoded = Option::<Vec<u8>>::decode(&mut cursor)
-            .map_err(|e| Error::Rpc(format!("metadata state_call: {e}")))?;
-        if !cursor.is_empty() {
-            return Err(Error::Rpc("metadata state_call: trailing bytes".into()));
-        }
-        if let Some(bytes) = decoded {
-            return Ok(hex0(&bytes));
-        }
-    }
-    Ok(fallback)
+/// Load metadata by executing the authenticated runtime before encoding user arguments.
+/// Stored/RPC metadata is never used implicitly.
+pub fn authenticate_metadata(
+    artifact: &mut Artifact,
+    rpc: Option<Rpc>,
+    session: &ReplaySession,
+) -> Result<()> {
+    with_maintenance(session, || {
+        let (_, state) = artifact.validate()?;
+        let db = open_db(artifact, rpc, session, &state)?;
+        let (wasm, heap) = runtime_code(&db, *state.state_root())?;
+        metadata::load(artifact, &db, &wasm, heap, session, &state)?;
+        persist_export(&db, artifact)
+    })
 }

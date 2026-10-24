@@ -18,7 +18,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         HashDB::insert(&mut memory, EMPTY_PREFIX, &unhex(node)?);
     }
     let backend = sp_state_machine::TrieBackendBuilder::new(memory, parent.state_root).build();
-    let session = ReplaySession::new(None)?;
+    // These legacy block fixtures predate metadata-only read proofs. Explicitly keep
+    // their recorded V14 decoding metadata while regenerating the original call fixtures.
+    let session = ReplaySession::new(None)?.with_rpc_metadata_fallback(true);
     let alice = "0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d";
     let ext = original.block["extrinsics"]
         .as_array()

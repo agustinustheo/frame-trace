@@ -13,7 +13,9 @@ fn replay(name: &str) -> call::CallReplay {
     call::replay(
         Artifact::load(&fixture(name)).unwrap(),
         None,
-        &ReplaySession::new(None).unwrap(),
+        &ReplaySession::new(None)
+            .unwrap()
+            .with_rpc_metadata_fallback(name.starts_with("call-people")),
         false,
     )
     .unwrap()
@@ -126,4 +128,38 @@ fn offline_public_nonce_decodes_v16_and_matches_recorded_node_oracle() {
             .starts_with("System::Account(")
     );
     assert_eq!(replay.proof_bytes, 3713);
+}
+
+#[test]
+fn offline_dry_run_set_empty_code_uses_version_reader_and_matches_recorded_oracle() {
+    let replay = replay("call-westend-dryrun");
+    assert_eq!(replay.block_number, 18_563_012);
+    assert_eq!(replay.oracle_match, Some(true));
+    assert_eq!(replay.proof_bytes, 3047);
+    assert_eq!(replay.measured_rpc_count, 0);
+    assert!(!replay.artifact.metadata.is_empty());
+    let trace = TracedBlock::from_call(&replay.capture).unwrap();
+    assert_eq!(trace.ops.len(), 24);
+}
+
+#[test]
+fn stored_metadata_is_ignored_and_unused_nodes_are_not_exported() {
+    let mut artifact = Artifact::load(&fixture("call-westend-nonce")).unwrap();
+    let original = artifact.clone();
+    artifact.metadata = "lying metadata".into();
+    let junk = "0xdeadbeefcafebabe";
+    artifact.proof_nodes.push(junk.into());
+    let replay = call::replay(artifact, None, &ReplaySession::new(None).unwrap(), false).unwrap();
+    assert_eq!(replay.result, 520u32.to_le_bytes());
+    assert_eq!(replay.artifact.metadata, original.metadata);
+    assert!(!replay.artifact.proof_nodes.iter().any(|node| node == junk));
+    assert!(
+        call::replay(
+            replay.artifact,
+            None,
+            &ReplaySession::new(None).unwrap(),
+            false
+        )
+        .is_ok()
+    );
 }

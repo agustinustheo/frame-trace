@@ -249,3 +249,25 @@ metadata argument/result types, empty call traces, exports, offline save/load,
 recent-path expiry, bounded related-key inference, and the existing block oracles.
 The sixteen compressed replay fixture files total **11,144,851 bytes**, sharing
 People and Westend Wasm nodes and metadata. No commit or push was made.
+
+
+## Round 3 validation (2026-10-25)
+
+Rust 1.93.0 `fmt --all -- --check`, `clippy --workspace --all-targets --locked --
+-D warnings`, and `test --workspace --locked` passed. Exact distinct test counts:
+**128 passed, 0 failed, 1 ignored, 0 doctests**. CLI: **28** (6 unit + 22
+integration); decode: **16** (3 unit + 13 integration); model: **19** (11 unit + 8
+integration); OTel: **10**; replay: **55** (37 unit + 7 call integration + 11 block
+integration). The existing public-network block test remains ignored. The final
+follow job-generation extraction was additionally checked with all **6** CLI unit
+tests; repeated runs and subprocess executions are not counted as new test cases.
+
+Live `DryRunApi_dry_run_call` on Westend Asset Hub at #18,563,012, with input
+`0x000000020005000000` (root System.set_code([])), returned the same bytes as
+`state_call`, without an extension trap: **24 storage operations**, **3,047
+execution-proof bytes**, **zero measured RPC calls**. The saved
+`call-westend-dryrun` fixture repeats the regression offline; its stored oracle is
+labelled recorded (unverified). The nonce fixture was refreshed to include locally
+executed metadata dependencies. Original People/block artifacts still need explicit
+unauthenticated metadata fallback for their historical names because they did not
+record those additional metadata-only proof paths.

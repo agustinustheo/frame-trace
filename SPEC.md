@@ -66,6 +66,8 @@ Raw keys and values can identify accounts. Keys are on by default (needed for de
 ```sh
 frame-trace block   --rpc wss://… --block <number|hash> [--otlp http://127.0.0.1:4318] [--json out.json] [--save <artifact-dir>]
 frame-trace block   --offline <artifact-dir> [--otlp …]          # replay a saved artifact, no network
+frame-trace call    --rpc wss://… [--at finalized] --method AccountNonceApi_account_nonce --data <hex> [--oracle] [--save <artifact-dir>]
+frame-trace call    --offline <artifact-dir> [--summary] [--otlp …]
 frame-trace follow  --rpc wss://… [--otlp …]                    # trace each new block
 frame-trace summary --rpc … --block …                            # terminal tables: top items, duplicate reads, per extrinsic
 ```
@@ -74,7 +76,7 @@ frame-trace summary --rpc … --block …                            # terminal 
 
 1. **Replay exporter (now).** Self-replay source, `block`, `follow`, `summary`, offline artifacts. Tested offline against saved artifacts from a local People chain and public Westend Asset Hub.
 2. **Runtime spans.** Nest storage ops under dispatch and hook spans when the runtime has `with-tracing`; build such runtimes on demand for debugging.
-3. **State queries.** Trace runtime API calls (`state_call`) and storage queries the same way, by executing them against proofs.
+3. **State queries.** `call` executes runtime APIs at a selected state, using authenticated proofs, measured storage/runtime spans, metadata argument/result decoding, optional safe `state_call` comparison, and offline artifacts. Calls have no block root assertion. A standalone storage query/trie-depth view is deferred; see README.
 4. **Constants.** Plain `#[pallet::constant]` values are compiled in and never touch storage. Tracing them needs an opt-in macro or instrumented runtime. Only `parameter_types! { storage … }` and dynamic parameters are visible as storage today.
 5. **PolkaMeter integration.** Attach a block trace to each load-test step, link spans by extrinsic hash.
 

@@ -7,8 +7,8 @@ and complete discovery proof nodes. The shared People/Westend Wasm nodes and met
 once under `blobs/<blake2-256>.zst`; fixture metadata/node strings use `blob:<hash>`.
 The loader bounds decompression and verifies each blob's content hash before
 rehydrating hex. No arbitrary reference paths are accepted. `Artifact::save`
-always writes self-contained artifacts. The sixteen compressed files, including call artifacts, blobs,
-oracles and the public reference, total 11,144,851 bytes (10.63 MiB). Sharing the
+always writes self-contained artifacts. The seventeen compressed files, including call artifacts, blobs,
+oracles and the public reference, total 11,150,918 bytes (10.63 MiB). Sharing the
 Westend Wasm as raw blob bytes also reduces the original public block artifact.
 
 | Directory | Block | Source | Artifact bytes |
@@ -47,7 +47,8 @@ proofs served over loopback HTTP; these four chain blocks do not touch child sta
 | `call-people-nonce` | People #1 / `e1e91429…` | `AccountNonceApi_account_nonce` (Alice) | 2,425 |
 | `call-people-fee` | People #1 / `e1e91429…` | `TransactionPaymentApi_query_info` (the saved signed transfer, plus u32 byte length) | 2,009 |
 | `call-people-metadata` | People #1 / `e1e91429…` | `Metadata_metadata_versions` | 1,662 |
-| `call-westend-nonce` | Westend Asset Hub #18,561,759 / `60c39d38…` | `AccountNonceApi_account_nonce` (Alice) | 5,301 |
+| `call-westend-nonce` | Westend Asset Hub #18,561,759 / `60c39d38…` | `AccountNonceApi_account_nonce` (Alice) | 6,302 |
+| `call-westend-dryrun` | Westend Asset Hub #18,563,012 | `DryRunApi_dry_run_call` (root set_code([])) | 5,066 |
 
 The People calls execute against the existing transfer fixture's **parent state**,
 not block #2's resulting state. They use its original V14 metadata, so results
@@ -70,3 +71,14 @@ Its artifact shares the identical runtime node with the existing public block
 fixture and stores V16 metadata in a shared content-addressed blob. Offline tests
 re-execute and compare with the recorded oracle; they do not contact the endpoint.
 No call claims a block root check. All reads authenticate against its state header.
+
+Round 3 added `call-westend-dryrun` at Westend Asset Hub #18,563,012, recorded
+2026-10-25 with `DryRunApi_dry_run_call`, input `0x000000020005000000`
+(root `System.set_code([])`). Local execution and live `state_call` matched;
+24 storage operations, 3,047 execution-proof bytes, zero measured RPCs. This
+exercises the executor-backed runtime-version reader. Its oracle is recorded
+(unverified), as with every offline oracle. Both this fixture and the refreshed
+`call-westend-nonce` retain metadata-execution dependencies and re-derive V16
+locally without RPC or fallback. Original People and block fixtures predate those
+metadata-only proofs; naming tests explicitly opt into their recorded metadata
+with `with_rpc_metadata_fallback(true)` / `--rpc-metadata-fallback`.

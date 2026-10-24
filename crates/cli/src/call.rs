@@ -38,21 +38,41 @@ pub struct CallArgs {
     /// Print storage summary tables.
     #[arg(long)]
     summary: bool,
-    #[arg(long)]
+    /// Write the decoded trace as JSON to this file (`-` for stdout).
+    #[arg(long, value_name = "FILE")]
     json: Option<PathBuf>,
+    /// OTLP/HTTP endpoint (bare --otlp uses http://127.0.0.1:4318).
     #[arg(long, num_args = 0..=1, default_missing_value = "http://127.0.0.1:4318")]
     otlp: Option<String>,
+    /// Maximum concurrent proof requests; each request batches up to 32 keys.
     #[arg(long, default_value_t = 8, value_parser = clap::value_parser!(u8).range(1..=64))]
     proof_concurrency: u8,
-    #[arg(long)]
+    /// Persistent authenticated proof-node and compiled Wasm cache directory.
+    #[arg(long, value_name = "DIR")]
     cache_dir: Option<PathBuf>,
+    /// Combined disk cache limit in bytes; active runtime modules remain pinned.
     #[arg(long, default_value_t = 1073741824)]
     cache_max_bytes: u64,
+    /// Allow UNAUTHENTICATED RPC metadata if local metadata execution is impossible.
+    #[arg(long)]
+    rpc_metadata_fallback: bool,
 }
 
 pub fn run(args: CallArgs) -> Result<()> {
+    // Reject malformed user input before any network or runtime work.
+    let raw_data = args
+        .data
+        .as_deref()
+        .map(|s| unhex(s).context("--data: invalid SCALE hex"))
+        .transpose()?;
+    let json_args = args
+        .args
+        .as_deref()
+        .map(|s| serde_json::from_str::<serde_json::Value>(s).context("--args: malformed JSON"))
+        .transpose()?;
     let session =
-        ReplaySession::with_cache_max_bytes(args.cache_dir.as_deref(), args.cache_max_bytes)?;
+        ReplaySession::with_cache_max_bytes(args.cache_dir.as_deref(), args.cache_max_bytes)?
+            .with_rpc_metadata_fallback(args.rpc_metadata_fallback);
     let (artifact, rpc) = if let Some(dir) = &args.offline {
         (Artifact::load(dir)?, None)
     } else {
@@ -68,14 +88,25 @@ pub fn run(args: CallArgs) -> Result<()> {
             args.method.as_deref().context("--method required")?,
         )?;
         let method = args.method.as_deref().context("--method required")?;
-        let data = if let Some(data) = &args.data {
-            unhex(data)?
+        call::authenticate_metadata(&mut artifact, Some(rpc.clone()), &session)?;
+        if let Ok(metadata) = Metadata::from_hex(&artifact.metadata) {
+            metadata.validate_runtime_method(method)?;
+        }
+        let data = if let Some(data) = raw_data {
+            data
         } else {
+            anyhow::ensure!(
+                !artifact.metadata.is_empty(),
+                "--args needs locally executed runtime API metadata; use --data SCALE hex"
+            );
             let metadata = Metadata::from_hex(&artifact.metadata)
                 .context("--args needs runtime API metadata; use --data SCALE hex")?;
-            let values =
-                serde_json::from_str(args.args.as_deref().context("--data or --args required")?)?;
-            metadata.encode_runtime_args(method, &values)?
+            metadata
+                .encode_runtime_args(
+                    method,
+                    json_args.as_ref().context("--data or --args required")?,
+                )
+                .context("--args: cannot encode runtime API arguments")?
         };
         artifact.call.as_mut().context("missing call context")?.data = hex0(&data);
         (artifact, Some(rpc))
@@ -84,17 +115,24 @@ pub fn run(args: CallArgs) -> Result<()> {
     if let Some(dir) = &args.save {
         replay.artifact.save(dir)?;
     }
-    let metadata = Metadata::from_hex(&replay.artifact.metadata)
-        .inspect_err(|e| {
-            eprintln!("warning: metadata decoding failed: {e}; using hex/unnamed storage");
-        })
-        .ok();
+    let metadata = if replay.artifact.metadata.is_empty() {
+        None
+    } else {
+        Metadata::from_hex(&replay.artifact.metadata)
+            .inspect_err(|e| {
+                eprintln!("warning: metadata decoding failed: {e}; using hex/unnamed storage");
+            })
+            .ok()
+    };
     let context = replay
         .artifact
         .call
         .as_ref()
         .context("missing call context")?;
-    let decoded = metadata.as_ref().and_then(|md| {
+    let decoded = metadata.as_ref().filter(|md| {
+        if md.version() < 15 { eprintln!("notice: V14 metadata has no runtime API types; displaying hex (use --data for arguments)"); false }
+        else { true }
+    }).and_then(|md| {
         md.decode_runtime_result(&context.method, &replay.result)
             .inspect_err(|e| {
                 eprintln!("warning: {e}; returning hex");
@@ -112,6 +150,13 @@ pub fn run(args: CallArgs) -> Result<()> {
         result: hex0(&replay.result),
         decoded: decoded.clone(),
         oracle_match: replay.oracle_match,
+        oracle_source: replay.oracle_match.map(|_| {
+            if args.offline.is_some() {
+                "recorded (unverified)"
+            } else {
+                "live"
+            }
+        }),
         proof_bytes: replay.proof_bytes,
         state_root: replay.artifact.parent_header["stateRoot"]
             .as_str()
@@ -127,7 +172,7 @@ pub fn run(args: CallArgs) -> Result<()> {
         context.method,
         replay.block_number,
         trace.totals.ops,
-        decoded.as_deref().unwrap_or(&hex0(&replay.result))
+        preview(decoded.as_deref().unwrap_or(&hex0(&replay.result)))
     );
     eprintln!(
         "root check: NOT APPLICABLE (runtime API call); authenticated state proofs; RPC calls: {} (measured: {}); execution proof: {} bytes; proof rounds: {}",
@@ -138,21 +183,31 @@ pub fn run(args: CallArgs) -> Result<()> {
             "state_call oracle: {}{}",
             if matched { "MATCH" } else { "MISMATCH" },
             if args.offline.is_some() {
-                " (recorded)"
+                " (recorded (unverified))"
             } else {
                 ""
             }
         );
     }
-    if let Some(path) = &args.json {
-        super::write_json(&trace, path)?;
-    }
-    if let Some(endpoint) = &args.otlp {
-        let spans = frame_trace_otel::export_otlp(&trace, endpoint, Default::default())?;
-        eprintln!("exported {spans} spans to {endpoint}");
-    }
-    if args.summary {
-        print!("{}", super::summary::render(&trace, 15));
+    super::emit(
+        &trace,
+        args.json.as_deref(),
+        args.otlp.as_deref(),
+        args.summary.then_some(15),
+    )?;
+    if replay.oracle_match == Some(false) {
+        return Err(super::OracleMismatch.into());
     }
     Ok(())
+}
+
+fn preview(value: &str) -> String {
+    match value.char_indices().nth(256) {
+        Some((cut, _)) => format!(
+            "{}… ({} chars; full value in --json)",
+            &value[..cut],
+            value.chars().count()
+        ),
+        None => value.to_owned(),
+    }
 }

@@ -50,6 +50,9 @@ pub struct ProofDb {
     parent: H256,
     session: ReplaySession,
     nodes: Arc<Mutex<BTreeMap<H256, Vec<u8>>>>,
+    used: Arc<Mutex<BTreeSet<H256>>>,
+    bootstrap: Arc<Mutex<BTreeSet<H256>>>,
+    families: Arc<BTreeSet<(Vec<u8>, Concat)>>,
     // Serialize misses and recheck the cache after acquiring this gate. Concurrent requests for
     // the same node share the first result. Complete-key hints batch the entire lookup path.
     fetch_gate: Arc<Mutex<()>>,
@@ -73,11 +76,15 @@ impl ProofDb {
     }
     pub fn with_session(rpc: Option<Rpc>, parent: H256, session: ReplaySession) -> Self {
         let online = rpc.is_some();
+        let families = Arc::new(families(&session.predicted_keys()));
         Self {
             rpc,
             parent,
             session,
             nodes: Default::default(),
+            used: Default::default(),
+            bootstrap: Default::default(),
+            families,
             fetch_gate: Default::default(),
             online: Arc::new(AtomicBool::new(online)),
             speculative: Default::default(),
@@ -89,6 +96,32 @@ impl ProofDb {
             round_trips: Default::default(),
         }
     }
+    pub fn used_nodes(&self) -> Vec<Vec<u8>> {
+        let used = self.used.lock();
+        self.nodes
+            .lock()
+            .iter()
+            .filter(|(h, _)| used.contains(h))
+            .map(|(_, node)| node.clone())
+            .collect()
+    }
+    pub fn retain_nodes(&self, nodes: &[Vec<u8>]) {
+        self.insert_nodes(nodes.iter().cloned());
+        self.used.lock().extend(
+            nodes
+                .iter()
+                .map(|node| H256::from(sp_io::hashing::blake2_256(node))),
+        );
+    }
+    pub fn rpc(&self) -> Option<&Rpc> {
+        self.rpc.as_ref()
+    }
+    pub fn mark_bootstrap(&self) {
+        *self.bootstrap.lock() = self.used.lock().clone();
+    }
+    pub fn begin_measured(&self) {
+        *self.used.lock() = self.bootstrap.lock().clone();
+    }
     pub fn set_root(&self, root: H256) {
         *self.root.lock() = Some(root);
     }
@@ -99,8 +132,8 @@ impl ProofDb {
             .unwrap_or(Error::Invalid(fallback))
     }
     /// Walk only authenticated cache nodes from this block's parent root. This probe cannot
-    /// fetch, record failures, or use speculative placeholders. It also imports used nodes
-    /// into the block's self-contained artifact.
+    /// fetch, record failures, or use speculative placeholders. Prefetched nodes are exported
+    /// only if execution subsequently reads them.
     fn covered(&self, child: Option<&ChildInfo>, key: &[u8]) -> bool {
         use sp_state_machine::Backend;
         struct Cached<'a>(&'a ProofDb);
@@ -310,12 +343,19 @@ impl ProofDb {
                     .map_err(|e| Error::Invalid(format!("{}: {e}", temporary.display())))?;
                 std::fs::rename(&temporary, &path)
                     .map_err(|e| Error::Invalid(format!("{}: {e}", path.display())))?;
+                self.session.index_write(path, node.len() as u64);
             }
         }
         Ok(())
     }
     pub fn export(&self) -> Vec<String> {
-        self.nodes.lock().values().map(|v| hex0(v)).collect()
+        let used = self.used.lock();
+        self.nodes
+            .lock()
+            .iter()
+            .filter(|(hash, _)| used.contains(hash))
+            .map(|(_, v)| hex0(v))
+            .collect()
     }
 }
 impl TrieBackendStorage<Blake2Hasher> for ProofDb {
@@ -323,12 +363,14 @@ impl TrieBackendStorage<Blake2Hasher> for ProofDb {
         if let Some(node) = self.cached(hash).inspect_err(|e| {
             *self.failure.lock() = Some(e.clone());
         })? {
+            self.used.lock().insert(*hash);
             return Ok(Some(node));
         }
         let _gate = self.fetch_gate.lock();
         if let Some(node) = self.cached(hash).inspect_err(|e| {
             *self.failure.lock() = Some(e.clone());
         })? {
+            self.used.lock().insert(*hash);
             return Ok(Some(node));
         }
         let result = (|| {
@@ -368,7 +410,7 @@ impl TrieBackendStorage<Blake2Hasher> for ProofDb {
                 vec![path.clone()]
             };
             if child.is_none() && full_key_hint {
-                paths.extend(related_keys(&paths, &self.session.predicted_keys()));
+                paths.extend(related_keys(&paths, &self.families));
             }
             if self.speculative.load(Ordering::SeqCst) {
                 // Missing values are placeholders in throw-away executions only. Their output
@@ -413,6 +455,9 @@ impl TrieBackendStorage<Blake2Hasher> for ProofDb {
         {
             *self.failure.lock() = Some(e.clone());
         }
+        if matches!(&result, Ok(Some(_))) {
+            self.used.lock().insert(*hash);
+        }
         result
     }
 }
@@ -439,31 +484,34 @@ pub(crate) fn sibling_paths(path: &[u8], odd: bool) -> Vec<Vec<u8>> {
 /// Learned single-map concat layouts let a newly encountered 32-byte identifier predict
 /// related reads (e.g. a linked-list node followed by account/ledger lookups). These are
 /// bandwidth-only guesses: every used value still traverses the current authenticated root.
-fn related_keys(keys: &[Vec<u8>], known: &BTreeSet<Vec<u8>>) -> Vec<Vec<u8>> {
-    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-    enum Concat {
-        Blake,
-        Twox,
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+enum Concat {
+    Blake,
+    Twox,
+}
+fn split(key: &[u8]) -> Option<(Concat, &[u8])> {
+    if key.len() == 80 && key[32..48] == sp_crypto_hashing::blake2_128(&key[48..]) {
+        Some((Concat::Blake, &key[48..]))
+    } else if key.len() == 72 && key[32..40] == sp_crypto_hashing::twox_64(&key[40..]) {
+        Some((Concat::Twox, &key[40..]))
+    } else {
+        None
     }
-    fn split(key: &[u8]) -> Option<(Concat, &[u8])> {
-        if key.len() == 80 && key[32..48] == sp_crypto_hashing::blake2_128(&key[48..]) {
-            Some((Concat::Blake, &key[48..]))
-        } else if key.len() == 72 && key[32..40] == sp_crypto_hashing::twox_64(&key[40..]) {
-            Some((Concat::Twox, &key[40..]))
-        } else {
-            None
-        }
-    }
-    let families: BTreeSet<_> = known
+}
+fn families(known: &BTreeSet<Vec<u8>>) -> BTreeSet<(Vec<u8>, Concat)> {
+    known
         .iter()
         .filter_map(|key| split(key).map(|(hasher, _)| (key[..32].to_vec(), hasher)))
-        .collect();
+        .take(256)
+        .collect()
+}
+fn related_keys(keys: &[Vec<u8>], families: &BTreeSet<(Vec<u8>, Concat)>) -> Vec<Vec<u8>> {
     let mut hints = BTreeSet::new();
     for key in keys {
         let Some((_, value)) = split(key) else {
             continue;
         };
-        for (prefix, hasher) in &families {
+        for (prefix, hasher) in families {
             let mut predicted = prefix.clone();
             match hasher {
                 Concat::Blake => predicted.extend(sp_crypto_hashing::blake2_128(value)),
@@ -500,7 +548,7 @@ mod prediction_tests {
         let known = [key(1, 7, false), key(2, 8, true)].into_iter().collect();
         let source = key(1, 9, false);
         assert_eq!(
-            related_keys(std::slice::from_ref(&source), &known),
+            related_keys(std::slice::from_ref(&source), &families(&known)),
             vec![key(2, 9, true)]
         );
         let mut corrupt = key(3, 7, false);
@@ -508,12 +556,12 @@ mod prediction_tests {
         assert!(
             related_keys(
                 std::slice::from_ref(&source),
-                &[corrupt].into_iter().collect()
+                &families(&[corrupt].into_iter().collect())
             )
             .is_empty()
         );
-        assert!(related_keys(&[vec![0; 32]], &known).is_empty());
+        assert!(related_keys(&[vec![0; 32]], &families(&known)).is_empty());
         let many = (0..64).map(|p| key(p, 7, false)).collect();
-        assert_eq!(related_keys(&[source], &many).len(), 31);
+        assert_eq!(related_keys(&[source], &families(&many)).len(), 31);
     }
 }

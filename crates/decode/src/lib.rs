@@ -28,6 +28,9 @@ pub enum Error {
     /// The metadata is inconsistent.
     #[error("invalid metadata: {0}")]
     Metadata(String),
+    /// Runtime API lookup, user arguments or result decoding.
+    #[error("{0}")]
+    RuntimeApi(String),
     /// The extrinsic could not be decoded.
     #[error("cannot decode extrinsic: {0}")]
     Extrinsic(String),

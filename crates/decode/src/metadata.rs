@@ -130,7 +130,7 @@ impl Metadata {
     }
 
     /// Resolve a pallet crate via metadata type paths (including aliased runtime names).
-    /// Ambiguous instances use the crate fallback rather than guessing an instance.
+    /// Multiple instances list all candidate runtime names.
     pub fn pallet_for_crate(&self, krate: &str) -> Option<String> {
         let mut names = Vec::new();
         with_runtime!(&self.runtime, md => {
@@ -144,7 +144,11 @@ impl Metadata {
                 }
             }
         });
-        if names.len() == 1 { names.pop() } else { None }
+        if names.is_empty() {
+            None
+        } else {
+            Some(names.join(" / "))
+        }
     }
 
     /// Metadata version (14, 15 or 16).
@@ -196,6 +200,39 @@ impl Metadata {
         }
     }
 
+    /// Validate an export against API metadata; V14 has no API list and cannot check it.
+    pub fn validate_runtime_method(&self, method: &str) -> Result<(), Error> {
+        if self.version() < 15 || self.runtime_api(method).is_some() {
+            return Ok(());
+        }
+        let names: Vec<String> = match &self.runtime {
+            Runtime::V14(_) => Vec::new(),
+            Runtime::V15(md) => md
+                .apis
+                .iter()
+                .flat_map(|api| {
+                    api.methods
+                        .iter()
+                        .map(|m| format!("{}_{}", api.name, m.name))
+                })
+                .collect(),
+            Runtime::V16(md) => md
+                .apis
+                .iter()
+                .flat_map(|api| {
+                    api.methods
+                        .iter()
+                        .map(|m| format!("{}_{}", api.name, m.name))
+                })
+                .collect(),
+        };
+        let suggestion = names.iter().min_by_key(|name| edit_distance(method, name));
+        Err(Error::RuntimeApi(format!(
+            "runtime API method {method} not found{}",
+            suggestion.map_or(String::new(), |name| format!(" (did you mean {name}?)"))
+        )))
+    }
+
     /// Encode a positional JSON array or an object keyed by runtime API parameter names.
     /// Accounts and byte sequences use JSON byte arrays. Enum variants use
     /// {"$variant":"Some","$values":[16]}; --data accepts any SCALE encoding.
@@ -204,8 +241,9 @@ impl Metadata {
         method: &str,
         args: &serde_json::Value,
     ) -> Result<Vec<u8>, Error> {
+        self.validate_runtime_method(method)?;
         let (inputs, _) = self.runtime_api(method).ok_or_else(|| {
-            Error::Metadata(format!(
+            Error::RuntimeApi(format!(
                 "runtime API types unavailable for {method}; use --data SCALE hex"
             ))
         })?;
@@ -218,11 +256,11 @@ impl Metadata {
                 .map(|(name, _)| {
                     values
                         .get(*name)
-                        .ok_or_else(|| Error::Metadata(format!("missing argument {name}")))
+                        .ok_or_else(|| Error::RuntimeApi(format!("missing argument {name}")))
                 })
                 .collect::<Result<_, _>>()?,
             _ => {
-                return Err(Error::Metadata(format!(
+                return Err(Error::RuntimeApi(format!(
                     "expected {} positional or named arguments",
                     inputs.len()
                 )));
@@ -232,7 +270,7 @@ impl Metadata {
         for ((name, ty), value) in inputs.into_iter().zip(values) {
             let value = json_value(value)?;
             scale_value::scale::encode_as_type(&value, ty, self.types(), &mut output)
-                .map_err(|e| Error::Metadata(format!("argument {name}: {e}")))?;
+                .map_err(|e| Error::RuntimeApi(format!("argument {name}: {e}")))?;
         }
         Ok(output)
     }
@@ -240,17 +278,50 @@ impl Metadata {
     /// Decode the complete runtime API output, without truncating it. Unknown APIs use hex upstream.
     pub fn decode_runtime_result(&self, method: &str, bytes: &[u8]) -> Result<String, Error> {
         let (_, ty) = self.runtime_api(method).ok_or_else(|| {
-            Error::Metadata(format!("runtime API types unavailable for {method}"))
+            Error::RuntimeApi(format!("runtime API types unavailable for {method}"))
         })?;
         let mut cursor = bytes;
         let value = scale_value::scale::decode_as_type(&mut cursor, ty, self.types())
-            .map_err(|e| Error::Metadata(format!("runtime API output: {e}")))?;
+            .map_err(|e| Error::RuntimeApi(format!("runtime API output: {e}")))?;
         if !cursor.is_empty() {
-            return Err(Error::Metadata(
+            return Err(Error::RuntimeApi(
                 "trailing bytes in runtime API output".into(),
             ));
         }
-        Ok(value.to_string())
+        let byte_sequences: std::collections::BTreeSet<_> = self
+            .types()
+            .types
+            .iter()
+            .filter_map(|ty| {
+                let elem = match &ty.ty.type_def {
+                    scale_info::TypeDef::Sequence(seq) => seq.type_param.id,
+                    scale_info::TypeDef::Array(arr) => arr.type_param.id,
+                    _ => return None,
+                };
+                matches!(
+                    self.types().resolve(elem)?.type_def,
+                    scale_info::TypeDef::Primitive(scale_info::TypeDefPrimitive::U8)
+                )
+                .then_some(ty.id)
+            })
+            .collect();
+        let mut output = String::new();
+        scale_value::stringify::to_writer_custom()
+            .add_custom_formatter(move |v, w| {
+                if byte_sequences.contains(&v.context) {
+                    if let scale_value::ValueDef::Composite(c) = &v.value
+                        && c.is_empty()
+                    {
+                        return Some(std::fmt::Write::write_str(w, "0x"));
+                    }
+                    scale_value::stringify::custom_formatters::format_hex(v, w)
+                } else {
+                    None
+                }
+            })
+            .write(&value, &mut output)
+            .map_err(|e| Error::RuntimeApi(e.to_string()))?;
+        Ok(output)
     }
 
     /// Names a key of the main trie (`child_trie` is `None`) or of a child trie, decoding map
@@ -388,7 +459,7 @@ fn json_value(value: &serde_json::Value) -> Result<scale_value::Value, Error> {
             } else if let Some(n) = n.as_i64() {
                 Value::i128(n.into())
             } else {
-                return Err(Error::Metadata(
+                return Err(Error::RuntimeApi(
                     "SCALE arguments require integers, not floating point".into(),
                 ));
             }
@@ -404,9 +475,11 @@ fn json_value(value: &serde_json::Value) -> Result<scale_value::Value, Error> {
             let name = values
                 .get("$variant")
                 .and_then(serde_json::Value::as_str)
-                .ok_or_else(|| Error::Metadata("$variant must be a string".into()))?;
+                .ok_or_else(|| Error::RuntimeApi("$variant must be a string".into()))?;
             if values.len() != 2 {
-                return Err(Error::Metadata("enum requires $variant and $values".into()));
+                return Err(Error::RuntimeApi(
+                    "enum requires $variant and $values".into(),
+                ));
             }
             match values.get("$values") {
                 Some(serde_json::Value::Array(fields)) => Value::unnamed_variant(
@@ -423,7 +496,11 @@ fn json_value(value: &serde_json::Value) -> Result<scale_value::Value, Error> {
                         .map(|(k, v)| Ok((k.clone(), json_value(v)?)))
                         .collect::<Result<Vec<_>, Error>>()?,
                 ),
-                _ => return Err(Error::Metadata("$values must be an array or object".into())),
+                _ => {
+                    return Err(Error::RuntimeApi(
+                        "$values must be an array or object".into(),
+                    ));
+                }
             }
         }
         serde_json::Value::Object(values) => Value::named_composite(
@@ -433,4 +510,70 @@ fn json_value(value: &serde_json::Value) -> Result<scale_value::Value, Error> {
                 .collect::<Result<Vec<_>, Error>>()?,
         ),
     })
+}
+
+fn edit_distance(a: &str, b: &str) -> usize {
+    let mut row: Vec<usize> = (0..=b.chars().count()).collect();
+    for (i, ac) in a.chars().enumerate() {
+        let mut diagonal = row[0];
+        row[0] = i + 1;
+        for (j, bc) in b.chars().enumerate() {
+            let old = row[j + 1];
+            row[j + 1] = (diagonal + usize::from(ac != bc))
+                .min(row[j] + 1)
+                .min(old + 1);
+            diagonal = old;
+        }
+    }
+    row.last().copied().unwrap_or(0)
+}
+
+#[cfg(test)]
+mod argument_tests {
+    use super::*;
+    use parity_scale_codec::Encode;
+    #[test]
+    fn variant_json_encodes_positional_and_named_fields() {
+        let positional =
+            json_value(&serde_json::json!({"$variant":"Some","$values":[16]})).expect("variant");
+        let named = json_value(&serde_json::json!({"$variant":"Record","$values":{"amount":16}}))
+            .expect("named variant");
+        assert!(
+            matches!(positional.value, scale_value::ValueDef::Variant(ref v) if v.name == "Some")
+        );
+        assert!(matches!(named.value, scale_value::ValueDef::Variant(ref v) if v.name == "Record"));
+        // Register a concrete enum shape, so both JSON spellings exercise real SCALE encoding.
+        let mut registry = scale_info::Registry::new();
+        let id = registry
+            .register_type(&scale_info::meta_type::<Option<u32>>())
+            .id;
+        let registry: PortableRegistry = registry.into();
+        let mut encoded = Vec::new();
+        scale_value::scale::encode_as_type(&positional, id, &registry, &mut encoded)
+            .expect("encode Some");
+        assert_eq!(encoded, Some(16u32).encode());
+        struct Named;
+        impl scale_info::TypeInfo for Named {
+            type Identity = Self;
+            fn type_info() -> scale_info::Type {
+                scale_info::Type::builder()
+                    .path(scale_info::Path::new("Named", "test"))
+                    .variant(scale_info::build::Variants::new().variant("Record", |v| {
+                        v.index(0).fields(
+                            scale_info::build::Fields::named()
+                                .field(|f| f.name("amount").ty::<u32>()),
+                        )
+                    }))
+            }
+        }
+        let mut registry = scale_info::Registry::new();
+        let id = registry.register_type(&scale_info::meta_type::<Named>()).id;
+        let registry: PortableRegistry = registry.into();
+        let mut encoded = Vec::new();
+        scale_value::scale::encode_as_type(&named, id, &registry, &mut encoded)
+            .expect("encode named");
+        assert_eq!(encoded, [0, 16, 0, 0, 0]);
+        let invalid = json_value(&serde_json::json!({"$variant":2,"$values":[]}));
+        assert!(invalid.is_err());
+    }
 }

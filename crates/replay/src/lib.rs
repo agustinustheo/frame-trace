@@ -1,6 +1,7 @@
 //! Faithful block replay using safe RPC and SDK authenticated trie execution.
 mod artifact;
 pub mod call;
+mod metadata;
 mod session;
 pub use session::ReplaySession;
 mod backend;
@@ -43,6 +44,14 @@ pub enum Error {
     MethodNotAllowed(String),
     #[error("RPC error: {0}")]
     Rpc(String),
+    #[error("RPC {method} error {code}: {message}")]
+    RpcResponse {
+        method: String,
+        code: i64,
+        message: String,
+    },
+    #[error("runtime API method {0} not found")]
+    MethodNotFound(String),
     #[error("RPC error: {0}")]
     TransientRpc(String),
     #[error("RPC cancelled")]
@@ -68,13 +77,11 @@ impl Error {
     }
 }
 
+// Only used by the explicitly enabled unauthenticated metadata fallback.
 fn metadata_result(result: Result<Value>) -> Result<String> {
     match result {
         Ok(Value::String(text)) => Ok(text),
-        Ok(Value::Null) | Err(Error::Unavailable(_)) => {
-            eprintln!("warning: metadata unavailable; continuing with undecoded names");
-            Ok(String::new())
-        }
+        Ok(Value::Null) | Err(Error::Unavailable(_)) => Ok(String::new()),
         Ok(_) => Err(Error::Rpc("state_getMetadata: non-string result".into())),
         Err(error) => Err(error),
     }
@@ -214,7 +221,7 @@ pub fn online_with_session(rpc: &Rpc, selector: &str, session: &ReplaySession) -
         block: response["block"].clone(),
         parent_header: rpc.call("chain_getHeader", json!([parent_hash]))?,
         runtime_version: rpc.call("state_getRuntimeVersion", json!([parent_hash]))?,
-        metadata: metadata_result(rpc.call("state_getMetadata", json!([parent_hash])))?,
+        metadata: String::new(),
         proof_nodes: Vec::new(),
     };
     let mut replay = replay_with_session(artifact, Some(rpc.clone()), session)?;
@@ -236,12 +243,16 @@ pub fn replay_with_session(
     rpc: Option<Rpc>,
     session: &ReplaySession,
 ) -> Result<Replay> {
-    let replay = replay_inner(artifact, rpc, session);
+    with_maintenance(session, || replay_inner(artifact, rpc, session))
+}
+
+fn with_maintenance<T>(session: &ReplaySession, run: impl FnOnce() -> Result<T>) -> Result<T> {
+    let result = run();
     let maintenance = session.prune_disk_cache();
-    match replay {
-        Ok(replay) => {
+    match result {
+        Ok(value) => {
             maintenance?;
-            Ok(replay)
+            Ok(value)
         }
         Err(error) => {
             if let Err(cache_error) = maintenance {
@@ -251,6 +262,7 @@ pub fn replay_with_session(
         }
     }
 }
+
 fn replay_inner(
     mut artifact: Artifact,
     rpc: Option<Rpc>,
@@ -267,15 +279,7 @@ fn replay_inner(
         .digest_mut()
         .logs
         .retain(|d| !matches!(d, generic::DigestItem::Seal(_, _)));
-    let db = ProofDb::with_session(rpc.clone(), parent.hash(), session.clone());
-    db.set_root(root);
-    db.insert_nodes(
-        artifact
-            .proof_nodes
-            .iter()
-            .map(|s| unhex(s))
-            .collect::<Result<Vec<_>>>()?,
-    );
+    let db = open_db(&artifact, rpc.clone(), session, &parent)?;
     if rpc.is_some() {
         eprintln!(
             "replay #{number}: prefetching prior access paths ({} in flight, batched keys)",
@@ -287,10 +291,12 @@ fn replay_inner(
         if session.nodes.lock().nodes.is_empty() {
             hints.extend([b":code".to_vec(), b":heappages".to_vec()]);
         }
-        db.prefetch(&hints.into_iter().collect::<Vec<_>>())?;
+        db.prefetch(&hints.into_iter().take(4096).collect::<Vec<_>>())?;
     }
     let (wasm, heap_pages) = runtime_code(&db, root)?;
-    let executor = &session.executor;
+    metadata::load(&mut artifact, &db, &wasm, heap_pages, session, &parent)?;
+    let executor = session.executor_for(&wasm);
+    db.mark_bootstrap();
     eprintln!("replay #{number}: compiling/loading runtime and discovering state");
     if rpc.is_some() && session.speculative_discovery {
         db.speculative.store(true, Ordering::SeqCst);
@@ -300,7 +306,7 @@ fn replay_inner(
                 root,
                 &wasm,
                 heap_pages,
-                executor,
+                &executor,
                 &block,
                 &Capture::new(),
             );
@@ -316,19 +322,17 @@ fn replay_inner(
         root,
         &wasm,
         heap_pages,
-        executor,
+        &executor,
         &block,
         &Capture::new(),
     )?;
-    db.online.store(false, Ordering::SeqCst);
     let capture = Capture::new();
-    let (proof_bytes, computed_state_root) = without_rpc(rpc.as_ref(), || {
-        execute(&db, root, &wasm, heap_pages, executor, &block, &capture)
+    let (proof_bytes, computed_state_root) = measured_run(&db, rpc.as_ref(), || {
+        execute(&db, root, &wasm, heap_pages, &executor, &block, &capture)
     })?;
     let rpc_count = rpc.as_ref().map_or(0, Rpc::count);
     let capture = captured(&capture, artifact.block_hash, parent.hash());
-    db.persist()?;
-    artifact.proof_nodes = db.export();
+    persist_export(&db, &mut artifact)?;
     Ok(Replay {
         capture,
         block_number: number,
@@ -407,7 +411,15 @@ fn execute_method(
     let backend = TracedBackend::new(db.clone(), root, recorder.clone());
     let mut overlay = OverlayedChanges::default();
     let mut extensions = Extensions::default();
-    extensions.register(ProofSizeExt::new(recorder.clone()));
+    // SDK ExecutionExtensions always supplies the executor-backed version reader.
+    extensions.register(sp_core::traits::ReadRuntimeVersionExt::new(
+        executor.clone(),
+    ));
+    // Import with proof recording supplies ProofSizeExt; ordinary state_call does not.
+    // Keep the backend recorder for reporting without exposing it to call runtimes.
+    if matches!(context, CallContext::Onchain { import: true }) {
+        extensions.register(ProofSizeExt::new(recorder.clone()));
+    }
     let fetcher = WrappedRuntimeCode(wasm.into());
     let code = RuntimeCode {
         code_fetcher: &fetcher,
@@ -445,7 +457,14 @@ fn execute_method(
                     .unwrap_or_else(|| "executor panicked".into()),
             )
         })?
-        .map_err(|e| Error::Execution(e.to_string()))?;
+        .map_err(|e| {
+            let text = e.to_string();
+            if text.contains("Exported method") && text.contains("not found") {
+                Error::MethodNotFound(method.into())
+            } else {
+                Error::Execution(text)
+            }
+        })?;
     Ok((recorder.estimate_encoded_size(), output))
 }
 
@@ -453,6 +472,36 @@ fn execute_method(
 pub fn header_hash(header: &Value) -> Result<String> {
     let header: Header = serde_json::from_value(header.clone())?;
     Ok(format!("{:?}", header.hash()))
+}
+
+fn open_db(
+    artifact: &Artifact,
+    rpc: Option<Rpc>,
+    session: &ReplaySession,
+    state: &Header,
+) -> Result<ProofDb> {
+    let db = ProofDb::with_session(rpc, state.hash(), session.clone());
+    db.set_root(*state.state_root());
+    db.insert_nodes(
+        artifact
+            .proof_nodes
+            .iter()
+            .map(|s| unhex(s))
+            .collect::<Result<Vec<_>>>()?,
+    );
+    Ok(db)
+}
+
+fn persist_export(db: &ProofDb, artifact: &mut Artifact) -> Result<()> {
+    db.persist()?;
+    artifact.proof_nodes = db.export();
+    Ok(())
+}
+
+fn measured_run<T>(db: &ProofDb, rpc: Option<&Rpc>, run: impl FnOnce() -> Result<T>) -> Result<T> {
+    db.online.store(false, Ordering::SeqCst);
+    db.begin_measured();
+    without_rpc(rpc, run)
 }
 
 fn without_rpc<T>(rpc: Option<&Rpc>, run: impl FnOnce() -> Result<T>) -> Result<T> {

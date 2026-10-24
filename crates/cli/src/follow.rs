@@ -28,6 +28,8 @@ enum State {
     Failed,
     Terminal,
     Reverted,
+    Skipped,
+    Cancelled,
 }
 struct Entry {
     number: u64,
@@ -47,10 +49,31 @@ enum Outcome {
     Passed,
     Retryable,
     Terminal,
+    Skipped,
+    Cancelled,
 }
 enum Event {
-    Started(String),
-    Finished(String, Outcome),
+    Started(String, Arc<AtomicBool>),
+    Finished(String, Arc<AtomicBool>, Outcome),
+}
+
+#[derive(Debug)]
+struct Skipped(&'static str);
+impl std::fmt::Display for Skipped {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.0)
+    }
+}
+impl std::error::Error for Skipped {}
+
+fn current_entry<'a>(
+    entries: &'a mut BTreeMap<String, Entry>,
+    hash: &str,
+    generation: &Arc<AtomicBool>,
+) -> Option<&'a mut Entry> {
+    entries
+        .get_mut(hash)
+        .filter(|entry| Arc::ptr_eq(&entry.reverted, generation))
 }
 
 // The catch covers acquisition, conversion, annotation and export, not just the SDK executor.
@@ -58,6 +81,17 @@ fn job_outcome(run: impl FnOnce() -> Result<()>) -> Outcome {
     match std::panic::catch_unwind(std::panic::AssertUnwindSafe(run)) {
         Ok(Ok(())) => Outcome::Passed,
         Ok(Err(error)) => {
+            if error.downcast_ref::<Skipped>().is_some() {
+                eprintln!("replay job skipped: {error}");
+                return Outcome::Skipped;
+            }
+            if matches!(
+                error.downcast_ref::<frame_trace_replay::Error>(),
+                Some(frame_trace_replay::Error::Cancelled)
+            ) {
+                eprintln!("replay job cancelled");
+                return Outcome::Cancelled;
+            }
             let retry = error
                 .downcast_ref::<frame_trace_replay::Error>()
                 .is_some_and(|e| e.is_transient())
@@ -80,11 +114,17 @@ fn job_outcome(run: impl FnOnce() -> Result<()>) -> Outcome {
 }
 fn finish(entry: &mut Entry, outcome: Outcome) {
     entry.attempts += 1;
-    entry.state = if entry.reverted.load(Ordering::SeqCst) {
+    entry.state = if outcome == Outcome::Skipped {
+        State::Skipped
+    } else if outcome == Outcome::Cancelled {
+        State::Cancelled
+    } else if entry.reverted.load(Ordering::SeqCst) {
         State::Reverted
     } else {
         match outcome {
             Outcome::Passed => State::Done,
+            Outcome::Skipped => State::Skipped,
+            Outcome::Cancelled => State::Cancelled,
             Outcome::Retryable if entry.attempts < MAX_ATTEMPTS => State::Failed,
             _ => State::Terminal,
         }
@@ -114,7 +154,11 @@ fn ancestry(
     loop {
         let height = number(&header)?;
         let hash = frame_trace_replay::header_hash(&header)?;
-        if height < lower || known.contains_key(&hash) {
+        if height < lower
+            || known
+                .get(&hash)
+                .is_some_and(|e| !e.reverted.load(Ordering::SeqCst))
+        {
             break;
         }
         pending.push((hash, height));
@@ -124,7 +168,10 @@ fn ancestry(
         let hash = header["parentHash"]
             .as_str()
             .context("parent hash missing")?;
-        if known.contains_key(hash) {
+        if known
+            .get(hash)
+            .is_some_and(|e| !e.reverted.load(Ordering::SeqCst))
+        {
             break;
         }
         let fetched = parent(hash)?;
@@ -189,7 +236,8 @@ pub fn run(args: FollowArgs) -> Result<()> {
         cancel.clone(),
     )?;
     let session =
-        ReplaySession::with_cache_max_bytes(args.cache_dir.as_deref(), args.cache_max_bytes)?;
+        ReplaySession::with_cache_max_bytes(args.cache_dir.as_deref(), args.cache_max_bytes)?
+            .with_rpc_metadata_fallback(args.rpc_metadata_fallback);
     let (send, receive) = mpsc::sync_channel::<Job>(QUEUE);
     let (events, completed) = mpsc::channel();
     let receive = Arc::new(Mutex::new(receive));
@@ -216,16 +264,15 @@ pub fn run(args: FollowArgs) -> Result<()> {
                     if rpc.cancelled() {
                         break;
                     }
-                    let _ = events.send(Event::Started(job.hash.clone()));
+                    let _ = events.send(Event::Started(job.hash.clone(), job.reverted.clone()));
                     let start = Instant::now();
                     let outcome = job_outcome(|| {
                         if job.reverted.load(Ordering::SeqCst) {
-                            anyhow::bail!("block already reverted");
+                            return Err(Skipped("block already reverted").into());
                         }
-                        anyhow::ensure!(
-                            job.number >= active_floor.load(Ordering::SeqCst),
-                            "queued block expired behind tip"
-                        );
+                        if job.number < active_floor.load(Ordering::SeqCst) {
+                            return Err(Skipped("queued block expired behind tip").into());
+                        }
                         let loaded = source::replay_loaded(
                             frame_trace_replay::online_with_session(&rpc, &job.hash, &session)?,
                             None,
@@ -249,7 +296,7 @@ pub fn run(args: FollowArgs) -> Result<()> {
                         );
                         Ok(())
                     });
-                    let _ = events.send(Event::Finished(job.hash, outcome));
+                    let _ = events.send(Event::Finished(job.hash, job.reverted, outcome));
                 }
             })
         })
@@ -260,15 +307,15 @@ pub fn run(args: FollowArgs) -> Result<()> {
     while !cancel.is_cancelled() {
         for event in completed.try_iter() {
             match event {
-                Event::Started(hash) => {
-                    if let Some(entry) = entries.get_mut(&hash)
+                Event::Started(hash, generation) => {
+                    if let Some(entry) = current_entry(&mut entries, &hash, &generation)
                         && !entry.reverted.load(Ordering::SeqCst)
                     {
                         entry.state = State::InFlight;
                     }
                 }
-                Event::Finished(hash, outcome) => {
-                    if let Some(entry) = entries.get_mut(&hash) {
+                Event::Finished(hash, generation, outcome) => {
+                    if let Some(entry) = current_entry(&mut entries, &hash, &generation) {
                         finish(entry, outcome);
                         if entry.state == State::Terminal {
                             eprintln!(
@@ -309,6 +356,7 @@ pub fn run(args: FollowArgs) -> Result<()> {
                     reverted: reverted.clone(),
                 }) {
                     Ok(()) => {
+                        order.retain(|old| old != &hash);
                         order.push_back(hash.clone());
                         entries.insert(
                             hash,
@@ -330,8 +378,8 @@ pub fn run(args: FollowArgs) -> Result<()> {
             }
             for (hash, entry) in &mut entries {
                 if entry.state == State::Failed && entry.number < floor.unwrap_or(tip) {
-                    entry.state = State::Terminal;
-                    eprintln!("terminal block {hash}: retry expired behind tip");
+                    entry.state = State::Skipped;
+                    eprintln!("skipped block {hash}: retry expired behind tip");
                 }
                 if entry.state == State::Failed
                     && entry.retry_at <= Instant::now()
@@ -376,11 +424,13 @@ pub fn run(args: FollowArgs) -> Result<()> {
             State::Failed,
             State::Terminal,
             State::Reverted,
+            State::Skipped,
+            State::Cancelled,
         ]
         .map(|state| entries.values().filter(|e| e.state == state).count());
         eprintln!(
-            "follow: queued={} in-flight={} done={} failed={} terminal={} reverted={}",
-            counts[0], counts[1], counts[2], counts[3], counts[4], counts[5]
+            "follow: queued={} in-flight={} done={} failed={} terminal={} reverted={} skipped={} cancelled={}",
+            counts[0], counts[1], counts[2], counts[3], counts[4], counts[5], counts[6], counts[7]
         );
         for _ in 0..20 {
             if cancel.is_cancelled() {
@@ -389,6 +439,23 @@ pub fn run(args: FollowArgs) -> Result<()> {
             thread::sleep(Duration::from_millis(100));
         }
     }
+    for (hash, entry) in &mut entries {
+        if matches!(entry.state, State::Queued | State::InFlight | State::Failed) {
+            entry.state = State::Cancelled;
+            eprintln!("cancelled block {hash}: follow stopped");
+        }
+    }
+    eprintln!(
+        "follow shutdown: skipped={} cancelled={}",
+        entries
+            .values()
+            .filter(|e| e.state == State::Skipped)
+            .count(),
+        entries
+            .values()
+            .filter(|e| e.state == State::Cancelled)
+            .count()
+    );
     drop(send);
     for worker in workers {
         if worker.is_finished() {
@@ -514,13 +581,74 @@ mod tests {
             frame_trace_replay::Error::Execution("root mismatch".into()),
             frame_trace_replay::Error::Unavailable("pruned".into()),
             frame_trace_replay::Error::Invalid("bad block".into()),
-            frame_trace_replay::Error::Cancelled,
         ] {
             assert_eq!(job_outcome(|| Err(error.into())), Outcome::Terminal);
         }
         assert_eq!(
+            job_outcome(|| Err(frame_trace_replay::Error::Cancelled.into())),
+            Outcome::Cancelled
+        );
+        assert_eq!(
+            job_outcome(|| Err(Skipped("expired").into())),
+            Outcome::Skipped
+        );
+        let mut skipped = entry(1, State::InFlight);
+        skipped.reverted.store(true, Ordering::SeqCst);
+        finish(&mut skipped, Outcome::Skipped);
+        assert_eq!(skipped.state, State::Skipped);
+        finish(&mut skipped, Outcome::Cancelled);
+        assert_eq!(skipped.state, State::Cancelled);
+        assert_eq!(
             job_outcome(|| Err(frame_trace_replay::Error::TransientRpc("timeout".into()).into())),
             Outcome::Retryable
+        );
+    }
+}
+
+#[cfg(test)]
+mod canonical_again_tests {
+    use super::*;
+    #[test]
+    fn reverted_tip_is_eligible_again_and_new_generation_survives_old_completion() {
+        let header = serde_json::json!({"number":"0x1", "parentHash":format!("0x{}", "00".repeat(32)),
+            "stateRoot":format!("0x{}", "11".repeat(32)), "extrinsicsRoot":format!("0x{}", "00".repeat(32)), "digest":{"logs":[]}});
+        let hash = frame_trace_replay::header_hash(&header).expect("header");
+        let old = Arc::new(AtomicBool::new(true));
+        let mut entries = BTreeMap::from([(
+            hash.clone(),
+            Entry {
+                number: 1,
+                state: State::Reverted,
+                attempts: 1,
+                retry_at: Instant::now(),
+                reverted: old.clone(),
+            },
+        )]);
+        let pending = ancestry(header.clone(), Some(1), &entries, |_| panic!("past floor"))
+            .expect("ancestry");
+        assert_eq!(pending, [(hash.clone(), 1)]);
+        let new = Arc::new(AtomicBool::new(false));
+        entries.insert(
+            hash.clone(),
+            Entry {
+                number: 1,
+                state: State::Queued,
+                attempts: 0,
+                retry_at: Instant::now(),
+                reverted: new.clone(),
+            },
+        );
+        assert!(
+            current_entry(&mut entries, &hash, &old).is_none(),
+            "ignore events from the previous job"
+        );
+        let entry = current_entry(&mut entries, &hash, &new).expect("current job");
+        finish(entry, Outcome::Passed);
+        assert_eq!(entry.state, State::Done);
+        assert!(
+            ancestry(header, Some(1), &entries, |_| panic!("known tip"))
+                .expect("ancestry")
+                .is_empty()
         );
     }
 }

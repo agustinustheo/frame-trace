@@ -38,6 +38,7 @@ pub struct AnnotatedCall {
     pub result: String,
     pub decoded: Option<String>,
     pub oracle_match: Option<bool>,
+    pub oracle_source: Option<&'static str>,
     pub proof_bytes: usize,
     pub state_root: String,
 }
@@ -145,7 +146,7 @@ pub fn annotate(block: &TracedBlock, metadata: Option<&Metadata>) -> AnnotatedBl
                     let krate = span.target.split("::").next().unwrap_or(&span.target);
                     let pallet = metadata
                         .and_then(|md| md.pallet_for_crate(krate))
-                        .unwrap_or_else(|| krate.to_owned());
+                        .unwrap_or_else(|| crate_label(krate));
                     if krate != "runtime" && !krate.is_empty() {
                         span.name = format!("{}: {pallet}", span.name);
                     }
@@ -247,5 +248,29 @@ fn annotate_op(op: &StorageOp, metadata: Option<&Metadata>) -> AnnotatedOp {
         value_len: op.value_len,
         value_truncated: op.value_truncated,
         duplicate_read: op.duplicate_read,
+    }
+}
+
+fn crate_label(krate: &str) -> String {
+    krate
+        .replace("pallet_", "")
+        .split('_')
+        .map(|part| {
+            let mut chars = part.chars();
+            chars
+                .next()
+                .map_or_else(String::new, |c| c.to_uppercase().chain(chars).collect())
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod naming_tests {
+    use super::*;
+    #[test]
+    fn crate_fallbacks_strip_pallet_and_use_camel_case() {
+        assert_eq!(crate_label("pallet_aura"), "Aura");
+        assert_eq!(crate_label("cumulus_pallet_xcmp_queue"), "CumulusXcmpQueue");
+        assert_eq!(crate_label("unknown_runtime_crate"), "UnknownRuntimeCrate");
     }
 }
