@@ -1,0 +1,25 @@
+[package]
+name = "frame-trace"
+description = "OpenTelemetry traces of what a Polkadot SDK block did to storage"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "frame-trace"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+comfy-table.workspace = true
+frame-trace-decode.workspace = true
+frame-trace-model.workspace = true
+frame-trace-otel.workspace = true
+hex.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,22 @@
+[package]
+name = "frame-trace-otel"
+description = "Turns frame-trace block traces into OpenTelemetry spans and exports them over OTLP"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+frame-trace-decode.workspace = true
+frame-trace-model.workspace = true
+opentelemetry.workspace = true
+opentelemetry_sdk.workspace = true
+opentelemetry-otlp.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+opentelemetry_sdk = { workspace = true, features = ["testing"] }
+
+[lints]
+workspace = true

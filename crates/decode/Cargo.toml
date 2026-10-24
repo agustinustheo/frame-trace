@@ -1,0 +1,27 @@
+[package]
+name = "frame-trace-decode"
+description = "Metadata-based storage key and extrinsic decoding for frame-trace"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+bs58.workspace = true
+frame-decode.workspace = true
+frame-metadata.workspace = true
+frame-trace-model.workspace = true
+hex.workspace = true
+parity-scale-codec.workspace = true
+scale-info.workspace = true
+scale-value.workspace = true
+serde.workspace = true
+sp-crypto-hashing.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+
+[lints]
+workspace = true

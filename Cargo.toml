@@ -1,0 +1,39 @@
+[workspace]
+resolver = "3"
+members = ["crates/model", "crates/decode", "crates/otel", "crates/cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.93"
+license = "Apache-2.0"
+repository = "https://github.com/agustinustheo/frame-trace"
+
+[workspace.dependencies]
+frame-trace-model = { path = "crates/model" }
+frame-trace-decode = { path = "crates/decode" }
+frame-trace-otel = { path = "crates/otel" }
+
+anyhow = "1.0.104"
+bs58 = "0.5.1"
+clap = { version = "4.6.7", features = ["derive"] }
+comfy-table = "8.0.1"
+frame-decode = { version = "0.18.1", default-features = false, features = ["std"] }
+frame-metadata = { version = "23.0.1", default-features = false, features = ["current", "decode", "std"] }
+hex = "0.4.3"
+opentelemetry = { version = "0.33.1", default-features = false, features = ["trace"] }
+opentelemetry_sdk = { version = "0.33.1", default-features = false, features = ["trace"] }
+opentelemetry-otlp = { version = "0.33.1", default-features = false, features = ["trace", "http-proto", "reqwest-blocking-client"] }
+parity-scale-codec = { version = "3.7.5", default-features = false, features = ["std"] }
+scale-info = { version = "2.11.6", default-features = false, features = ["std", "decode"] }
+scale-value = { version = "0.18.2", default-features = false }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0.154"
+sp-crypto-hashing = "0.1.0"
+thiserror = "2.0.21"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+unwrap_used = "warn"

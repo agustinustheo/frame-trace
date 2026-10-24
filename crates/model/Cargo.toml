@@ -1,0 +1,22 @@
+[package]
+name = "frame-trace-model"
+description = "Block trace model for frame-trace: storage ops, execution phases and stats (no I/O)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+hex.workspace = true
+parity-scale-codec.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+hex.workspace = true
+sp-crypto-hashing.workspace = true
+
+[lints]
+workspace = true
