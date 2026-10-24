@@ -159,7 +159,7 @@ impl Metadata {
     }
 
     /// Names a key from its first bytes only, without map keys: for keys the node printed
-    /// truncated. The result is never `complete`.
+    /// truncated. The result is never complete.
     pub fn item_name(&self, child_trie: Option<&[u8]>, key_head: &[u8]) -> KeyName {
         self.name(child_trie, key_head, false)
     }
@@ -168,6 +168,7 @@ impl Metadata {
         if let Some(trie) = child_trie {
             return KeyName::Child {
                 trie: trie.to_vec(),
+                key: key.to_vec(),
             };
         }
         if decode_keys && let Some(name) = well_known(key) {

@@ -2,6 +2,9 @@
 
 use std::fmt;
 
+/// Child trie keys longer than this many bytes are shown cut, with `…`.
+const CHILD_KEY_SHOWN: usize = 32;
+
 /// What a storage key refers to.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum KeyName {
@@ -19,10 +22,13 @@ pub enum KeyName {
     },
     /// A well-known key outside of any pallet, such as `:code`.
     WellKnown(String),
-    /// A key inside a child trie, identified by its unprefixed storage key.
+    /// A key inside a child trie. Child keys are not described by metadata, so the key is
+    /// shown as hex.
     Child {
-        /// Child trie storage key.
+        /// Child trie storage key (unprefixed).
         trie: Vec<u8>,
+        /// The key inside the child trie; empty for ops on the whole trie (`kill_child`).
+        key: Vec<u8>,
     },
     /// No storage item with this prefix. `pallet` is set when the first 16 bytes match one.
     Unknown {
@@ -41,12 +47,23 @@ impl KeyName {
         }
     }
 
+    /// Whether the name identifies the key: every map key decoded, or a child key short enough
+    /// to show in full.
+    pub fn is_complete(&self) -> bool {
+        match self {
+            KeyName::Storage { complete, .. } => *complete,
+            KeyName::WellKnown(_) => true,
+            KeyName::Child { key, .. } => key.len() <= CHILD_KEY_SHOWN,
+            KeyName::Unknown { .. } => false,
+        }
+    }
+
     /// The item: `Pallet::Item`, the well-known key, `child:<id>`, or `unknown`.
     pub fn item(&self) -> String {
         match self {
             KeyName::Storage { pallet, item, .. } => format!("{pallet}::{item}"),
             KeyName::WellKnown(name) => name.clone(),
-            KeyName::Child { trie } => {
+            KeyName::Child { trie, .. } => {
                 format!("child:0x{}", hex::encode(trie.get(..8).unwrap_or(trie)))
             }
             KeyName::Unknown {
@@ -60,8 +77,19 @@ impl KeyName {
 impl fmt::Display for KeyName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.item())?;
-        let KeyName::Storage { keys, complete, .. } = self else {
-            return Ok(());
+        let (keys, complete) = match self {
+            KeyName::Storage { keys, complete, .. } => (keys, complete),
+            KeyName::Child { key, .. } if key.is_empty() => return Ok(()),
+            KeyName::Child { key, .. } => {
+                let shown = hex::encode(key.get(..CHILD_KEY_SHOWN).unwrap_or(key));
+                let more = if key.len() > CHILD_KEY_SHOWN {
+                    "…"
+                } else {
+                    ""
+                };
+                return write!(f, "[0x{shown}{more}]");
+            }
+            _ => return Ok(()),
         };
         match (keys.is_empty(), complete) {
             (true, true) => Ok(()),

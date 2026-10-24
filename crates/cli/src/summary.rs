@@ -40,6 +40,10 @@ fn phases(block: &AnnotatedBlock) -> Table {
     );
     for phase in &block.phases {
         table.add_row(stats_row(phase.label.clone(), &phase.stats));
+        // Runs inside the extrinsic (between its checks and its own work); not in its row.
+        if let Some(nested) = &phase.post_inherents {
+            table.add_row(stats_row(format!("  └ {}", nested.label), &nested.stats));
+        }
     }
     table.add_row(stats_row("total".into(), &block.totals));
     table
@@ -73,7 +77,7 @@ struct ItemTally {
 
 fn items(block: &AnnotatedBlock, top: usize) -> Table {
     let mut tally: BTreeMap<&str, ItemTally> = BTreeMap::new();
-    for op in block.phases.iter().flat_map(|p| &p.ops) {
+    for op in block.all_phases().flat_map(|p| &p.ops) {
         let t = tally.entry(op.item.as_str()).or_default();
         let len = op.value_len.unwrap_or(0);
         match op.op {
@@ -125,7 +129,7 @@ fn items(block: &AnnotatedBlock, top: usize) -> Table {
 
 fn duplicates(block: &AnnotatedBlock, top: usize) -> Table {
     let mut table = table(2, &["phase", "key", "dup reads"]);
-    for phase in &block.phases {
+    for phase in block.all_phases() {
         // Group by key identity (child trie, raw key), whatever read method was used: names
         // can be shared by different keys (`<unknown>`, undecoded map keys).
         let mut counts: BTreeMap<(Option<&str>, &str), (&AnnotatedOp, usize)> = BTreeMap::new();

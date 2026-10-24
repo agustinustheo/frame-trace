@@ -7,6 +7,8 @@
 //! ├─ initialization                                phase span, phase totals
 //! │  └─ get System::Number                         storage op span
 //! ├─ extrinsic 1: Balances.transfer_keep_alive
+//! │  ├─ get System::BlockHash(0)                   its check reads
+//! │  ├─ post inherents (on_poll)                   nested, first signed extrinsic only
 //! │  └─ get System::Account(5Grw…)
 //! └─ finalization
 //! ```
@@ -86,7 +88,7 @@ impl Default for Timing {
 
 /// Spans [`record_block`] creates for `block`: root, phases and ops.
 pub fn span_count(block: &AnnotatedBlock) -> usize {
-    1 + block.phases.iter().map(|p| 1 + p.ops.len()).sum::<usize>()
+    1 + block.all_phases().map(|p| 1 + p.ops.len()).sum::<usize>()
 }
 
 /// A tracer provider exporting through `exporter` with a batch processor whose queue holds
@@ -157,9 +159,18 @@ pub fn export_block<E: SpanExporter + 'static>(
 }
 
 /// Records `block` as one trace on `tracer`. Returns the number of spans created.
+///
+/// Op `seq` occupies the time slot `[start + seq * op_width, start + (seq + 1) * op_width)`, so
+/// a nested phase sits inside its parent's span at the point where it ran.
 pub fn record_block(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) -> usize {
     let at = |slot: usize| timing.start + timing.op_width * u32::try_from(slot).unwrap_or(u32::MAX);
-    let total_ops: usize = block.phases.iter().map(|p| p.ops.len()).sum();
+    let end = block
+        .phases
+        .iter()
+        .filter_map(AnnotatedPhase::seq_span)
+        .map(|span| span.end)
+        .max()
+        .unwrap_or(0);
 
     let mut attrs = vec![
         KeyValue::new("frame.timing", "synthetic"),
@@ -189,13 +200,12 @@ pub fn record_block(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) 
         .start_with_context(tracer, &Context::new());
     let root_cx = Context::new().with_span(root);
 
-    let mut spans = 1;
-    let mut slot = 0;
-    for phase in &block.phases {
-        spans += record_phase(tracer, &root_cx, phase, slot, &at);
-        slot += phase.ops.len();
-    }
-    root_cx.span().end_with_timestamp(at(total_ops.max(1)));
+    let spans = 1 + block
+        .phases
+        .iter()
+        .map(|phase| record_phase(tracer, &root_cx, phase, &at))
+        .sum::<usize>();
+    root_cx.span().end_with_timestamp(at(end.max(1)));
     spans
 }
 
@@ -203,9 +213,9 @@ fn record_phase(
     tracer: &SdkTracer,
     parent: &Context,
     phase: &AnnotatedPhase,
-    first_slot: usize,
     at: &impl Fn(usize) -> SystemTime,
 ) -> usize {
+    let slots = phase.seq_span().unwrap_or(0..0);
     let mut attrs = vec![
         KeyValue::new("frame.timing", "synthetic"),
         KeyValue::new("frame.phase", phase.kind),
@@ -220,13 +230,14 @@ fn record_phase(
     let span = tracer
         .span_builder(phase.label.clone())
         .with_kind(SpanKind::Internal)
-        .with_start_time(at(first_slot))
+        .with_start_time(at(slots.start))
         .with_attributes(attrs)
         .start_with_context(tracer, parent);
     let cx = parent.with_span(span);
 
-    for (i, op) in phase.ops.iter().enumerate() {
-        let slot = first_slot + i;
+    let mut spans = 1 + phase.ops.len();
+    for op in &phase.ops {
+        let slot = op.seq;
         let mut span = tracer
             .span_builder(truncate(&op.label))
             .with_kind(SpanKind::Internal)
@@ -235,9 +246,11 @@ fn record_phase(
             .start_with_context(tracer, &cx);
         opentelemetry::trace::Span::end_with_timestamp(&mut span, at(slot + 1));
     }
-    cx.span()
-        .end_with_timestamp(at(first_slot + phase.ops.len()));
-    1 + phase.ops.len()
+    if let Some(nested) = &phase.post_inherents {
+        spans += record_phase(tracer, &cx, nested, at);
+    }
+    cx.span().end_with_timestamp(at(slots.end));
+    spans
 }
 
 fn op_attributes(op: &AnnotatedOp, extrinsic_index: Option<u32>) -> Vec<KeyValue> {

@@ -31,13 +31,14 @@ pub struct Stats {
 
 impl Stats {
     /// Totals of `ops`. Duplicate reads are taken from the ops' `duplicate_read` flags.
-    pub fn of(ops: &[StorageOp]) -> Self {
-        let mut stats = Stats {
-            ops: ops.len(),
-            ..Stats::default()
-        };
+    pub fn of<'a>(ops: impl IntoIterator<Item = &'a StorageOp>) -> Self {
+        let mut stats = Stats::default();
         let mut touched = HashSet::new();
-        for op in ops.iter().filter(|op| op.kind.has_key()) {
+        for op in ops {
+            stats.ops += 1;
+            if !op.kind.has_key() {
+                continue;
+            }
             let len = op.value_len.unwrap_or(0);
             if op.kind.is_read() {
                 stats.reads += 1;
@@ -64,9 +65,9 @@ impl Stats {
 /// Called once per phase. A repeated read counts whatever happened to the key in between. Such
 /// reads are usually served by the overlay, so they are cheap on the node, but benchmarks may
 /// still charge them as database reads. Reads of truncated keys are never flagged.
-pub fn mark_duplicate_reads(ops: &mut [StorageOp]) {
+pub fn mark_duplicate_reads<'a>(ops: impl IntoIterator<Item = &'a mut StorageOp>) {
     let mut seen: HashSet<(Option<Vec<u8>>, Vec<u8>)> = HashSet::new();
-    for op in ops.iter_mut().filter(|op| op.kind.is_read()) {
+    for op in ops.into_iter().filter(|op| op.kind.is_read()) {
         op.duplicate_read = match op.key_id() {
             Some((child, key)) => !seen.insert((child.map(<[u8]>::to_vec), key.to_vec())),
             None => false,

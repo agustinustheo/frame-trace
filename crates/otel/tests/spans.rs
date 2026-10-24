@@ -95,8 +95,7 @@ fn builds_block_phase_op_tree() {
             "extrinsic 0: Timestamp.set",
             "extrinsic 1: Balances.transfer_keep_alive",
             "finalization",
-            "initialization",
-            "post inherents (on_poll)"
+            "initialization"
         ]
     );
 
@@ -119,14 +118,31 @@ fn builds_block_phase_op_tree() {
         Some("Timestamp.set".into())
     );
 
-    // Ops of extrinsic 1 are its children, in order, with consecutive synthetic slots.
+    // Extrinsic 1 first runs inherents_applied (ops 16..19), as a nested phase span.
+    let nested = by_name(&spans, "post inherents (on_poll)");
+    assert_eq!(nested.parent_span_id, ext1.span_context.span_id());
+    assert_eq!(nested.start_time, ext1.start_time);
+    assert_eq!(
+        (nested.start_time, nested.end_time),
+        (
+            start + Duration::from_millis(16),
+            start + Duration::from_millis(19)
+        )
+    );
+    let nested_ops = spans
+        .iter()
+        .filter(|s| s.parent_span_id == nested.span_context.span_id())
+        .count();
+    assert_eq!(nested_ops, 3);
+
+    // Then its own ops, children of the extrinsic span, in consecutive synthetic slots.
     let mut ops: Vec<&SpanData> = spans
         .iter()
-        .filter(|s| s.parent_span_id == ext1.span_context.span_id())
+        .filter(|s| s.parent_span_id == ext1.span_context.span_id() && s.name != nested.name)
         .collect();
     ops.sort_by_key(|s| s.start_time);
     assert_eq!(ops.len(), 10);
-    assert_eq!(ops[0].start_time, ext1.start_time);
+    assert_eq!(ops[0].start_time, nested.end_time);
     assert_eq!(ops[9].end_time, ext1.end_time);
     assert!(ops.windows(2).all(|w| w[0].end_time == w[1].start_time));
 
@@ -164,7 +180,7 @@ fn builds_block_phase_op_tree() {
         .iter()
         .find(|s| attr(s, "frame.storage.child_trie").is_some())
         .unwrap();
-    assert_eq!(child.name, "get child:0xbeef");
+    assert_eq!(child.name, "get child:0xbeef[0x01]");
 }
 
 fn synthetic_block(ops: usize) -> AnnotatedBlock {
@@ -199,6 +215,7 @@ fn synthetic_block(ops: usize) -> AnnotatedBlock {
             label: "unsegmented".into(),
             stats: Stats::default(),
             ops: (0..ops).map(op).collect(),
+            post_inherents: None,
         }],
     }
 }

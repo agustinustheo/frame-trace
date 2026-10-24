@@ -189,3 +189,69 @@ fn block_fails_when_the_collector_rejects_spans() {
         "{stderr}"
     );
 }
+
+#[test]
+fn summary_shows_post_inherents_inside_the_first_signed_extrinsic() {
+    let out = run(&[
+        "summary",
+        "--from-file",
+        &fixture("model/real/people-paseo-block-2-trace-state.json"),
+        "--metadata",
+        &fixture("model/real/people-paseo-block-1-metadata.hex"),
+    ]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stdout = String::from_utf8(out.stdout).unwrap();
+    let rows: Vec<&str> = stdout.lines().filter(|l| l.contains(" ┆ ")).collect();
+    let transfer = rows
+        .iter()
+        .position(|l| l.contains("extrinsic 2: Balances.transfer_keep_alive"))
+        .unwrap();
+    assert!(
+        rows[transfer + 1].contains("└ post inherents (on_poll)"),
+        "{stdout}"
+    );
+    // 103 own ops (check reads + its work), 14 nested.
+    assert!(rows[transfer].contains("┆ 103 ┆"), "{stdout}");
+    assert!(rows[transfer + 1].contains("┆  14 ┆"), "{stdout}");
+}
+
+#[test]
+fn child_trie_keys_are_named_and_grouped_by_key() {
+    let get = |key: &str| {
+        format!(
+            r#"{{"target":"state","data":{{"stringValues":{{"method":"ChildGet","child_info":"01","key":"{key}","result":"None"}}}},"parentId":null}}"#
+        )
+    };
+    let json = format!(
+        r#"{{"blockHash":"0x01","parentHash":"0x00","events":[{},{},{},{}]}}"#,
+        get("aa"),
+        get("aa"),
+        get("bb"),
+        get("bb"),
+    );
+    let path = std::env::temp_dir().join(format!("frame-trace-child-{}.json", std::process::id()));
+    std::fs::write(&path, json).unwrap();
+    let out = run(&["summary", "--from-file", path.to_str().unwrap()]);
+    std::fs::remove_file(&path).ok();
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let stdout = String::from_utf8(out.stdout).unwrap();
+    let rows: Vec<&str> = stdout
+        .lines()
+        .filter(|l| l.contains("unsegmented") && l.contains("child:"))
+        .collect();
+    assert_eq!(rows.len(), 2, "{stdout}");
+    assert!(
+        rows[0].contains("child:0x01[0xaa]") && !rows[0].contains(" ["),
+        "{stdout}"
+    );
+    assert!(rows[1].contains("child:0x01[0xbb]"), "{stdout}");
+}

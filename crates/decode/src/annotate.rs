@@ -1,6 +1,6 @@
 //! A traced block with names: the form the exporters and the CLI consume.
 
-use frame_trace_model::{PrintedBytes, Stats, StorageOp, TracedBlock};
+use frame_trace_model::{Phase, PrintedBytes, Stats, StorageOp, TracedBlock};
 use serde::Serialize;
 
 use crate::{KeyName, Metadata, key::well_known};
@@ -36,10 +36,36 @@ pub struct AnnotatedPhase {
     pub call_error: Option<String>,
     /// Display name, for example `extrinsic 1: Balances.transfer_keep_alive`.
     pub label: String,
-    /// Storage totals.
+    /// Storage totals of the phase's own ops (without `post_inherents`).
     pub stats: Stats,
-    /// Ops in order.
+    /// The phase's own ops in order (without those of `post_inherents`).
     pub ops: Vec<AnnotatedOp>,
+    /// `inherents_applied` work (`on_poll`) nested inside the first signed extrinsic, between its
+    /// `check` reads and its own work.
+    pub post_inherents: Option<Box<AnnotatedPhase>>,
+}
+
+impl AnnotatedBlock {
+    /// Every phase, each followed by its nested phase.
+    pub fn all_phases(&self) -> impl Iterator<Item = &AnnotatedPhase> {
+        self.phases.iter().flat_map(AnnotatedPhase::with_nested)
+    }
+}
+
+impl AnnotatedPhase {
+    /// This phase, then its nested phase if any.
+    pub fn with_nested(&self) -> impl Iterator<Item = &AnnotatedPhase> {
+        std::iter::once(self).chain(self.post_inherents.as_deref())
+    }
+
+    /// Positions in the block of the first and past-the-last op, nested phase included.
+    pub fn seq_span(&self) -> Option<std::ops::Range<usize>> {
+        let seqs = self.with_nested().flat_map(|p| &p.ops).map(|op| op.seq);
+        let (min, max) = seqs.fold(None, |acc: Option<(usize, usize)>, s| {
+            Some(acc.map_or((s, s), |(lo, hi)| (lo.min(s), hi.max(s))))
+        })?;
+        Some(min..max + 1)
+    }
 }
 
 /// One storage op with its key named.
@@ -82,44 +108,52 @@ pub struct AnnotatedOp {
 /// Names the keys and extrinsics of `block`. Without metadata, keys outside the well-known set
 /// are `<unknown>` and extrinsics are unnamed.
 pub fn annotate(block: &TracedBlock, metadata: Option<&Metadata>) -> AnnotatedBlock {
-    let phases = block
-        .phases
-        .iter()
-        .map(|phase| {
-            let decoded = metadata
-                .zip(phase.extrinsic.as_deref())
-                .map(|(md, bytes)| md.call_name(bytes));
-            let (call, call_error) = match decoded {
-                Some(Ok(call)) => (Some(call.to_string()), None),
-                Some(Err(err)) => (None, Some(err.to_string())),
-                None => (None, None),
-            };
-            let label = match &call {
-                Some(call) => format!("{}: {call}", phase.kind),
-                None => phase.kind.to_string(),
-            };
-            AnnotatedPhase {
-                kind: phase.kind.name(),
-                extrinsic_index: phase.kind.extrinsic_index(),
-                call,
-                call_error,
-                label,
-                stats: phase.stats,
-                ops: block
-                    .phase_ops(phase)
-                    .iter()
-                    .map(|op| annotate_op(op, metadata))
-                    .collect(),
-            }
-        })
-        .collect();
     AnnotatedBlock {
         block_number: None,
         block_hash: block.block_hash.clone(),
         parent_hash: block.parent_hash.clone(),
         skipped_events: block.skipped_events,
         totals: block.totals(),
-        phases,
+        phases: block
+            .phases
+            .iter()
+            .map(|phase| annotate_phase(block, phase, metadata))
+            .collect(),
+    }
+}
+
+fn annotate_phase(
+    block: &TracedBlock,
+    phase: &Phase,
+    metadata: Option<&Metadata>,
+) -> AnnotatedPhase {
+    let decoded = metadata
+        .zip(phase.extrinsic.as_deref())
+        .map(|(md, bytes)| md.call_name(bytes));
+    let (call, call_error) = match decoded {
+        Some(Ok(call)) => (Some(call.to_string()), None),
+        Some(Err(err)) => (None, Some(err.to_string())),
+        None => (None, None),
+    };
+    let label = match &call {
+        Some(call) => format!("{}: {call}", phase.kind),
+        None => phase.kind.to_string(),
+    };
+    AnnotatedPhase {
+        kind: phase.kind.name(),
+        extrinsic_index: phase.kind.extrinsic_index(),
+        call,
+        call_error,
+        label,
+        stats: phase.stats,
+        ops: block
+            .phase_ops(phase)
+            .map(|op| annotate_op(op, metadata))
+            .collect(),
+        post_inherents: phase
+            .post_inherents
+            .as_ref()
+            .map(|nested| Box::new(annotate_phase(block, nested, metadata))),
     }
 }
 
@@ -132,15 +166,15 @@ fn annotate_op(op: &StorageOp, metadata: Option<&Metadata>) -> AnnotatedOp {
         (None, key) => match (child, key.and_then(well_known)) {
             (Some(trie), _) => KeyName::Child {
                 trie: trie.to_vec(),
+                key: op.key.head.clone(),
             },
             (None, Some(name)) => name,
             (None, None) => KeyName::Unknown { pallet: None },
         },
     };
-    let (map_keys, named_in_full) = match &name {
-        KeyName::Storage { keys, complete, .. } => (keys.clone(), *complete),
-        KeyName::WellKnown(_) | KeyName::Child { .. } => (Vec::new(), true),
-        KeyName::Unknown { .. } => (Vec::new(), false),
+    let map_keys = match &name {
+        KeyName::Storage { keys, .. } => keys.clone(),
+        _ => Vec::new(),
     };
     let label = if op.kind.has_key() {
         format!("{} {name}", op.kind)
@@ -157,7 +191,7 @@ fn annotate_op(op: &StorageOp, metadata: Option<&Metadata>) -> AnnotatedOp {
             .is_some_and(PrintedBytes::is_truncated),
         key: op.key.to_hex(),
         key_truncated: op.key.is_truncated(),
-        key_complete: named_in_full && op.key_id().is_some(),
+        key_complete: name.is_complete() && op.key_id().is_some(),
         pallet: name.pallet().map(str::to_owned),
         item: name.item(),
         map_keys,

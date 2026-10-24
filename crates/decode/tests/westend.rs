@@ -132,8 +132,26 @@ fn names_well_known_and_child_keys() {
             .to_string(),
         ":child_storage:default:0x0102"
     );
+
+    // Child keys are shown, so different keys in one trie get different names.
+    let a = md.key_name(Some(&[0xbe, 0xef]), &[0x01]);
+    let b = md.key_name(Some(&[0xbe, 0xef]), &[0x02]);
+    assert_eq!(a.to_string(), "child:0xbeef[0x01]");
+    assert_eq!(b.to_string(), "child:0xbeef[0x02]");
     assert_eq!(
-        md.key_name(Some(&[0xbe, 0xef]), b"anything").to_string(),
+        (a.item(), a.is_complete()),
+        ("child:0xbeef".to_owned(), true)
+    );
+    // Long child keys are cut, and then the name alone does not identify the key.
+    let long = md.key_name(Some(&[0xbe, 0xef]), &[0xab; 40]);
+    assert_eq!(
+        long.to_string(),
+        format!("child:0xbeef[0x{}…]", "ab".repeat(32))
+    );
+    assert!(!long.is_complete());
+    // An op on the whole trie (kill_child) has no key.
+    assert_eq!(
+        md.key_name(Some(&[0xbe, 0xef]), &[]).to_string(),
         "child:0xbeef"
     );
 }
@@ -180,13 +198,24 @@ fn annotates_a_traced_block() {
         [
             "initialization",
             "extrinsic 0: Timestamp.set",
-            "post inherents (on_poll)",
             "extrinsic 1: Balances.transfer_keep_alive",
             "finalization"
         ]
     );
 
-    let ext1 = &annotated.phases[3];
+    let ext1 = &annotated.phases[2];
+    let nested = ext1.post_inherents.as_ref().unwrap();
+    assert_eq!(nested.label, "post inherents (on_poll)");
+    assert_eq!(
+        nested.ops.iter().map(|op| op.seq).collect::<Vec<_>>(),
+        [16, 17, 18]
+    );
+    assert_eq!(ext1.ops.len(), 10);
+    assert_eq!(annotated.all_phases().count(), 5);
+    assert_eq!(ext1.seq_span(), Some(16..29));
+    let child = ext1.ops.iter().find(|op| op.child_trie.is_some()).unwrap();
+    assert_eq!(child.label, "get child:0xbeef[0x01]");
+    assert!(child.key_complete);
     let read = &ext1.ops[2];
     assert_eq!(
         read.label,
@@ -200,11 +229,11 @@ fn annotates_a_traced_block() {
     assert!(ext1.ops[3].duplicate_read);
     assert_eq!(annotated.phases[0].ops[0].label, "get System::Number");
     assert_eq!(annotated.phases[0].ops[8].label, "get System::BlockHash(0)");
-    let clear_prefix = &annotated.phases[4].ops[6];
+    let clear_prefix = &annotated.phases[3].ops[6];
     assert_eq!(clear_prefix.label, "clear_prefix System::BlockHash(…)");
     assert!(!clear_prefix.key_complete);
     assert_eq!(
-        annotated.phases[4].ops.last().unwrap().label,
+        annotated.phases[3].ops.last().unwrap().label,
         "storage_root"
     );
 

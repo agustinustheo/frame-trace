@@ -30,14 +30,20 @@
 //! - A `Put` of `ExecutionPhase` with a value is a marker. It ends the current phase and belongs
 //!   to it, together with the `ExtrinsicWeightReclaimed` delete right after an
 //!   `ApplyExtrinsic` marker (the cleanup of the extrinsic that just finished).
-//! - An extrinsic's own work starts at its `System::ExtrinsicData(i)` write (with the
-//!   `:extrinsic_index` read just before it). Ops between the marker and that point:
-//!   - from `InherentsApplied = true` on (with the read just before it) form a `PostInherents`
-//!     phase (`post_inherents`, `on_poll`, migration steps);
-//!   - before that, for extrinsic 0 they are the tail of `initialize_block` and go to
-//!     `Initialization`; for later extrinsics they stay with the extrinsic (its `check`), or go
-//!     to `PostInherents` when that phase follows, so no extrinsic is split in two.
-//!   - Without an `ExtrinsicData` write (an older runtime) the whole segment is the extrinsic.
+//! - An extrinsic owns everything from the end of the previous phase to its own marker,
+//!   including its `check` reads (for signed extrinsics the transaction extensions' `implicit`
+//!   data: `System::BlockHash(0)`, `System::Number`, `System::BlockHash(n)`), which run before
+//!   its `System::ExtrinsicData(i)` write.
+//! - The first signed extrinsic also runs `inherents_applied` between its `check` and that
+//!   write. That work is a `PostInherents` phase nested inside the extrinsic: from the read of
+//!   `InherentsApplied` before the `InherentsApplied = true` write up to the `:extrinsic_index`
+//!   read before `ExtrinsicData(i)`. The extrinsic's stats leave it out.
+//! - Extrinsic 0 is special: the ops after the `ApplyExtrinsic(0)` marker are the tail of
+//!   `initialize_block` and go to `Initialization`; extrinsic 0 starts at its
+//!   `inherents_applied` work if any, else at its `ExtrinsicData` write (with the
+//!   `:extrinsic_index` read before it). Extrinsic 0 is an inherent in practice, and inherents
+//!   have no `check` reads.
+//! - Without an `ExtrinsicData` write (an older runtime) the whole segment is the extrinsic.
 //! - The last `ApplyExtrinsic(n)` segment is the one closed by the `Finalization` marker. No
 //!   extrinsic `n` exists (`n` is the extrinsic count). If it contains the
 //!   `InherentsApplied = true` write (a block with only inherents), everything up to the
@@ -47,8 +53,8 @@
 //! - With no markers at all (not a FRAME runtime, or the trace was filtered by key), the whole
 //!   block is one `Unsegmented` phase.
 //!
-//! Known limit: with extrinsic 0 being a signed extrinsic (a block without inherents), reads its
-//! `check` makes before `inherents_applied` are counted as `Initialization`.
+//! Known limit: in a block without inherents, extrinsic 0 is signed and its `check` reads are
+//! counted as `Initialization`.
 
 use std::ops::Range;
 
@@ -124,8 +130,31 @@ pub fn phase_marker(op: &StorageOp) -> Option<PhaseKind> {
     PhaseKind::decode(op.value.as_deref()?)
 }
 
-/// Splits `ops` into phases (see the module docs for the rule). The ranges cover `ops` in order.
-pub fn segment(ops: &[StorageOp]) -> Vec<(PhaseKind, Range<usize>)> {
+/// Where a phase sits in the op list.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Segment {
+    /// Which phase.
+    pub kind: PhaseKind,
+    /// All its ops, including the nested `post_inherents` range.
+    pub ops: Range<usize>,
+    /// For the first signed extrinsic: the `inherents_applied` work (`PostInherents`) that runs
+    /// inside it, between its `check` reads and its `ExtrinsicData` write.
+    pub post_inherents: Option<Range<usize>>,
+}
+
+impl Segment {
+    fn new(kind: PhaseKind, ops: Range<usize>) -> Self {
+        Self {
+            kind,
+            ops,
+            post_inherents: None,
+        }
+    }
+}
+
+/// Splits `ops` into phases (see the module docs for the rule). The top-level segments cover
+/// `ops` in order.
+pub fn segment(ops: &[StorageOp]) -> Vec<Segment> {
     // (kind, range, kind of the marker that closed it)
     let mut raw: Vec<(PhaseKind, Range<usize>, Option<PhaseKind>)> = Vec::new();
     let mut current = PhaseKind::Initialization;
@@ -153,38 +182,40 @@ pub fn segment(ops: &[StorageOp]) -> Vec<(PhaseKind, Range<usize>)> {
         return if ops.is_empty() {
             Vec::new()
         } else {
-            vec![(PhaseKind::Unsegmented, 0..ops.len())]
+            vec![Segment::new(PhaseKind::Unsegmented, 0..ops.len())]
         };
     }
     raw.push((current, start..ops.len(), None));
 
-    let mut out: Vec<(PhaseKind, Range<usize>)> = Vec::new();
+    let mut out: Vec<Segment> = Vec::new();
     for (kind, range, closed_by) in raw {
         let pieces = match (kind, closed_by) {
             (PhaseKind::ApplyExtrinsic(_), Some(PhaseKind::Finalization)) => {
                 split_before_finalization(ops, range)
             }
             (PhaseKind::ApplyExtrinsic(index), _) => split_extrinsic(ops, index, range),
-            _ => vec![(kind, range)],
+            _ => vec![Segment::new(kind, range)],
         };
-        for (kind, range) in pieces {
+        for piece in pieces {
             match out.last_mut() {
-                _ if range.is_empty() => {}
-                Some((last, last_range)) if *last == kind => last_range.end = range.end,
-                _ => out.push((kind, range)),
+                _ if piece.ops.is_empty() => {}
+                Some(last)
+                    if last.kind == piece.kind
+                        && last.post_inherents.is_none()
+                        && piece.post_inherents.is_none() =>
+                {
+                    last.ops.end = piece.ops.end
+                }
+                _ => out.push(piece),
             }
         }
     }
     out
 }
 
-/// Splits the segment of extrinsic `index` into the work before its `ExtrinsicData` write
-/// (initialization tail, `PostInherents`) and the extrinsic itself.
-fn split_extrinsic(
-    ops: &[StorageOp],
-    index: u32,
-    range: Range<usize>,
-) -> Vec<(PhaseKind, Range<usize>)> {
+/// Finds the `PostInherents` work inside the segment of extrinsic `index`, and for extrinsic 0
+/// hands the `initialize_block` tail back to `Initialization`.
+fn split_extrinsic(ops: &[StorageOp], index: u32, range: Range<usize>) -> Vec<Segment> {
     let extrinsic = PhaseKind::ApplyExtrinsic(index);
     let Some(data) = range.clone().find(|&i| {
         let op = &ops[i];
@@ -192,36 +223,30 @@ fn split_extrinsic(
             && op.child_trie.is_none()
             && op.key.complete().and_then(keys::extrinsic_data_index) == Some(index)
     }) else {
-        return vec![(extrinsic, range)];
+        return vec![Segment::new(extrinsic, range)];
     };
     let body = with_preceding(ops, data, range.start, OpKind::Get, keys::EXTRINSIC_INDEX);
-    let before = match index {
-        0 => PhaseKind::Initialization,
-        _ => extrinsic,
+    let post = inherents_applied(ops, range.start..body);
+    // Extrinsic 0 cannot be told apart from the `initialize_block` tail before it, so it
+    // starts at its `inherents_applied` work, or else at its `ExtrinsicData` write.
+    let start = match index {
+        0 => post.unwrap_or(body),
+        _ => range.start,
     };
-    match inherents_applied(ops, range.start..body) {
-        Some(post) => {
-            let before = match index {
-                0 => PhaseKind::Initialization,
-                _ => PhaseKind::PostInherents,
-            };
-            vec![
-                (before, range.start..post),
-                (PhaseKind::PostInherents, post..body),
-                (extrinsic, body..range.end),
-            ]
-        }
-        None => vec![(before, range.start..body), (extrinsic, body..range.end)],
-    }
+    vec![
+        Segment::new(PhaseKind::Initialization, range.start..start),
+        Segment {
+            kind: extrinsic,
+            ops: start..range.end,
+            post_inherents: post.map(|post| post..body),
+        },
+    ]
 }
 
 /// Splits the segment between the last extrinsic and the `Finalization` marker.
-fn split_before_finalization(
-    ops: &[StorageOp],
-    range: Range<usize>,
-) -> Vec<(PhaseKind, Range<usize>)> {
+fn split_before_finalization(ops: &[StorageOp], range: Range<usize>) -> Vec<Segment> {
     if inherents_applied(ops, range.clone()).is_none() {
-        return vec![(PhaseKind::Finalization, range)];
+        return vec![Segment::new(PhaseKind::Finalization, range)];
     }
     // `note_finished_extrinsics` takes `:extrinsic_index`: a read followed by a delete.
     let take = range
@@ -235,8 +260,8 @@ fn split_before_finalization(
         })
         .map_or(range.end, |i| i - 1);
     vec![
-        (PhaseKind::PostInherents, range.start..take),
-        (PhaseKind::Finalization, take..range.end),
+        Segment::new(PhaseKind::PostInherents, range.start..take),
+        Segment::new(PhaseKind::Finalization, take..range.end),
     ]
 }
 
