@@ -1,0 +1,6887 @@
+{
+  "fixture-people-kill-prefix": {
+    "blocks": 1,
+    "heights": [
+      8,
+      8
+    ],
+    "signed_extrinsics": 1,
+    "totals": {
+      "ops": 411,
+      "reads": 229,
+      "writes": 178,
+      "distinct_keys": 79,
+      "bytes_read": 5751,
+      "bytes_written": 4686,
+      "duplicate_reads": 122,
+      "truncated_keys": 0
+    },
+    "block_us_median": 4027.375,
+    "block_us_sum": 4027.375,
+    "storage_us_sum": 889.038,
+    "proof_bytes_median": 6867,
+    "proof_bytes_range": [
+      6867,
+      6867
+    ],
+    "categories": {
+      "initialization": {
+        "ops": 152,
+        "reads": 74,
+        "writes": 77,
+        "bytes_read": 910,
+        "bytes_written": 804,
+        "repeat_reads": 53,
+        "repeat_reads_without_write": 3,
+        "storage_us": 243.242
+      },
+      "inherents": {
+        "ops": 80,
+        "reads": 40,
+        "writes": 40,
+        "bytes_read": 338,
+        "bytes_written": 2976,
+        "repeat_reads": 11,
+        "repeat_reads_without_write": 5,
+        "storage_us": 168.288
+      },
+      "user_extrinsics": {
+        "ops": 93,
+        "reads": 63,
+        "writes": 28,
+        "bytes_read": 2025,
+        "bytes_written": 683,
+        "repeat_reads": 48,
+        "repeat_reads_without_write": 33,
+        "storage_us": 202.876
+      },
+      "post_inherents": {
+        "ops": 14,
+        "reads": 12,
+        "writes": 2,
+        "bytes_read": 40,
+        "bytes_written": 15,
+        "repeat_reads": 2,
+        "repeat_reads_without_write": 2,
+        "storage_us": 23.584
+      },
+      "finalization": {
+        "ops": 72,
+        "reads": 40,
+        "writes": 31,
+        "bytes_read": 2438,
+        "bytes_written": 208,
+        "repeat_reads": 8,
+        "repeat_reads_without_write": 6,
+        "storage_us": 251.048
+      }
+    },
+    "items": {
+      "System::Events": {
+        "ops": 8,
+        "writes": 8,
+        "bytes_written": 240,
+        "storage_us": 13.335
+      },
+      "System::EventCount": {
+        "ops": 15,
+        "writes": 8,
+        "bytes_written": 28,
+        "reads": 7,
+        "bytes_read": 24,
+        "repeat_reads": 6,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 4,
+        "storage_us": 16.708
+      },
+      "System::EventTopics": {
+        "ops": 2,
+        "writes": 1,
+        "bytes_written": 0,
+        "storage_us": 8.625
+      },
+      "System::LastRuntimeUpgrade": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 22,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 4.542
+      },
+      "System::Number": {
+        "ops": 15,
+        "reads": 14,
+        "bytes_read": 56,
+        "repeat_reads": 13,
+        "repeat_reads_without_write": 12,
+        "flagged_duplicate_reads": 8,
+        "writes": 1,
+        "bytes_written": 4,
+        "storage_us": 19.167
+      },
+      "System::ExecutionPhase": {
+        "ops": 14,
+        "writes": 7,
+        "bytes_written": 22,
+        "reads": 7,
+        "bytes_read": 35,
+        "repeat_reads": 6,
+        "repeat_reads_without_write": 4,
+        "flagged_duplicate_reads": 4,
+        "storage_us": 16.293
+      },
+      ":extrinsic_index": {
+        "ops": 12,
+        "writes": 5,
+        "bytes_written": 16,
+        "reads": 7,
+        "bytes_read": 28,
+        "repeat_reads": 6,
+        "repeat_reads_without_write": 3,
+        "flagged_duplicate_reads": 3,
+        "storage_us": 11.793
+      },
+      ":intrablock_entropy": {
+        "ops": 2,
+        "writes": 2,
+        "bytes_written": 32,
+        "storage_us": 3.042
+      },
+      "System::Digest": {
+        "ops": 9,
+        "writes": 2,
+        "bytes_written": 57,
+        "reads": 7,
+        "bytes_read": 273,
+        "repeat_reads": 6,
+        "repeat_reads_without_write": 5,
+        "flagged_duplicate_reads": 5,
+        "storage_us": 19.207
+      },
+      "System::ParentHash": {
+        "ops": 3,
+        "writes": 1,
+        "bytes_written": 32,
+        "reads": 2,
+        "bytes_read": 64,
+        "repeat_reads": 1,
+        "repeat_reads_without_write": 1,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 6.208
+      },
+      "System::BlockHash": {
+        "ops": 8,
+        "writes": 1,
+        "bytes_written": 32,
+        "reads": 7,
+        "bytes_read": 160,
+        "repeat_reads": 5,
+        "repeat_reads_without_write": 5,
+        "flagged_duplicate_reads": 4,
+        "storage_us": 21.375
+      },
+      "System::BlockWeight": {
+        "ops": 118,
+        "writes": 58,
+        "bytes_written": 690,
+        "reads": 60,
+        "bytes_read": 722,
+        "repeat_reads": 59,
+        "repeat_reads_without_write": 2,
+        "flagged_duplicate_reads": 54,
+        "storage_us": 159.58
+      },
+      "System::BlockSize": {
+        "ops": 11,
+        "writes": 6,
+        "bytes_written": 20,
+        "reads": 5,
+        "bytes_read": 20,
+        "repeat_reads": 4,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 2,
+        "storage_us": 13.21
+      },
+      "ParachainSystem::DidSetValidationCode": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 0,
+        "storage_us": 3.542
+      },
+      "ParachainSystem::NewValidationCode": {
+        "ops": 1,
+        "writes": 1,
+        "bytes_written": 0,
+        "storage_us": 1.541
+      },
+      "ParachainSystem::UnincludedSegment": {
+        "ops": 6,
+        "reads": 3,
+        "bytes_read": 100,
+        "repeat_reads": 2,
+        "repeat_reads_without_write": 1,
+        "flagged_duplicate_reads": 1,
+        "writes": 3,
+        "bytes_written": 56,
+        "storage_us": 12.291
+      },
+      "ParachainSystem::BlockWeightMode": {
+        "ops": 1,
+        "writes": 1,
+        "bytes_written": 0,
+        "storage_us": 1.041
+      },
+      "ParachainSystem::ValidationData": {
+        "ops": 5,
+        "writes": 2,
+        "bytes_written": 41,
+        "reads": 3,
+        "bytes_read": 82,
+        "repeat_reads": 2,
+        "repeat_reads_without_write": 1,
+        "flagged_duplicate_reads": 1,
+        "storage_us": 8.875
+      },
+      "ParachainSystem::ProcessedDownwardMessages": {
+        "ops": 2,
+        "writes": 2,
+        "bytes_written": 4,
+        "storage_us": 2.166
+      },
+      "ParachainSystem::UpwardMessages": {
+        "ops": 2,
+        "writes": 2,
+        "bytes_written": 1,
+        "storage_us": 2.041
+      },
+      "ParachainSystem::HrmpOutboundMessages": {
+        "ops": 2,
+        "writes": 2,
+        "bytes_written": 1,
+        "storage_us": 2.042
+      },
+      "ParachainSystem::CustomValidationHeadData": {
+        "ops": 1,
+        "writes": 1,
+        "bytes_written": 0,
+        "storage_us": 1.083
+      },
+      "ParachainSystem::HrmpWatermark": {
+        "ops": 3,
+        "reads": 2,
+        "bytes_read": 8,
+        "repeat_reads": 1,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 4,
+        "storage_us": 4.792
+      },
+      "ParachainSystem::HostConfiguration": {
+        "ops": 3,
+        "reads": 2,
+        "bytes_read": 88,
+        "repeat_reads": 1,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 44,
+        "storage_us": 9.125
+      },
+      "ParachainSystem::AnnouncedHrmpMessagesPerCandidate": {
+        "ops": 3,
+        "writes": 2,
+        "bytes_written": 4,
+        "reads": 1,
+        "bytes_read": 4,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 3.583
+      },
+      "Authorship::Author": {
+        "ops": 3,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 2,
+        "bytes_written": 32,
+        "storage_us": 5.292
+      },
+      "Aura::Authorities": {
+        "ops": 3,
+        "reads": 3,
+        "bytes_read": 99,
+        "repeat_reads": 2,
+        "repeat_reads_without_write": 2,
+        "flagged_duplicate_reads": 1,
+        "storage_us": 10.416
+      },
+      "Session::Validators": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 33,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 3.5
+      },
+      "System::Account": {
+        "ops": 26,
+        "reads": 23,
+        "bytes_read": 1680,
+        "repeat_reads": 21,
+        "repeat_reads_without_write": 19,
+        "flagged_duplicate_reads": 21,
+        "writes": 3,
+        "bytes_written": 240,
+        "storage_us": 100.79
+      },
+      "CollatorSelection::LastAuthoredBlock": {
+        "ops": 1,
+        "writes": 1,
+        "bytes_written": 4,
+        "storage_us": 1.708
+      },
+      "Aura::CurrentSlot": {
+        "ops": 4,
+        "reads": 3,
+        "bytes_read": 24,
+        "repeat_reads": 2,
+        "repeat_reads_without_write": 1,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 8,
+        "storage_us": 6.457
+      },
+      "AuraExt::Authorities": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 33,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 33,
+        "storage_us": 5.542
+      },
+      "PolkadotXcm::CurrentMigration": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 2.333
+      },
+      "PolkadotXcm::VersionDiscoveryQueue": {
+        "ops": 3,
+        "reads": 1,
+        "bytes_read": 1,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 2,
+        "bytes_written": 1,
+        "storage_us": 4.708
+      },
+      "MessageQueue::ServiceHead": {
+        "ops": 2,
+        "reads": 2,
+        "bytes_read": 0,
+        "repeat_reads": 1,
+        "repeat_reads_without_write": 1,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 4.625
+      },
+      "NftCredits::CreditBuffers": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 2.584
+      },
+      "MultiBlockMigrations::Cursor": {
+        "ops": 4,
+        "reads": 4,
+        "bytes_read": 0,
+        "repeat_reads": 3,
+        "repeat_reads_without_write": 3,
+        "flagged_duplicate_reads": 1,
+        "storage_us": 7.792
+      },
+      "System::ExtrinsicData": {
+        "ops": 9,
+        "writes": 6,
+        "bytes_written": 1750,
+        "reads": 3,
+        "bytes_read": 1750,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 74.126
+      },
+      ":transaction_level:": {
+        "ops": 16,
+        "reads": 8,
+        "bytes_read": 20,
+        "repeat_reads": 7,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 5,
+        "writes": 8,
+        "bytes_written": 20,
+        "storage_us": 18.124
+      },
+      "ParachainSystem::LastRelayChainBlockNumber": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 4,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 4,
+        "storage_us": 3.291
+      },
+      "ParachainInfo::ParachainId": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 4,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 2.5
+      },
+      "AuraExt::RelaySlotInfo": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 12,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 12,
+        "storage_us": 5.041
+      },
+      "ParachainSystem::AggregatedUnincludedSegment": {
+        "ops": 6,
+        "reads": 4,
+        "bytes_read": 60,
+        "repeat_reads": 3,
+        "repeat_reads_without_write": 2,
+        "flagged_duplicate_reads": 2,
+        "writes": 2,
+        "bytes_written": 30,
+        "storage_us": 11.209
+      },
+      "ParachainSystem::UpgradeRestrictionSignal": {
+        "ops": 2,
+        "writes": 2,
+        "bytes_written": 1,
+        "storage_us": 2.209
+      },
+      "ParachainSystem::UpgradeGoAhead": {
+        "ops": 3,
+        "writes": 2,
+        "bytes_written": 1,
+        "reads": 1,
+        "bytes_read": 1,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 3.125
+      },
+      "ParachainSystem::RelayStateProof": {
+        "ops": 1,
+        "writes": 1,
+        "bytes_written": 980,
+        "storage_us": 21.708
+      },
+      "ParachainSystem::RelevantMessagingState": {
+        "ops": 5,
+        "writes": 2,
+        "bytes_written": 84,
+        "reads": 3,
+        "bytes_read": 126,
+        "repeat_reads": 2,
+        "repeat_reads_without_write": 1,
+        "flagged_duplicate_reads": 2,
+        "storage_us": 11.292
+      },
+      "RelayRandomness::Randomness": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 38,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 38,
+        "storage_us": 6.042
+      },
+      "ParachainSystem::PendingApprovedPeer": {
+        "ops": 2,
+        "writes": 1,
+        "bytes_written": 0,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 2.083
+      },
+      "ParachainSystem::LastDmqMqcHead": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 1.834
+      },
+      "ParachainSystem::LastHrmpMqcHeads": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 1,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 1,
+        "storage_us": 3.041
+      },
+      "ParachainSystem::LastProcessedHrmpMessage": {
+        "ops": 1,
+        "writes": 1,
+        "bytes_written": 8,
+        "storage_us": 1.709
+      },
+      "System::ExtrinsicWeightReclaimed": {
+        "ops": 10,
+        "reads": 6,
+        "bytes_read": 0,
+        "repeat_reads": 5,
+        "repeat_reads_without_write": 3,
+        "flagged_duplicate_reads": 3,
+        "writes": 4,
+        "bytes_written": 3,
+        "storage_us": 12.374
+      },
+      "Timestamp::DidUpdate": {
+        "ops": 4,
+        "reads": 2,
+        "bytes_read": 1,
+        "repeat_reads": 1,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 2,
+        "bytes_written": 1,
+        "storage_us": 5.125
+      },
+      "Timestamp::Now": {
+        "ops": 3,
+        "reads": 2,
+        "bytes_read": 16,
+        "repeat_reads": 1,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 8,
+        "storage_us": 5.04
+      },
+      "TransactionPayment::NextFeeMultiplier": {
+        "ops": 3,
+        "reads": 2,
+        "bytes_read": 32,
+        "repeat_reads": 1,
+        "repeat_reads_without_write": 1,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 16,
+        "storage_us": 8.041
+      },
+      "Balances::TotalIssuance": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 16,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 2.75
+      },
+      "TransactionPayment::TxPaymentCredit": {
+        "ops": 5,
+        "reads": 3,
+        "bytes_read": 16,
+        "repeat_reads": 2,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 1,
+        "writes": 2,
+        "bytes_written": 16,
+        "storage_us": 7.168
+      },
+      "Sudo::Key": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 32,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 3.25
+      },
+      "<unknown>": {
+        "ops": 4,
+        "writes": 1,
+        "bytes_written": 0,
+        "storage_us": 111.625
+      },
+      "System::InherentsApplied": {
+        "ops": 4,
+        "reads": 2,
+        "bytes_read": 1,
+        "repeat_reads": 1,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 2,
+        "bytes_written": 1,
+        "storage_us": 5.0
+      },
+      "MobRule::ActiveSince": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 1.875
+      },
+      "Members::ActiveMembers": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 2.292
+      },
+      "Game::Game": {
+        "ops": 2,
+        "reads": 2,
+        "bytes_read": 0,
+        "repeat_reads": 1,
+        "repeat_reads_without_write": 1,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 3.584
+      },
+      "Game::GameSchedules": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 1.667
+      },
+      "Coinage::PaidTokenCollectionsCreated": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 2.417
+      },
+      "System::ExtrinsicCount": {
+        "ops": 3,
+        "writes": 2,
+        "bytes_written": 4,
+        "reads": 1,
+        "bytes_read": 4,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 3.375
+      },
+      "XcmpQueue::<unknown>": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 2.0
+      },
+      "ParachainSystem::PoVMessagesTracker": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 43,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 43,
+        "storage_us": 6.417
+      },
+      "ParachainSystem::PendingUpwardMessages": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 1,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 1,
+        "storage_us": 3.125
+      },
+      "ParachainSystem::PreviousCoreCount": {
+        "ops": 1,
+        "writes": 1,
+        "bytes_written": 1,
+        "storage_us": 1.167
+      },
+      "ParachainSystem::PendingUpwardSignals": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 1.875
+      },
+      "ParachainSystem::UpwardDeliveryFeeFactor": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 16,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 16,
+        "storage_us": 4.875
+      },
+      "XcmpQueue::OutboundXcmpStatus": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 1,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 1,
+        "storage_us": 3.167
+      },
+      "System::BlocksTillUpgrade": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 2.541
+      }
+    },
+    "calls": {
+      "ParachainSystem.set_validation_data": {
+        "n": 1,
+        "median": {
+          "ops": 54,
+          "reads": 26,
+          "writes": 28,
+          "bytes_read": 279,
+          "bytes_written": 2904,
+          "repeat_reads": 8,
+          "repeat_reads_without_write": 3,
+          "storage_us": 136.83
+        },
+        "ranges": {
+          "reads": [
+            26,
+            26
+          ],
+          "writes": [
+            28,
+            28
+          ],
+          "bytes_read": [
+            279,
+            279
+          ],
+          "bytes_written": [
+            2904,
+            2904
+          ],
+          "storage_us": [
+            136.83,
+            136.83
+          ]
+        }
+      },
+      "Timestamp.set": {
+        "n": 1,
+        "median": {
+          "ops": 26,
+          "reads": 14,
+          "writes": 12,
+          "bytes_read": 59,
+          "bytes_written": 72,
+          "repeat_reads": 3,
+          "repeat_reads_without_write": 2,
+          "storage_us": 31.458
+        },
+        "ranges": {
+          "reads": [
+            14,
+            14
+          ],
+          "writes": [
+            12,
+            12
+          ],
+          "bytes_read": [
+            59,
+            59
+          ],
+          "bytes_written": [
+            72,
+            72
+          ],
+          "storage_us": [
+            31.458,
+            31.458
+          ]
+        }
+      },
+      "Sudo.sudo": {
+        "n": 1,
+        "median": {
+          "ops": 93,
+          "reads": 63,
+          "writes": 28,
+          "bytes_read": 2025,
+          "bytes_written": 683,
+          "repeat_reads": 48,
+          "repeat_reads_without_write": 33,
+          "storage_us": 202.876
+        },
+        "ranges": {
+          "reads": [
+            63,
+            63
+          ],
+          "writes": [
+            28,
+            28
+          ],
+          "bytes_read": [
+            2025,
+            2025
+          ],
+          "bytes_written": [
+            683,
+            683
+          ],
+          "storage_us": [
+            202.876,
+            202.876
+          ]
+        }
+      }
+    },
+    "hooks": {},
+    "duplicates": [
+      {
+        "phase": "initialization",
+        "item": "System::BlockWeight",
+        "repeated": 49
+      },
+      {
+        "phase": "extrinsic 2: Sudo.sudo",
+        "item": "System::Account",
+        "repeated": 21
+      },
+      {
+        "phase": "extrinsic 2: Sudo.sudo",
+        "item": "System::Number",
+        "repeated": 7
+      },
+      {
+        "phase": "extrinsic 2: Sudo.sudo",
+        "item": "System::ExecutionPhase",
+        "repeated": 4
+      },
+      {
+        "phase": "extrinsic 2: Sudo.sudo",
+        "item": "System::EventCount",
+        "repeated": 4
+      },
+      {
+        "phase": "extrinsic 2: Sudo.sudo",
+        "item": "System::BlockHash",
+        "repeated": 4
+      },
+      {
+        "phase": "extrinsic 2: Sudo.sudo",
+        "item": ":transaction_level:",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "System::Digest",
+        "repeated": 3
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Digest",
+        "repeated": 2
+      },
+      {
+        "phase": "finalization",
+        "item": "System::BlockWeight",
+        "repeated": 2
+      },
+      {
+        "phase": "finalization",
+        "item": "ParachainSystem::RelevantMessagingState",
+        "repeated": 2
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Number",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "Aura::Authorities",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::UnincludedSegment",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::BlockSize",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::AggregatedUnincludedSegment",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::ValidationData",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Sudo.sudo",
+        "item": "TransactionPayment::TxPaymentCredit",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Sudo.sudo",
+        "item": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Sudo.sudo",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Sudo.sudo",
+        "item": "System::BlockSize",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Sudo.sudo",
+        "item": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "MultiBlockMigrations::Cursor",
+        "repeated": 1
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "ParachainSystem::AggregatedUnincludedSegment",
+        "repeated": 1
+      }
+    ]
+  },
+  "fixture-people-traced": {
+    "blocks": 1,
+    "heights": [
+      4,
+      4
+    ],
+    "signed_extrinsics": 1,
+    "totals": {
+      "ops": 518,
+      "reads": 312,
+      "writes": 204,
+      "distinct_keys": 79,
+      "bytes_read": 9542,
+      "bytes_written": 5686,
+      "duplicate_reads": 203,
+      "truncated_keys": 0
+    },
+    "block_us_median": 5300.25,
+    "block_us_sum": 5300.25,
+    "storage_us_sum": 1273.737,
+    "proof_bytes_median": 6586,
+    "proof_bytes_range": [
+      6586,
+      6586
+    ],
+    "categories": {
+      "initialization": {
+        "ops": 152,
+        "reads": 74,
+        "writes": 77,
+        "bytes_read": 910,
+        "bytes_written": 804,
+        "repeat_reads": 53,
+        "repeat_reads_without_write": 3,
+        "storage_us": 274.658
+      },
+      "inherents": {
+        "ops": 80,
+        "reads": 40,
+        "writes": 40,
+        "bytes_read": 338,
+        "bytes_written": 2976,
+        "repeat_reads": 11,
+        "repeat_reads_without_write": 5,
+        "storage_us": 172.958
+      },
+      "user_extrinsics": {
+        "ops": 200,
+        "reads": 146,
+        "writes": 54,
+        "bytes_read": 5715,
+        "bytes_written": 1683,
+        "repeat_reads": 129,
+        "repeat_reads_without_write": 100,
+        "storage_us": 475.161
+      },
+      "post_inherents": {
+        "ops": 14,
+        "reads": 12,
+        "writes": 2,
+        "bytes_read": 40,
+        "bytes_written": 15,
+        "repeat_reads": 2,
+        "repeat_reads_without_write": 2,
+        "storage_us": 23.831
+      },
+      "finalization": {
+        "ops": 72,
+        "reads": 40,
+        "writes": 31,
+        "bytes_read": 2539,
+        "bytes_written": 208,
+        "repeat_reads": 8,
+        "repeat_reads_without_write": 6,
+        "storage_us": 327.129
+      }
+    },
+    "items": {
+      "System::Events": {
+        "ops": 16,
+        "writes": 16,
+        "bytes_written": 591,
+        "storage_us": 27.459
+      },
+      "System::EventCount": {
+        "ops": 31,
+        "writes": 16,
+        "bytes_written": 60,
+        "reads": 15,
+        "bytes_read": 56,
+        "repeat_reads": 14,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 12,
+        "storage_us": 34.916
+      },
+      "System::EventTopics": {
+        "ops": 2,
+        "writes": 1,
+        "bytes_written": 0,
+        "storage_us": 14.167
+      },
+      "System::LastRuntimeUpgrade": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 22,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 7.916
+      },
+      "System::Number": {
+        "ops": 23,
+        "reads": 22,
+        "bytes_read": 88,
+        "repeat_reads": 21,
+        "repeat_reads_without_write": 20,
+        "flagged_duplicate_reads": 16,
+        "writes": 1,
+        "bytes_written": 4,
+        "storage_us": 28.917
+      },
+      "System::ExecutionPhase": {
+        "ops": 22,
+        "writes": 7,
+        "bytes_written": 22,
+        "reads": 15,
+        "bytes_read": 75,
+        "repeat_reads": 14,
+        "repeat_reads_without_write": 12,
+        "flagged_duplicate_reads": 12,
+        "storage_us": 26.664
+      },
+      ":extrinsic_index": {
+        "ops": 12,
+        "writes": 5,
+        "bytes_written": 16,
+        "reads": 7,
+        "bytes_read": 28,
+        "repeat_reads": 6,
+        "repeat_reads_without_write": 3,
+        "flagged_duplicate_reads": 3,
+        "storage_us": 13.168
+      },
+      ":intrablock_entropy": {
+        "ops": 2,
+        "writes": 2,
+        "bytes_written": 32,
+        "storage_us": 3.625
+      },
+      "System::Digest": {
+        "ops": 9,
+        "writes": 2,
+        "bytes_written": 57,
+        "reads": 7,
+        "bytes_read": 273,
+        "repeat_reads": 6,
+        "repeat_reads_without_write": 5,
+        "flagged_duplicate_reads": 5,
+        "storage_us": 20.042
+      },
+      "System::ParentHash": {
+        "ops": 3,
+        "writes": 1,
+        "bytes_written": 32,
+        "reads": 2,
+        "bytes_read": 64,
+        "repeat_reads": 1,
+        "repeat_reads_without_write": 1,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 6.292
+      },
+      "System::BlockHash": {
+        "ops": 8,
+        "writes": 1,
+        "bytes_written": 32,
+        "reads": 7,
+        "bytes_read": 160,
+        "repeat_reads": 5,
+        "repeat_reads_without_write": 5,
+        "flagged_duplicate_reads": 4,
+        "storage_us": 21.459
+      },
+      "System::BlockWeight": {
+        "ops": 118,
+        "writes": 58,
+        "bytes_written": 692,
+        "reads": 60,
+        "bytes_read": 724,
+        "repeat_reads": 59,
+        "repeat_reads_without_write": 2,
+        "flagged_duplicate_reads": 54,
+        "storage_us": 169.953
+      },
+      "System::BlockSize": {
+        "ops": 11,
+        "writes": 6,
+        "bytes_written": 20,
+        "reads": 5,
+        "bytes_read": 20,
+        "repeat_reads": 4,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 2,
+        "storage_us": 13.418
+      },
+      "ParachainSystem::DidSetValidationCode": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 0,
+        "storage_us": 4.667
+      },
+      "ParachainSystem::NewValidationCode": {
+        "ops": 1,
+        "writes": 1,
+        "bytes_written": 0,
+        "storage_us": 1.5
+      },
+      "ParachainSystem::UnincludedSegment": {
+        "ops": 6,
+        "reads": 3,
+        "bytes_read": 100,
+        "repeat_reads": 2,
+        "repeat_reads_without_write": 1,
+        "flagged_duplicate_reads": 1,
+        "writes": 3,
+        "bytes_written": 56,
+        "storage_us": 13.998
+      },
+      "ParachainSystem::BlockWeightMode": {
+        "ops": 1,
+        "writes": 1,
+        "bytes_written": 0,
+        "storage_us": 1.166
+      },
+      "ParachainSystem::ValidationData": {
+        "ops": 5,
+        "writes": 2,
+        "bytes_written": 41,
+        "reads": 3,
+        "bytes_read": 82,
+        "repeat_reads": 2,
+        "repeat_reads_without_write": 1,
+        "flagged_duplicate_reads": 1,
+        "storage_us": 9.126
+      },
+      "ParachainSystem::ProcessedDownwardMessages": {
+        "ops": 2,
+        "writes": 2,
+        "bytes_written": 4,
+        "storage_us": 2.291
+      },
+      "ParachainSystem::UpwardMessages": {
+        "ops": 2,
+        "writes": 2,
+        "bytes_written": 1,
+        "storage_us": 2.208
+      },
+      "ParachainSystem::HrmpOutboundMessages": {
+        "ops": 2,
+        "writes": 2,
+        "bytes_written": 1,
+        "storage_us": 2.209
+      },
+      "ParachainSystem::CustomValidationHeadData": {
+        "ops": 1,
+        "writes": 1,
+        "bytes_written": 0,
+        "storage_us": 1.208
+      },
+      "ParachainSystem::HrmpWatermark": {
+        "ops": 3,
+        "reads": 2,
+        "bytes_read": 8,
+        "repeat_reads": 1,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 4,
+        "storage_us": 5.792
+      },
+      "ParachainSystem::HostConfiguration": {
+        "ops": 3,
+        "reads": 2,
+        "bytes_read": 88,
+        "repeat_reads": 1,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 44,
+        "storage_us": 9.667
+      },
+      "ParachainSystem::AnnouncedHrmpMessagesPerCandidate": {
+        "ops": 3,
+        "writes": 2,
+        "bytes_written": 4,
+        "reads": 1,
+        "bytes_read": 4,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 18.958
+      },
+      "Authorship::Author": {
+        "ops": 3,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 2,
+        "bytes_written": 32,
+        "storage_us": 7.334
+      },
+      "Aura::Authorities": {
+        "ops": 3,
+        "reads": 3,
+        "bytes_read": 99,
+        "repeat_reads": 2,
+        "repeat_reads_without_write": 2,
+        "flagged_duplicate_reads": 1,
+        "storage_us": 12.708
+      },
+      "Session::Validators": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 33,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 4.166
+      },
+      "System::Account": {
+        "ops": 83,
+        "reads": 74,
+        "bytes_read": 5200,
+        "repeat_reads": 70,
+        "repeat_reads_without_write": 63,
+        "flagged_duplicate_reads": 69,
+        "writes": 9,
+        "bytes_written": 720,
+        "storage_us": 308.662
+      },
+      "CollatorSelection::LastAuthoredBlock": {
+        "ops": 1,
+        "writes": 1,
+        "bytes_written": 4,
+        "storage_us": 1.791
+      },
+      "Aura::CurrentSlot": {
+        "ops": 4,
+        "reads": 3,
+        "bytes_read": 24,
+        "repeat_reads": 2,
+        "repeat_reads_without_write": 1,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 8,
+        "storage_us": 6.541
+      },
+      "AuraExt::Authorities": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 33,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 33,
+        "storage_us": 5.958
+      },
+      "PolkadotXcm::CurrentMigration": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 2.333
+      },
+      "PolkadotXcm::VersionDiscoveryQueue": {
+        "ops": 3,
+        "reads": 1,
+        "bytes_read": 1,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 2,
+        "bytes_written": 1,
+        "storage_us": 4.917
+      },
+      "MessageQueue::ServiceHead": {
+        "ops": 2,
+        "reads": 2,
+        "bytes_read": 0,
+        "repeat_reads": 1,
+        "repeat_reads_without_write": 1,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 5.292
+      },
+      "NftCredits::CreditBuffers": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 2.791
+      },
+      "MultiBlockMigrations::Cursor": {
+        "ops": 4,
+        "reads": 4,
+        "bytes_read": 0,
+        "repeat_reads": 3,
+        "repeat_reads_without_write": 3,
+        "flagged_duplicate_reads": 1,
+        "storage_us": 8.957
+      },
+      "System::ExtrinsicData": {
+        "ops": 9,
+        "writes": 6,
+        "bytes_written": 1851,
+        "reads": 3,
+        "bytes_read": 1851,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 80.126
+      },
+      ":transaction_level:": {
+        "ops": 24,
+        "reads": 12,
+        "bytes_read": 36,
+        "repeat_reads": 11,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 9,
+        "writes": 12,
+        "bytes_written": 36,
+        "storage_us": 27.708
+      },
+      "ParachainSystem::LastRelayChainBlockNumber": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 4,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 4,
+        "storage_us": 3.791
+      },
+      "ParachainInfo::ParachainId": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 4,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 2.833
+      },
+      "AuraExt::RelaySlotInfo": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 12,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 12,
+        "storage_us": 5.459
+      },
+      "ParachainSystem::AggregatedUnincludedSegment": {
+        "ops": 6,
+        "reads": 4,
+        "bytes_read": 60,
+        "repeat_reads": 3,
+        "repeat_reads_without_write": 2,
+        "flagged_duplicate_reads": 2,
+        "writes": 2,
+        "bytes_written": 30,
+        "storage_us": 11.792
+      },
+      "ParachainSystem::UpgradeRestrictionSignal": {
+        "ops": 2,
+        "writes": 2,
+        "bytes_written": 1,
+        "storage_us": 2.25
+      },
+      "ParachainSystem::UpgradeGoAhead": {
+        "ops": 3,
+        "writes": 2,
+        "bytes_written": 1,
+        "reads": 1,
+        "bytes_read": 1,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 3.25
+      },
+      "ParachainSystem::RelayStateProof": {
+        "ops": 1,
+        "writes": 1,
+        "bytes_written": 980,
+        "storage_us": 21.125
+      },
+      "ParachainSystem::RelevantMessagingState": {
+        "ops": 5,
+        "writes": 2,
+        "bytes_written": 84,
+        "reads": 3,
+        "bytes_read": 126,
+        "repeat_reads": 2,
+        "repeat_reads_without_write": 1,
+        "flagged_duplicate_reads": 2,
+        "storage_us": 11.709
+      },
+      "RelayRandomness::Randomness": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 38,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 38,
+        "storage_us": 6.417
+      },
+      "ParachainSystem::PendingApprovedPeer": {
+        "ops": 2,
+        "writes": 1,
+        "bytes_written": 0,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 2.416
+      },
+      "ParachainSystem::LastDmqMqcHead": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 1.958
+      },
+      "ParachainSystem::LastHrmpMqcHeads": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 1,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 1,
+        "storage_us": 3.041
+      },
+      "ParachainSystem::LastProcessedHrmpMessage": {
+        "ops": 1,
+        "writes": 1,
+        "bytes_written": 8,
+        "storage_us": 1.708
+      },
+      "System::ExtrinsicWeightReclaimed": {
+        "ops": 10,
+        "reads": 6,
+        "bytes_read": 0,
+        "repeat_reads": 5,
+        "repeat_reads_without_write": 3,
+        "flagged_duplicate_reads": 3,
+        "writes": 4,
+        "bytes_written": 5,
+        "storage_us": 12.874
+      },
+      "Timestamp::DidUpdate": {
+        "ops": 4,
+        "reads": 2,
+        "bytes_read": 1,
+        "repeat_reads": 1,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 2,
+        "bytes_written": 1,
+        "storage_us": 6.042
+      },
+      "Timestamp::Now": {
+        "ops": 3,
+        "reads": 2,
+        "bytes_read": 16,
+        "repeat_reads": 1,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 8,
+        "storage_us": 5.083
+      },
+      "TransactionPayment::NextFeeMultiplier": {
+        "ops": 4,
+        "reads": 3,
+        "bytes_read": 48,
+        "repeat_reads": 2,
+        "repeat_reads_without_write": 2,
+        "flagged_duplicate_reads": 1,
+        "writes": 1,
+        "bytes_written": 16,
+        "storage_us": 13.667
+      },
+      "Balances::TotalIssuance": {
+        "ops": 6,
+        "reads": 5,
+        "bytes_read": 80,
+        "repeat_reads": 4,
+        "repeat_reads_without_write": 4,
+        "flagged_duplicate_reads": 4,
+        "writes": 1,
+        "bytes_written": 16,
+        "storage_us": 14.708
+      },
+      "TransactionPayment::TxPaymentCredit": {
+        "ops": 5,
+        "reads": 3,
+        "bytes_read": 16,
+        "repeat_reads": 2,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 1,
+        "writes": 2,
+        "bytes_written": 16,
+        "storage_us": 7.167
+      },
+      "System::InherentsApplied": {
+        "ops": 4,
+        "reads": 2,
+        "bytes_read": 1,
+        "repeat_reads": 1,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 2,
+        "bytes_written": 1,
+        "storage_us": 5.375
+      },
+      "MobRule::ActiveSince": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 1.916
+      },
+      "Members::ActiveMembers": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 2.417
+      },
+      "Game::Game": {
+        "ops": 2,
+        "reads": 2,
+        "bytes_read": 0,
+        "repeat_reads": 1,
+        "repeat_reads_without_write": 1,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 3.709
+      },
+      "Game::GameSchedules": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 1.542
+      },
+      "Coinage::PaidTokenCollectionsCreated": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 2.459
+      },
+      "System::ExtrinsicCount": {
+        "ops": 3,
+        "writes": 2,
+        "bytes_written": 4,
+        "reads": 1,
+        "bytes_read": 4,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 6.876
+      },
+      "XcmpQueue::<unknown>": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 2.375
+      },
+      "ParachainSystem::PoVMessagesTracker": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 43,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 43,
+        "storage_us": 7.001
+      },
+      "ParachainSystem::PendingUpwardMessages": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 1,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 1,
+        "storage_us": 3.251
+      },
+      "ParachainSystem::PreviousCoreCount": {
+        "ops": 1,
+        "writes": 1,
+        "bytes_written": 1,
+        "storage_us": 1.208
+      },
+      "ParachainSystem::PendingUpwardSignals": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 2.083
+      },
+      "ParachainSystem::UpwardDeliveryFeeFactor": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 16,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 16,
+        "storage_us": 4.958
+      },
+      "XcmpQueue::OutboundXcmpStatus": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 1,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 1,
+        "storage_us": 7.791
+      },
+      "System::BlocksTillUpgrade": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 4.458
+      },
+      "<unknown>": {
+        "ops": 1,
+        "storage_us": 138.958
+      }
+    },
+    "calls": {
+      "ParachainSystem.set_validation_data": {
+        "n": 1,
+        "median": {
+          "ops": 54,
+          "reads": 26,
+          "writes": 28,
+          "bytes_read": 279,
+          "bytes_written": 2904,
+          "repeat_reads": 8,
+          "repeat_reads_without_write": 3,
+          "storage_us": 141.0
+        },
+        "ranges": {
+          "reads": [
+            26,
+            26
+          ],
+          "writes": [
+            28,
+            28
+          ],
+          "bytes_read": [
+            279,
+            279
+          ],
+          "bytes_written": [
+            2904,
+            2904
+          ],
+          "storage_us": [
+            141.0,
+            141.0
+          ]
+        }
+      },
+      "Timestamp.set": {
+        "n": 1,
+        "median": {
+          "ops": 26,
+          "reads": 14,
+          "writes": 12,
+          "bytes_read": 59,
+          "bytes_written": 72,
+          "repeat_reads": 3,
+          "repeat_reads_without_write": 2,
+          "storage_us": 31.958
+        },
+        "ranges": {
+          "reads": [
+            14,
+            14
+          ],
+          "writes": [
+            12,
+            12
+          ],
+          "bytes_read": [
+            59,
+            59
+          ],
+          "bytes_written": [
+            72,
+            72
+          ],
+          "storage_us": [
+            31.958,
+            31.958
+          ]
+        }
+      },
+      "Utility.batch": {
+        "n": 1,
+        "median": {
+          "ops": 200,
+          "reads": 146,
+          "writes": 54,
+          "bytes_read": 5715,
+          "bytes_written": 1683,
+          "repeat_reads": 129,
+          "repeat_reads_without_write": 100,
+          "storage_us": 475.161
+        },
+        "ranges": {
+          "reads": [
+            146,
+            146
+          ],
+          "writes": [
+            54,
+            54
+          ],
+          "bytes_read": [
+            5715,
+            5715
+          ],
+          "bytes_written": [
+            1683,
+            1683
+          ],
+          "storage_us": [
+            475.161,
+            475.161
+          ]
+        }
+      }
+    },
+    "hooks": {
+      "on_initialize: System": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 1.334,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: ParachainSystem": {
+        "n": 1,
+        "median_ops": 15,
+        "median_reads": 6,
+        "median_writes": 9,
+        "median_duration_us": 40.25,
+        "median_storage_us": 30.374,
+        "items": {
+          "ParachainSystem::DidSetValidationCode": {
+            "ops": 1,
+            "reads": 1,
+            "bytes_read": 0,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "storage_us": 3.417
+          },
+          "ParachainSystem::NewValidationCode": {
+            "ops": 1,
+            "writes": 1,
+            "bytes_written": 0,
+            "storage_us": 1.5
+          },
+          "ParachainSystem::UnincludedSegment": {
+            "ops": 2,
+            "reads": 1,
+            "bytes_read": 12,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "writes": 1,
+            "bytes_written": 44,
+            "storage_us": 6.041
+          },
+          "System::ParentHash": {
+            "ops": 1,
+            "reads": 1,
+            "bytes_read": 32,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "storage_us": 2.167
+          },
+          "ParachainSystem::BlockWeightMode": {
+            "ops": 1,
+            "writes": 1,
+            "bytes_written": 0,
+            "storage_us": 1.166
+          },
+          "ParachainSystem::ValidationData": {
+            "ops": 1,
+            "writes": 1,
+            "bytes_written": 0,
+            "storage_us": 0.958
+          },
+          "ParachainSystem::ProcessedDownwardMessages": {
+            "ops": 1,
+            "writes": 1,
+            "bytes_written": 0,
+            "storage_us": 0.916
+          },
+          "ParachainSystem::UpwardMessages": {
+            "ops": 1,
+            "writes": 1,
+            "bytes_written": 0,
+            "storage_us": 0.958
+          },
+          "ParachainSystem::HrmpOutboundMessages": {
+            "ops": 1,
+            "writes": 1,
+            "bytes_written": 0,
+            "storage_us": 1.084
+          },
+          "ParachainSystem::CustomValidationHeadData": {
+            "ops": 1,
+            "writes": 1,
+            "bytes_written": 0,
+            "storage_us": 1.208
+          },
+          "ParachainSystem::HrmpWatermark": {
+            "ops": 1,
+            "reads": 1,
+            "bytes_read": 4,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "storage_us": 3.084
+          },
+          "ParachainSystem::HostConfiguration": {
+            "ops": 1,
+            "reads": 1,
+            "bytes_read": 44,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "storage_us": 4.875
+          },
+          "ParachainSystem::AnnouncedHrmpMessagesPerCandidate": {
+            "ops": 1,
+            "writes": 1,
+            "bytes_written": 4,
+            "storage_us": 1.375
+          },
+          "System::Digest": {
+            "ops": 1,
+            "reads": 1,
+            "bytes_read": 15,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "storage_us": 1.625
+          }
+        }
+      },
+      "on_initialize: Timestamp": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.583,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: ParachainInfo": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.542,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: CumulusWeightReclaim": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.459,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: IndivRelayRandomness": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.625,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: Parameters": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.417,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: NetworkSuffix": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.334,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: Balances": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.459,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: TransactionPayment": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.333,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: OriginRestriction": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.458,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: Assets / PoolAssets": {
+        "n": 2,
+        "median_ops": 0.0,
+        "median_reads": 0.0,
+        "median_writes": 0.0,
+        "median_duration_us": 0.396,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: AssetsHolder": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.5,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: AssetRate": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.417,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: AssetTxPayment": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.375,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: AssetConversion": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.333,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: Authorship": {
+        "n": 1,
+        "median_ops": 10,
+        "median_reads": 7,
+        "median_writes": 3,
+        "median_duration_us": 37.875,
+        "median_storage_us": 26.416,
+        "items": {
+          "Authorship::Author": {
+            "ops": 2,
+            "reads": 1,
+            "bytes_read": 0,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "writes": 1,
+            "bytes_written": 32,
+            "storage_us": 5.75
+          },
+          "System::Digest": {
+            "ops": 1,
+            "reads": 1,
+            "bytes_read": 15,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 1,
+            "storage_us": 1.708
+          },
+          "Aura::Authorities": {
+            "ops": 1,
+            "reads": 1,
+            "bytes_read": 33,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "storage_us": 5.042
+          },
+          "Session::Validators": {
+            "ops": 1,
+            "reads": 1,
+            "bytes_read": 33,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "storage_us": 4.166
+          },
+          "System::Account": {
+            "ops": 1,
+            "reads": 1,
+            "bytes_read": 0,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "storage_us": 3.709
+          },
+          "System::Number": {
+            "ops": 1,
+            "reads": 1,
+            "bytes_read": 4,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 1,
+            "storage_us": 1.25
+          },
+          "CollatorSelection::LastAuthoredBlock": {
+            "ops": 1,
+            "writes": 1,
+            "bytes_written": 4,
+            "storage_us": 1.791
+          },
+          "System::BlockWeight": {
+            "ops": 2,
+            "reads": 1,
+            "bytes_read": 11,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 1,
+            "writes": 1,
+            "bytes_written": 12,
+            "storage_us": 3.0
+          }
+        }
+      },
+      "on_initialize: CollatorSelection": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.5,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: Session": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.583,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: Aura": {
+        "n": 1,
+        "median_ops": 4,
+        "median_reads": 3,
+        "median_writes": 1,
+        "median_duration_us": 11.333,
+        "median_storage_us": 8.749,
+        "items": {
+          "System::Digest": {
+            "ops": 1,
+            "reads": 1,
+            "bytes_read": 15,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 1,
+            "storage_us": 1.583
+          },
+          "Aura::CurrentSlot": {
+            "ops": 2,
+            "reads": 1,
+            "bytes_read": 8,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "writes": 1,
+            "bytes_written": 8,
+            "storage_us": 3.916
+          },
+          "Aura::Authorities": {
+            "ops": 1,
+            "reads": 1,
+            "bytes_read": 33,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 1,
+            "storage_us": 3.25
+          }
+        }
+      },
+      "on_initialize: CumulusAuraExt": {
+        "n": 1,
+        "median_ops": 1,
+        "median_reads": 1,
+        "median_writes": 0,
+        "median_duration_us": 5.292,
+        "median_storage_us": 3.708,
+        "items": {
+          "AuraExt::Authorities": {
+            "ops": 1,
+            "reads": 1,
+            "bytes_read": 33,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "storage_us": 3.708
+          }
+        }
+      },
+      "on_initialize: XcmpQueue": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.333,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: PolkadotXcm": {
+        "n": 1,
+        "median_ops": 4,
+        "median_reads": 2,
+        "median_writes": 2,
+        "median_duration_us": 10.125,
+        "median_storage_us": 7.25,
+        "items": {
+          "PolkadotXcm::CurrentMigration": {
+            "ops": 1,
+            "reads": 1,
+            "bytes_read": 0,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "storage_us": 2.333
+          },
+          "PolkadotXcm::VersionDiscoveryQueue": {
+            "ops": 3,
+            "reads": 1,
+            "bytes_read": 1,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "writes": 2,
+            "bytes_written": 1,
+            "storage_us": 4.917
+          }
+        }
+      },
+      "on_initialize: CumulusXcm": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.583,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: MessageQueue": {
+        "n": 1,
+        "median_ops": 1,
+        "median_reads": 1,
+        "median_writes": 0,
+        "median_duration_us": 6.542,
+        "median_storage_us": 3.125,
+        "items": {
+          "MessageQueue::ServiceHead": {
+            "ops": 1,
+            "reads": 1,
+            "bytes_read": 0,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "storage_us": 3.125
+          }
+        }
+      },
+      "on_initialize: Utility": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.542,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: Multisig": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.333,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: Sudo": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.5,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: VerifySignature": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.5,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: Proxy": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.417,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: People": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.375,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: MobRule": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.458,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: ProofOfInk": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.458,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: Game": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.5,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: Score": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.458,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: NftCredits": {
+        "n": 1,
+        "median_ops": 1,
+        "median_reads": 1,
+        "median_writes": 0,
+        "median_duration_us": 5.208,
+        "median_storage_us": 2.791,
+        "items": {
+          "NftCredits::CreditBuffers": {
+            "ops": 1,
+            "reads": 1,
+            "bytes_read": 0,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "storage_us": 2.791
+          }
+        }
+      },
+      "on_initialize: DummyDim": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.542,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: PeopleLite": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.5,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: Resources": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.5,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: ChunksManager": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.458,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: Members": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.375,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: Coinage": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.375,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: MembersNotifier": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.5,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: Airdrop": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.333,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: Honour": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.375,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: PeopleAirdrops": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.542,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_initialize: MultiBlockMigrations": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.458,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: System": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.541,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: ParachainSystem": {
+        "n": 1,
+        "median_ops": 34,
+        "median_reads": 19,
+        "median_writes": 15,
+        "median_duration_us": 114.375,
+        "median_storage_us": 83.21,
+        "items": {
+          "ParachainSystem::DidSetValidationCode": {
+            "ops": 1,
+            "writes": 1,
+            "bytes_written": 0,
+            "storage_us": 1.25
+          },
+          "ParachainSystem::UpgradeRestrictionSignal": {
+            "ops": 1,
+            "writes": 1,
+            "bytes_written": 0,
+            "storage_us": 1.125
+          },
+          "ParachainSystem::UpgradeGoAhead": {
+            "ops": 2,
+            "reads": 1,
+            "bytes_read": 1,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "writes": 1,
+            "bytes_written": 0,
+            "storage_us": 2.167
+          },
+          "ParachainSystem::ValidationData": {
+            "ops": 1,
+            "reads": 1,
+            "bytes_read": 41,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "storage_us": 2.292
+          },
+          "ParachainSystem::LastRelayChainBlockNumber": {
+            "ops": 1,
+            "writes": 1,
+            "bytes_written": 4,
+            "storage_us": 1.291
+          },
+          "ParachainSystem::HostConfiguration": {
+            "ops": 1,
+            "reads": 1,
+            "bytes_read": 44,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "storage_us": 2.417
+          },
+          "ParachainSystem::RelevantMessagingState": {
+            "ops": 4,
+            "reads": 3,
+            "bytes_read": 126,
+            "repeat_reads": 2,
+            "repeat_reads_without_write": 1,
+            "flagged_duplicate_reads": 2,
+            "writes": 1,
+            "bytes_written": 42,
+            "storage_us": 9.126
+          },
+          "ParachainSystem::AggregatedUnincludedSegment": {
+            "ops": 3,
+            "reads": 2,
+            "bytes_read": 30,
+            "repeat_reads": 1,
+            "repeat_reads_without_write": 1,
+            "flagged_duplicate_reads": 1,
+            "writes": 1,
+            "bytes_written": 15,
+            "storage_us": 5.167
+          },
+          "System::Digest": {
+            "ops": 3,
+            "reads": 3,
+            "bytes_read": 171,
+            "repeat_reads": 2,
+            "repeat_reads_without_write": 2,
+            "flagged_duplicate_reads": 2,
+            "storage_us": 7.709
+          },
+          "ParachainSystem::PoVMessagesTracker": {
+            "ops": 2,
+            "reads": 1,
+            "bytes_read": 43,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "writes": 1,
+            "bytes_written": 43,
+            "storage_us": 7.001
+          },
+          "ParachainSystem::PendingUpwardMessages": {
+            "ops": 2,
+            "reads": 1,
+            "bytes_read": 1,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "writes": 1,
+            "bytes_written": 1,
+            "storage_us": 3.251
+          },
+          "ParachainSystem::UpwardMessages": {
+            "ops": 1,
+            "writes": 1,
+            "bytes_written": 1,
+            "storage_us": 1.25
+          },
+          "ParachainSystem::PreviousCoreCount": {
+            "ops": 1,
+            "writes": 1,
+            "bytes_written": 1,
+            "storage_us": 1.208
+          },
+          "ParachainSystem::PendingUpwardSignals": {
+            "ops": 1,
+            "reads": 1,
+            "bytes_read": 0,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "storage_us": 2.083
+          },
+          "ParachainSystem::PendingApprovedPeer": {
+            "ops": 1,
+            "reads": 1,
+            "bytes_read": 0,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "storage_us": 1.041
+          },
+          "ParachainSystem::UpwardDeliveryFeeFactor": {
+            "ops": 2,
+            "reads": 1,
+            "bytes_read": 16,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "writes": 1,
+            "bytes_written": 16,
+            "storage_us": 4.958
+          },
+          "ParachainSystem::AnnouncedHrmpMessagesPerCandidate": {
+            "ops": 2,
+            "reads": 1,
+            "bytes_read": 4,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "writes": 1,
+            "bytes_written": 0,
+            "storage_us": 17.583
+          },
+          "XcmpQueue::OutboundXcmpStatus": {
+            "ops": 2,
+            "reads": 1,
+            "bytes_read": 1,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "writes": 1,
+            "bytes_written": 1,
+            "storage_us": 7.791
+          },
+          "ParachainSystem::HrmpWatermark": {
+            "ops": 1,
+            "reads": 1,
+            "bytes_read": 4,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "storage_us": 1.375
+          },
+          "ParachainSystem::UnincludedSegment": {
+            "ops": 1,
+            "writes": 1,
+            "bytes_written": 11,
+            "storage_us": 2.0
+          },
+          "ParachainSystem::HrmpOutboundMessages": {
+            "ops": 1,
+            "writes": 1,
+            "bytes_written": 1,
+            "storage_us": 1.125
+          }
+        }
+      },
+      "on_finalize: Timestamp": {
+        "n": 1,
+        "median_ops": 2,
+        "median_reads": 1,
+        "median_writes": 1,
+        "median_duration_us": 4.209,
+        "median_storage_us": 2.625,
+        "items": {
+          "Timestamp::DidUpdate": {
+            "ops": 2,
+            "reads": 1,
+            "bytes_read": 1,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "writes": 1,
+            "bytes_written": 0,
+            "storage_us": 2.625
+          }
+        }
+      },
+      "on_finalize: ParachainInfo": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.5,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: CumulusWeightReclaim": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.458,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: IndivRelayRandomness": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.583,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: Parameters": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.375,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: NetworkSuffix": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.417,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: Balances": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.5,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: TransactionPayment": {
+        "n": 1,
+        "median_ops": 4,
+        "median_reads": 3,
+        "median_writes": 1,
+        "median_duration_us": 15.959,
+        "median_storage_us": 10.458,
+        "items": {
+          "TransactionPayment::NextFeeMultiplier": {
+            "ops": 2,
+            "reads": 1,
+            "bytes_read": 16,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "writes": 1,
+            "bytes_written": 16,
+            "storage_us": 7.417
+          },
+          "System::BlockWeight": {
+            "ops": 1,
+            "reads": 1,
+            "bytes_read": 18,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 1,
+            "storage_us": 2.083
+          },
+          "TransactionPayment::TxPaymentCredit": {
+            "ops": 1,
+            "reads": 1,
+            "bytes_read": 0,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "storage_us": 0.958
+          }
+        }
+      },
+      "on_finalize: OriginRestriction": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.458,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: Assets / PoolAssets": {
+        "n": 2,
+        "median_ops": 0.0,
+        "median_reads": 0.0,
+        "median_writes": 0.0,
+        "median_duration_us": 0.355,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: AssetsHolder": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.459,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: AssetRate": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.375,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: AssetTxPayment": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.375,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: AssetConversion": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.333,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: Authorship": {
+        "n": 1,
+        "median_ops": 1,
+        "median_reads": 0,
+        "median_writes": 1,
+        "median_duration_us": 2.167,
+        "median_storage_us": 1.584,
+        "items": {
+          "Authorship::Author": {
+            "ops": 1,
+            "writes": 1,
+            "bytes_written": 0,
+            "storage_us": 1.584
+          }
+        }
+      },
+      "on_finalize: CollatorSelection": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.5,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: Session": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.459,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: Aura": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.334,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: CumulusAuraExt": {
+        "n": 1,
+        "median_ops": 2,
+        "median_reads": 1,
+        "median_writes": 1,
+        "median_duration_us": 9.041,
+        "median_storage_us": 6.666,
+        "items": {
+          "Aura::Authorities": {
+            "ops": 1,
+            "reads": 1,
+            "bytes_read": 33,
+            "repeat_reads": 0,
+            "repeat_reads_without_write": 0,
+            "flagged_duplicate_reads": 0,
+            "storage_us": 4.416
+          },
+          "AuraExt::Authorities": {
+            "ops": 1,
+            "writes": 1,
+            "bytes_written": 33,
+            "storage_us": 2.25
+          }
+        }
+      },
+      "on_finalize: XcmpQueue": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.416,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: PolkadotXcm": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 24.708,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: CumulusXcm": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.459,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: MessageQueue": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.458,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: Utility": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.334,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: Multisig": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.5,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: Sudo": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.334,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: VerifySignature": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.334,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: Proxy": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.417,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: People": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.333,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: MobRule": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.333,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: ProofOfInk": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.333,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: Game": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.333,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: Score": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.375,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: NftCredits": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.5,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: DummyDim": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.541,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: PeopleLite": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.375,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: Resources": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.417,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: ChunksManager": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.375,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: Members": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.541,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: Coinage": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.417,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: MembersNotifier": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.5,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: Airdrop": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.5,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: Honour": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.542,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: PeopleAirdrops": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.375,
+        "median_storage_us": 0.0,
+        "items": {}
+      },
+      "on_finalize: MultiBlockMigrations": {
+        "n": 1,
+        "median_ops": 0,
+        "median_reads": 0,
+        "median_writes": 0,
+        "median_duration_us": 0.375,
+        "median_storage_us": 0.0,
+        "items": {}
+      }
+    },
+    "duplicates": [
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": "System::Account",
+        "repeated": 69
+      },
+      {
+        "phase": "initialization",
+        "item": "System::BlockWeight",
+        "repeated": 49
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": "System::Number",
+        "repeated": 15
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": "System::ExecutionPhase",
+        "repeated": 12
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": "System::EventCount",
+        "repeated": 12
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": ":transaction_level:",
+        "repeated": 7
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": "Balances::TotalIssuance",
+        "repeated": 4
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": "System::BlockHash",
+        "repeated": 4
+      },
+      {
+        "phase": "finalization",
+        "item": "System::Digest",
+        "repeated": 3
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Digest",
+        "repeated": 2
+      },
+      {
+        "phase": "finalization",
+        "item": "System::BlockWeight",
+        "repeated": 2
+      },
+      {
+        "phase": "finalization",
+        "item": "ParachainSystem::RelevantMessagingState",
+        "repeated": 2
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Number",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "Aura::Authorities",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::UnincludedSegment",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::BlockSize",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::AggregatedUnincludedSegment",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::ValidationData",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": "TransactionPayment::NextFeeMultiplier",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": "TransactionPayment::TxPaymentCredit",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": "System::BlockSize",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "MultiBlockMigrations::Cursor",
+        "repeated": 1
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "ParachainSystem::AggregatedUnincludedSegment",
+        "repeated": 1
+      }
+    ]
+  },
+  "fixture-people-transfer": {
+    "blocks": 1,
+    "heights": [
+      2,
+      2
+    ],
+    "signed_extrinsics": 1,
+    "totals": {
+      "ops": 421,
+      "reads": 242,
+      "writes": 177,
+      "distinct_keys": 78,
+      "bytes_read": 6737,
+      "bytes_written": 4839,
+      "duplicate_reads": 134,
+      "truncated_keys": 0
+    },
+    "block_us_median": 4174.708,
+    "block_us_sum": 4174.708,
+    "storage_us_sum": 975.216,
+    "proof_bytes_median": 6479,
+    "proof_bytes_range": [
+      6479,
+      6479
+    ],
+    "categories": {
+      "initialization": {
+        "ops": 152,
+        "reads": 74,
+        "writes": 77,
+        "bytes_read": 910,
+        "bytes_written": 804,
+        "repeat_reads": 53,
+        "repeat_reads_without_write": 3,
+        "storage_us": 259.252
+      },
+      "inherents": {
+        "ops": 80,
+        "reads": 40,
+        "writes": 40,
+        "bytes_read": 338,
+        "bytes_written": 2976,
+        "repeat_reads": 11,
+        "repeat_reads_without_write": 5,
+        "storage_us": 174.75
+      },
+      "user_extrinsics": {
+        "ops": 103,
+        "reads": 76,
+        "writes": 27,
+        "bytes_read": 2995,
+        "bytes_written": 836,
+        "repeat_reads": 60,
+        "repeat_reads_without_write": 49,
+        "storage_us": 261.753
+      },
+      "post_inherents": {
+        "ops": 14,
+        "reads": 12,
+        "writes": 2,
+        "bytes_read": 40,
+        "bytes_written": 15,
+        "repeat_reads": 2,
+        "repeat_reads_without_write": 2,
+        "storage_us": 23.793
+      },
+      "finalization": {
+        "ops": 72,
+        "reads": 40,
+        "writes": 31,
+        "bytes_read": 2454,
+        "bytes_written": 208,
+        "repeat_reads": 8,
+        "repeat_reads_without_write": 6,
+        "storage_us": 255.668
+      }
+    },
+    "items": {
+      "System::Events": {
+        "ops": 8,
+        "writes": 8,
+        "bytes_written": 287,
+        "storage_us": 14.791
+      },
+      "System::EventCount": {
+        "ops": 15,
+        "writes": 8,
+        "bytes_written": 28,
+        "reads": 7,
+        "bytes_read": 24,
+        "repeat_reads": 6,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 4,
+        "storage_us": 16.626
+      },
+      "System::EventTopics": {
+        "ops": 2,
+        "writes": 1,
+        "bytes_written": 0,
+        "storage_us": 11.959
+      },
+      "System::LastRuntimeUpgrade": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 22,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 6.084
+      },
+      "System::Number": {
+        "ops": 15,
+        "reads": 14,
+        "bytes_read": 56,
+        "repeat_reads": 13,
+        "repeat_reads_without_write": 12,
+        "flagged_duplicate_reads": 8,
+        "writes": 1,
+        "bytes_written": 4,
+        "storage_us": 19.293
+      },
+      "System::ExecutionPhase": {
+        "ops": 14,
+        "writes": 7,
+        "bytes_written": 22,
+        "reads": 7,
+        "bytes_read": 35,
+        "repeat_reads": 6,
+        "repeat_reads_without_write": 4,
+        "flagged_duplicate_reads": 4,
+        "storage_us": 16.792
+      },
+      ":extrinsic_index": {
+        "ops": 12,
+        "writes": 5,
+        "bytes_written": 16,
+        "reads": 7,
+        "bytes_read": 28,
+        "repeat_reads": 6,
+        "repeat_reads_without_write": 3,
+        "flagged_duplicate_reads": 3,
+        "storage_us": 12.333
+      },
+      ":intrablock_entropy": {
+        "ops": 2,
+        "writes": 2,
+        "bytes_written": 32,
+        "storage_us": 3.042
+      },
+      "System::Digest": {
+        "ops": 9,
+        "writes": 2,
+        "bytes_written": 57,
+        "reads": 7,
+        "bytes_read": 273,
+        "repeat_reads": 6,
+        "repeat_reads_without_write": 5,
+        "flagged_duplicate_reads": 5,
+        "storage_us": 19.333
+      },
+      "System::ParentHash": {
+        "ops": 3,
+        "writes": 1,
+        "bytes_written": 32,
+        "reads": 2,
+        "bytes_read": 64,
+        "repeat_reads": 1,
+        "repeat_reads_without_write": 1,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 6.167
+      },
+      "System::BlockHash": {
+        "ops": 8,
+        "writes": 1,
+        "bytes_written": 32,
+        "reads": 7,
+        "bytes_read": 160,
+        "repeat_reads": 5,
+        "repeat_reads_without_write": 5,
+        "flagged_duplicate_reads": 4,
+        "storage_us": 20.458
+      },
+      "System::BlockWeight": {
+        "ops": 118,
+        "writes": 58,
+        "bytes_written": 692,
+        "reads": 60,
+        "bytes_read": 724,
+        "repeat_reads": 59,
+        "repeat_reads_without_write": 2,
+        "flagged_duplicate_reads": 54,
+        "storage_us": 165.712
+      },
+      "System::BlockSize": {
+        "ops": 11,
+        "writes": 6,
+        "bytes_written": 20,
+        "reads": 5,
+        "bytes_read": 20,
+        "repeat_reads": 4,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 2,
+        "storage_us": 13.25
+      },
+      "ParachainSystem::DidSetValidationCode": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 0,
+        "storage_us": 3.792
+      },
+      "ParachainSystem::NewValidationCode": {
+        "ops": 1,
+        "writes": 1,
+        "bytes_written": 0,
+        "storage_us": 1.583
+      },
+      "ParachainSystem::UnincludedSegment": {
+        "ops": 6,
+        "reads": 3,
+        "bytes_read": 100,
+        "repeat_reads": 2,
+        "repeat_reads_without_write": 1,
+        "flagged_duplicate_reads": 1,
+        "writes": 3,
+        "bytes_written": 56,
+        "storage_us": 13.291
+      },
+      "ParachainSystem::BlockWeightMode": {
+        "ops": 1,
+        "writes": 1,
+        "bytes_written": 0,
+        "storage_us": 1.041
+      },
+      "ParachainSystem::ValidationData": {
+        "ops": 5,
+        "writes": 2,
+        "bytes_written": 41,
+        "reads": 3,
+        "bytes_read": 82,
+        "repeat_reads": 2,
+        "repeat_reads_without_write": 1,
+        "flagged_duplicate_reads": 1,
+        "storage_us": 8.916
+      },
+      "ParachainSystem::ProcessedDownwardMessages": {
+        "ops": 2,
+        "writes": 2,
+        "bytes_written": 4,
+        "storage_us": 2.251
+      },
+      "ParachainSystem::UpwardMessages": {
+        "ops": 2,
+        "writes": 2,
+        "bytes_written": 1,
+        "storage_us": 2.209
+      },
+      "ParachainSystem::HrmpOutboundMessages": {
+        "ops": 2,
+        "writes": 2,
+        "bytes_written": 1,
+        "storage_us": 2.083
+      },
+      "ParachainSystem::CustomValidationHeadData": {
+        "ops": 1,
+        "writes": 1,
+        "bytes_written": 0,
+        "storage_us": 1.167
+      },
+      "ParachainSystem::HrmpWatermark": {
+        "ops": 3,
+        "reads": 2,
+        "bytes_read": 8,
+        "repeat_reads": 1,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 4,
+        "storage_us": 5.291
+      },
+      "ParachainSystem::HostConfiguration": {
+        "ops": 3,
+        "reads": 2,
+        "bytes_read": 88,
+        "repeat_reads": 1,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 44,
+        "storage_us": 9.417
+      },
+      "ParachainSystem::AnnouncedHrmpMessagesPerCandidate": {
+        "ops": 3,
+        "writes": 2,
+        "bytes_written": 4,
+        "reads": 1,
+        "bytes_read": 4,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 3.709
+      },
+      "Authorship::Author": {
+        "ops": 3,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 2,
+        "bytes_written": 32,
+        "storage_us": 5.459
+      },
+      "Aura::Authorities": {
+        "ops": 3,
+        "reads": 3,
+        "bytes_read": 99,
+        "repeat_reads": 2,
+        "repeat_reads_without_write": 2,
+        "flagged_duplicate_reads": 1,
+        "storage_us": 10.874
+      },
+      "Session::Validators": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 33,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 3.791
+      },
+      "System::Account": {
+        "ops": 40,
+        "reads": 36,
+        "bytes_read": 2640,
+        "repeat_reads": 33,
+        "repeat_reads_without_write": 30,
+        "flagged_duplicate_reads": 32,
+        "writes": 4,
+        "bytes_written": 320,
+        "storage_us": 163.541
+      },
+      "CollatorSelection::LastAuthoredBlock": {
+        "ops": 1,
+        "writes": 1,
+        "bytes_written": 4,
+        "storage_us": 1.708
+      },
+      "Aura::CurrentSlot": {
+        "ops": 4,
+        "reads": 3,
+        "bytes_read": 24,
+        "repeat_reads": 2,
+        "repeat_reads_without_write": 1,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 8,
+        "storage_us": 6.834
+      },
+      "AuraExt::Authorities": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 33,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 33,
+        "storage_us": 5.499
+      },
+      "PolkadotXcm::CurrentMigration": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 2.25
+      },
+      "PolkadotXcm::VersionDiscoveryQueue": {
+        "ops": 3,
+        "reads": 1,
+        "bytes_read": 1,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 2,
+        "bytes_written": 1,
+        "storage_us": 4.5
+      },
+      "MessageQueue::ServiceHead": {
+        "ops": 2,
+        "reads": 2,
+        "bytes_read": 0,
+        "repeat_reads": 1,
+        "repeat_reads_without_write": 1,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 4.542
+      },
+      "NftCredits::CreditBuffers": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 2.792
+      },
+      "MultiBlockMigrations::Cursor": {
+        "ops": 4,
+        "reads": 4,
+        "bytes_read": 0,
+        "repeat_reads": 3,
+        "repeat_reads_without_write": 3,
+        "flagged_duplicate_reads": 1,
+        "storage_us": 8.626
+      },
+      "System::ExtrinsicData": {
+        "ops": 9,
+        "writes": 6,
+        "bytes_written": 1766,
+        "reads": 3,
+        "bytes_read": 1766,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 76.0
+      },
+      ":transaction_level:": {
+        "ops": 12,
+        "reads": 6,
+        "bytes_read": 12,
+        "repeat_reads": 5,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 3,
+        "writes": 6,
+        "bytes_written": 12,
+        "storage_us": 13.5
+      },
+      "ParachainSystem::LastRelayChainBlockNumber": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 4,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 4,
+        "storage_us": 3.458
+      },
+      "ParachainInfo::ParachainId": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 4,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 2.792
+      },
+      "AuraExt::RelaySlotInfo": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 12,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 12,
+        "storage_us": 5.459
+      },
+      "ParachainSystem::AggregatedUnincludedSegment": {
+        "ops": 6,
+        "reads": 4,
+        "bytes_read": 60,
+        "repeat_reads": 3,
+        "repeat_reads_without_write": 2,
+        "flagged_duplicate_reads": 2,
+        "writes": 2,
+        "bytes_written": 30,
+        "storage_us": 11.208
+      },
+      "ParachainSystem::UpgradeRestrictionSignal": {
+        "ops": 2,
+        "writes": 2,
+        "bytes_written": 1,
+        "storage_us": 2.208
+      },
+      "ParachainSystem::UpgradeGoAhead": {
+        "ops": 3,
+        "writes": 2,
+        "bytes_written": 1,
+        "reads": 1,
+        "bytes_read": 1,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 3.208
+      },
+      "ParachainSystem::RelayStateProof": {
+        "ops": 1,
+        "writes": 1,
+        "bytes_written": 980,
+        "storage_us": 21.958
+      },
+      "ParachainSystem::RelevantMessagingState": {
+        "ops": 5,
+        "writes": 2,
+        "bytes_written": 84,
+        "reads": 3,
+        "bytes_read": 126,
+        "repeat_reads": 2,
+        "repeat_reads_without_write": 1,
+        "flagged_duplicate_reads": 2,
+        "storage_us": 11.791
+      },
+      "RelayRandomness::Randomness": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 38,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 38,
+        "storage_us": 6.375
+      },
+      "ParachainSystem::PendingApprovedPeer": {
+        "ops": 2,
+        "writes": 1,
+        "bytes_written": 0,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 2.5
+      },
+      "ParachainSystem::LastDmqMqcHead": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 1.875
+      },
+      "ParachainSystem::LastHrmpMqcHeads": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 1,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 1,
+        "storage_us": 3.208
+      },
+      "ParachainSystem::LastProcessedHrmpMessage": {
+        "ops": 1,
+        "writes": 1,
+        "bytes_written": 8,
+        "storage_us": 1.75
+      },
+      "System::ExtrinsicWeightReclaimed": {
+        "ops": 10,
+        "reads": 6,
+        "bytes_read": 0,
+        "repeat_reads": 5,
+        "repeat_reads_without_write": 3,
+        "flagged_duplicate_reads": 3,
+        "writes": 4,
+        "bytes_written": 3,
+        "storage_us": 13.041
+      },
+      "Timestamp::DidUpdate": {
+        "ops": 4,
+        "reads": 2,
+        "bytes_read": 1,
+        "repeat_reads": 1,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 2,
+        "bytes_written": 1,
+        "storage_us": 5.417
+      },
+      "Timestamp::Now": {
+        "ops": 3,
+        "reads": 2,
+        "bytes_read": 16,
+        "repeat_reads": 1,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 8,
+        "storage_us": 5.166
+      },
+      "TransactionPayment::NextFeeMultiplier": {
+        "ops": 4,
+        "reads": 3,
+        "bytes_read": 48,
+        "repeat_reads": 2,
+        "repeat_reads_without_write": 2,
+        "flagged_duplicate_reads": 1,
+        "writes": 1,
+        "bytes_written": 16,
+        "storage_us": 11.71
+      },
+      "Balances::TotalIssuance": {
+        "ops": 4,
+        "reads": 3,
+        "bytes_read": 48,
+        "repeat_reads": 2,
+        "repeat_reads_without_write": 2,
+        "flagged_duplicate_reads": 2,
+        "writes": 1,
+        "bytes_written": 16,
+        "storage_us": 9.792
+      },
+      "TransactionPayment::TxPaymentCredit": {
+        "ops": 5,
+        "reads": 3,
+        "bytes_read": 16,
+        "repeat_reads": 2,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 1,
+        "writes": 2,
+        "bytes_written": 16,
+        "storage_us": 7.041
+      },
+      "System::InherentsApplied": {
+        "ops": 4,
+        "reads": 2,
+        "bytes_read": 1,
+        "repeat_reads": 1,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 2,
+        "bytes_written": 1,
+        "storage_us": 5.042
+      },
+      "MobRule::ActiveSince": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 1.834
+      },
+      "Members::ActiveMembers": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 2.334
+      },
+      "Game::Game": {
+        "ops": 2,
+        "reads": 2,
+        "bytes_read": 0,
+        "repeat_reads": 1,
+        "repeat_reads_without_write": 1,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 3.542
+      },
+      "Game::GameSchedules": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 1.666
+      },
+      "Coinage::PaidTokenCollectionsCreated": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 2.541
+      },
+      "System::ExtrinsicCount": {
+        "ops": 3,
+        "writes": 2,
+        "bytes_written": 4,
+        "reads": 1,
+        "bytes_read": 4,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 3.5
+      },
+      "XcmpQueue::<unknown>": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 2.0
+      },
+      "ParachainSystem::PoVMessagesTracker": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 43,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 43,
+        "storage_us": 6.375
+      },
+      "ParachainSystem::PendingUpwardMessages": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 1,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 1,
+        "storage_us": 3.501
+      },
+      "ParachainSystem::PreviousCoreCount": {
+        "ops": 1,
+        "writes": 1,
+        "bytes_written": 1,
+        "storage_us": 1.209
+      },
+      "ParachainSystem::PendingUpwardSignals": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 1.917
+      },
+      "ParachainSystem::UpwardDeliveryFeeFactor": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 16,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 16,
+        "storage_us": 4.667
+      },
+      "XcmpQueue::OutboundXcmpStatus": {
+        "ops": 2,
+        "reads": 1,
+        "bytes_read": 1,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 1,
+        "bytes_written": 1,
+        "storage_us": 3.25
+      },
+      "System::BlocksTillUpgrade": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 2.417
+      },
+      "<unknown>": {
+        "ops": 1,
+        "storage_us": 108.958
+      }
+    },
+    "calls": {
+      "ParachainSystem.set_validation_data": {
+        "n": 1,
+        "median": {
+          "ops": 54,
+          "reads": 26,
+          "writes": 28,
+          "bytes_read": 279,
+          "bytes_written": 2904,
+          "repeat_reads": 8,
+          "repeat_reads_without_write": 3,
+          "storage_us": 142.792
+        },
+        "ranges": {
+          "reads": [
+            26,
+            26
+          ],
+          "writes": [
+            28,
+            28
+          ],
+          "bytes_read": [
+            279,
+            279
+          ],
+          "bytes_written": [
+            2904,
+            2904
+          ],
+          "storage_us": [
+            142.792,
+            142.792
+          ]
+        }
+      },
+      "Timestamp.set": {
+        "n": 1,
+        "median": {
+          "ops": 26,
+          "reads": 14,
+          "writes": 12,
+          "bytes_read": 59,
+          "bytes_written": 72,
+          "repeat_reads": 3,
+          "repeat_reads_without_write": 2,
+          "storage_us": 31.958
+        },
+        "ranges": {
+          "reads": [
+            14,
+            14
+          ],
+          "writes": [
+            12,
+            12
+          ],
+          "bytes_read": [
+            59,
+            59
+          ],
+          "bytes_written": [
+            72,
+            72
+          ],
+          "storage_us": [
+            31.958,
+            31.958
+          ]
+        }
+      },
+      "Balances.transfer_keep_alive": {
+        "n": 1,
+        "median": {
+          "ops": 103,
+          "reads": 76,
+          "writes": 27,
+          "bytes_read": 2995,
+          "bytes_written": 836,
+          "repeat_reads": 60,
+          "repeat_reads_without_write": 49,
+          "storage_us": 261.753
+        },
+        "ranges": {
+          "reads": [
+            76,
+            76
+          ],
+          "writes": [
+            27,
+            27
+          ],
+          "bytes_read": [
+            2995,
+            2995
+          ],
+          "bytes_written": [
+            836,
+            836
+          ],
+          "storage_us": [
+            261.753,
+            261.753
+          ]
+        }
+      }
+    },
+    "hooks": {},
+    "duplicates": [
+      {
+        "phase": "initialization",
+        "item": "System::BlockWeight",
+        "repeated": 49
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::Account",
+        "repeated": 32
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::Number",
+        "repeated": 7
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::ExecutionPhase",
+        "repeated": 4
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::EventCount",
+        "repeated": 4
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::BlockHash",
+        "repeated": 4
+      },
+      {
+        "phase": "finalization",
+        "item": "System::Digest",
+        "repeated": 3
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Digest",
+        "repeated": 2
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "Balances::TotalIssuance",
+        "repeated": 2
+      },
+      {
+        "phase": "finalization",
+        "item": "System::BlockWeight",
+        "repeated": 2
+      },
+      {
+        "phase": "finalization",
+        "item": "ParachainSystem::RelevantMessagingState",
+        "repeated": 2
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Number",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "Aura::Authorities",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::UnincludedSegment",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::BlockSize",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::AggregatedUnincludedSegment",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::ValidationData",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "TransactionPayment::NextFeeMultiplier",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "TransactionPayment::TxPaymentCredit",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::BlockSize",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "MultiBlockMigrations::Cursor",
+        "repeated": 1
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "ParachainSystem::AggregatedUnincludedSegment",
+        "repeated": 1
+      }
+    ]
+  },
+  "nextpeople": {
+    "blocks": 20,
+    "heights": [
+      2227649,
+      2227668
+    ],
+    "signed_extrinsics": 0,
+    "totals": {
+      "ops": 6448,
+      "reads": 3342,
+      "writes": 3066,
+      "distinct_keys": 1460,
+      "bytes_read": 340629,
+      "bytes_written": 489910,
+      "duplicate_reads": 1544,
+      "truncated_keys": 0
+    },
+    "block_us_median": 5566.416,
+    "block_us_sum": 117821.706,
+    "storage_us_sum": 37013.694,
+    "proof_bytes_median": 13412.5,
+    "proof_bytes_range": [
+      13080,
+      13543
+    ],
+    "categories": {
+      "initialization": {
+        "ops": 3040,
+        "reads": 1480,
+        "writes": 1540,
+        "bytes_read": 29477,
+        "bytes_written": 22437,
+        "repeat_reads": 1060,
+        "repeat_reads_without_write": 60,
+        "storage_us": 9226.198
+      },
+      "inherents": {
+        "ops": 1572,
+        "reads": 786,
+        "writes": 786,
+        "bytes_read": 26384,
+        "bytes_written": 454893,
+        "repeat_reads": 206,
+        "repeat_reads_without_write": 100,
+        "storage_us": 12970.025
+      },
+      "post_inherents": {
+        "ops": 278,
+        "reads": 238,
+        "writes": 40,
+        "bytes_read": 1884,
+        "bytes_written": 300,
+        "repeat_reads": 58,
+        "repeat_reads_without_write": 58,
+        "storage_us": 1000.5939999999999
+      },
+      "finalization": {
+        "ops": 1558,
+        "reads": 838,
+        "writes": 700,
+        "bytes_read": 282884,
+        "bytes_written": 12280,
+        "repeat_reads": 220,
+        "repeat_reads_without_write": 180,
+        "storage_us": 13816.876999999997
+      }
+    },
+    "items": {
+      "System::Events": {
+        "ops": 60,
+        "writes": 60,
+        "bytes_written": 620,
+        "storage_us": 224.003
+      },
+      "System::EventCount": {
+        "ops": 100,
+        "writes": 60,
+        "bytes_written": 160,
+        "reads": 40,
+        "bytes_read": 80,
+        "repeat_reads": 20,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 208.167
+      },
+      "System::EventTopics": {
+        "ops": 40,
+        "writes": 20,
+        "bytes_written": 0,
+        "storage_us": 343.50200000000007
+      },
+      "System::LastRuntimeUpgrade": {
+        "ops": 20,
+        "reads": 20,
+        "bytes_read": 440,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 218.459
+      },
+      "System::Number": {
+        "ops": 140,
+        "reads": 120,
+        "bytes_read": 480,
+        "repeat_reads": 100,
+        "repeat_reads_without_write": 80,
+        "flagged_duplicate_reads": 20,
+        "writes": 20,
+        "bytes_written": 80,
+        "storage_us": 361.74300000000005
+      },
+      "System::ExecutionPhase": {
+        "ops": 160,
+        "writes": 120,
+        "bytes_written": 340,
+        "reads": 40,
+        "bytes_read": 200,
+        "repeat_reads": 20,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 295.746
+      },
+      ":extrinsic_index": {
+        "ops": 180,
+        "writes": 80,
+        "bytes_written": 240,
+        "reads": 100,
+        "bytes_read": 400,
+        "repeat_reads": 80,
+        "repeat_reads_without_write": 40,
+        "flagged_duplicate_reads": 40,
+        "storage_us": 287.622
+      },
+      ":intrablock_entropy": {
+        "ops": 40,
+        "writes": 40,
+        "bytes_written": 640,
+        "storage_us": 96.374
+      },
+      "System::Digest": {
+        "ops": 180,
+        "writes": 40,
+        "bytes_written": 1520,
+        "reads": 140,
+        "bytes_read": 8120,
+        "repeat_reads": 120,
+        "repeat_reads_without_write": 100,
+        "flagged_duplicate_reads": 100,
+        "storage_us": 750.0889999999999
+      },
+      "System::ParentHash": {
+        "ops": 60,
+        "writes": 20,
+        "bytes_written": 640,
+        "reads": 40,
+        "bytes_read": 1280,
+        "repeat_reads": 20,
+        "repeat_reads_without_write": 20,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 189.37199999999999
+      },
+      "System::BlockHash": {
+        "ops": 60,
+        "writes": 40,
+        "bytes_written": 640,
+        "reads": 20,
+        "bytes_read": 640,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 185.791
+      },
+      "System::BlockWeight": {
+        "ops": 2280,
+        "writes": 1120,
+        "bytes_written": 13040,
+        "reads": 1160,
+        "bytes_read": 13600,
+        "repeat_reads": 1140,
+        "repeat_reads_without_write": 40,
+        "flagged_duplicate_reads": 1060,
+        "storage_us": 5007.257000000001
+      },
+      "System::BlockSize": {
+        "ops": 160,
+        "writes": 100,
+        "bytes_written": 320,
+        "reads": 60,
+        "bytes_read": 240,
+        "repeat_reads": 40,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 20,
+        "storage_us": 300.917
+      },
+      "ParachainSystem::DidSetValidationCode": {
+        "ops": 40,
+        "reads": 20,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 20,
+        "bytes_written": 0,
+        "storage_us": 180.916
+      },
+      "ParachainSystem::NewValidationCode": {
+        "ops": 20,
+        "writes": 20,
+        "bytes_written": 0,
+        "storage_us": 54.958999999999996
+      },
+      "ParachainSystem::UnincludedSegment": {
+        "ops": 120,
+        "reads": 60,
+        "bytes_read": 19931,
+        "repeat_reads": 40,
+        "repeat_reads_without_write": 20,
+        "flagged_duplicate_reads": 20,
+        "writes": 60,
+        "bytes_written": 13160,
+        "storage_us": 1557.626
+      },
+      "ParachainSystem::BlockWeightMode": {
+        "ops": 20,
+        "writes": 20,
+        "bytes_written": 0,
+        "storage_us": 35.874
+      },
+      "ParachainSystem::ValidationData": {
+        "ops": 100,
+        "writes": 40,
+        "bytes_written": 5780,
+        "reads": 60,
+        "bytes_read": 11560,
+        "repeat_reads": 40,
+        "repeat_reads_without_write": 20,
+        "flagged_duplicate_reads": 20,
+        "storage_us": 832.6669999999999
+      },
+      "ParachainSystem::ProcessedDownwardMessages": {
+        "ops": 40,
+        "writes": 40,
+        "bytes_written": 80,
+        "storage_us": 72.20599999999999
+      },
+      "ParachainSystem::UpwardMessages": {
+        "ops": 100,
+        "writes": 100,
+        "bytes_written": 940,
+        "storage_us": 182.29
+      },
+      "ParachainSystem::HrmpOutboundMessages": {
+        "ops": 40,
+        "writes": 40,
+        "bytes_written": 20,
+        "storage_us": 64.08800000000001
+      },
+      "ParachainSystem::CustomValidationHeadData": {
+        "ops": 20,
+        "writes": 20,
+        "bytes_written": 0,
+        "storage_us": 39.377
+      },
+      "ParachainSystem::HrmpWatermark": {
+        "ops": 60,
+        "reads": 40,
+        "bytes_read": 160,
+        "repeat_reads": 20,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 20,
+        "bytes_written": 80,
+        "storage_us": 185.499
+      },
+      "ParachainSystem::HostConfiguration": {
+        "ops": 60,
+        "reads": 40,
+        "bytes_read": 1760,
+        "repeat_reads": 20,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 20,
+        "bytes_written": 880,
+        "storage_us": 333.78900000000004
+      },
+      "ParachainSystem::AnnouncedHrmpMessagesPerCandidate": {
+        "ops": 60,
+        "writes": 40,
+        "bytes_written": 80,
+        "reads": 20,
+        "bytes_read": 80,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 116.49799999999999
+      },
+      "Authorship::Author": {
+        "ops": 60,
+        "reads": 20,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 40,
+        "bytes_written": 640,
+        "storage_us": 186.45700000000002
+      },
+      "Aura::Authorities": {
+        "ops": 60,
+        "reads": 60,
+        "bytes_read": 3900,
+        "repeat_reads": 40,
+        "repeat_reads_without_write": 40,
+        "flagged_duplicate_reads": 20,
+        "storage_us": 442.91699999999986
+      },
+      "Session::Validators": {
+        "ops": 20,
+        "reads": 20,
+        "bytes_read": 1300,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 155.043
+      },
+      "System::Account": {
+        "ops": 20,
+        "reads": 20,
+        "bytes_read": 1600,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 260.75
+      },
+      "CollatorSelection::LastAuthoredBlock": {
+        "ops": 20,
+        "writes": 20,
+        "bytes_written": 80,
+        "storage_us": 57.166
+      },
+      "Aura::CurrentSlot": {
+        "ops": 80,
+        "reads": 60,
+        "bytes_read": 480,
+        "repeat_reads": 40,
+        "repeat_reads_without_write": 20,
+        "flagged_duplicate_reads": 0,
+        "writes": 20,
+        "bytes_written": 160,
+        "storage_us": 210.872
+      },
+      "AuraExt::Authorities": {
+        "ops": 40,
+        "reads": 20,
+        "bytes_read": 1300,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 20,
+        "bytes_written": 1300,
+        "storage_us": 247.124
+      },
+      "PolkadotXcm::CurrentMigration": {
+        "ops": 20,
+        "reads": 20,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 74.46000000000001
+      },
+      "PolkadotXcm::VersionDiscoveryQueue": {
+        "ops": 60,
+        "reads": 20,
+        "bytes_read": 20,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 40,
+        "bytes_written": 20,
+        "storage_us": 164.92000000000002
+      },
+      "MessageQueue::ServiceHead": {
+        "ops": 40,
+        "reads": 40,
+        "bytes_read": 0,
+        "repeat_reads": 20,
+        "repeat_reads_without_write": 20,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 151.458
+      },
+      "NftCredits::CreditBuffers": {
+        "ops": 20,
+        "reads": 20,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 109.291
+      },
+      "MultiBlockMigrations::Cursor": {
+        "ops": 80,
+        "reads": 80,
+        "bytes_read": 0,
+        "repeat_reads": 60,
+        "repeat_reads_without_write": 60,
+        "flagged_duplicate_reads": 20,
+        "storage_us": 287.041
+      },
+      "System::ExtrinsicData": {
+        "ops": 120,
+        "writes": 80,
+        "bytes_written": 223680,
+        "reads": 40,
+        "bytes_read": 223680,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 7531.628000000001
+      },
+      ":transaction_level:": {
+        "ops": 160,
+        "reads": 80,
+        "bytes_read": 160,
+        "repeat_reads": 60,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 40,
+        "writes": 80,
+        "bytes_written": 160,
+        "storage_us": 323.7900000000001
+      },
+      "ParachainSystem::LastRelayChainBlockNumber": {
+        "ops": 40,
+        "reads": 20,
+        "bytes_read": 80,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 20,
+        "bytes_written": 80,
+        "storage_us": 114.96000000000001
+      },
+      "ParachainInfo::ParachainId": {
+        "ops": 20,
+        "reads": 20,
+        "bytes_read": 80,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 82.03999999999999
+      },
+      "AuraExt::RelaySlotInfo": {
+        "ops": 40,
+        "reads": 20,
+        "bytes_read": 240,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 20,
+        "bytes_written": 240,
+        "storage_us": 242.24599999999998
+      },
+      "ParachainSystem::AggregatedUnincludedSegment": {
+        "ops": 92,
+        "reads": 66,
+        "bytes_read": 990,
+        "repeat_reads": 46,
+        "repeat_reads_without_write": 40,
+        "flagged_duplicate_reads": 26,
+        "writes": 26,
+        "bytes_written": 390,
+        "storage_us": 382.495
+      },
+      "ParachainSystem::UpgradeRestrictionSignal": {
+        "ops": 40,
+        "writes": 40,
+        "bytes_written": 20,
+        "storage_us": 81.167
+      },
+      "ParachainSystem::UpgradeGoAhead": {
+        "ops": 60,
+        "writes": 40,
+        "bytes_written": 20,
+        "reads": 20,
+        "bytes_read": 20,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 101.83299999999998
+      },
+      "ParachainSystem::RelayStateProof": {
+        "ops": 20,
+        "writes": 20,
+        "bytes_written": 203540,
+        "storage_us": 3873.124
+      },
+      "ParachainSystem::RelevantMessagingState": {
+        "ops": 160,
+        "writes": 40,
+        "bytes_written": 12800,
+        "reads": 120,
+        "bytes_read": 38400,
+        "repeat_reads": 100,
+        "repeat_reads_without_write": 80,
+        "flagged_duplicate_reads": 100,
+        "storage_us": 2198.791
+      },
+      "RelayRandomness::Randomness": {
+        "ops": 40,
+        "reads": 20,
+        "bytes_read": 1480,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 20,
+        "bytes_written": 1480,
+        "storage_us": 278.66200000000003
+      },
+      "ParachainSystem::PendingApprovedPeer": {
+        "ops": 60,
+        "writes": 40,
+        "bytes_written": 780,
+        "reads": 20,
+        "bytes_read": 780,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 178.831
+      },
+      "ParachainSystem::LastDmqMqcHead": {
+        "ops": 20,
+        "reads": 20,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 70.708
+      },
+      "ParachainSystem::LastHrmpMqcHeads": {
+        "ops": 40,
+        "reads": 20,
+        "bytes_read": 2180,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 20,
+        "bytes_written": 2180,
+        "storage_us": 271.001
+      },
+      "ParachainSystem::LastProcessedHrmpMessage": {
+        "ops": 20,
+        "writes": 20,
+        "bytes_written": 160,
+        "storage_us": 54.584
+      },
+      "System::ExtrinsicWeightReclaimed": {
+        "ops": 120,
+        "reads": 80,
+        "bytes_read": 0,
+        "repeat_reads": 60,
+        "repeat_reads_without_write": 40,
+        "flagged_duplicate_reads": 40,
+        "writes": 40,
+        "bytes_written": 0,
+        "storage_us": 285.71
+      },
+      "Timestamp::DidUpdate": {
+        "ops": 80,
+        "reads": 40,
+        "bytes_read": 20,
+        "repeat_reads": 20,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 40,
+        "bytes_written": 20,
+        "storage_us": 191.784
+      },
+      "Timestamp::Now": {
+        "ops": 96,
+        "reads": 76,
+        "bytes_read": 608,
+        "repeat_reads": 56,
+        "repeat_reads_without_write": 36,
+        "flagged_duplicate_reads": 18,
+        "writes": 20,
+        "bytes_written": 160,
+        "storage_us": 274.086
+      },
+      "System::InherentsApplied": {
+        "ops": 60,
+        "reads": 20,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 40,
+        "bytes_written": 20,
+        "storage_us": 167.75400000000002
+      },
+      "MobRule::ActiveSince": {
+        "ops": 20,
+        "reads": 20,
+        "bytes_read": 160,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 112.833
+      },
+      "Members::ActiveMembers": {
+        "ops": 20,
+        "reads": 20,
+        "bytes_read": 80,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 120.917
+      },
+      "Game::Game": {
+        "ops": 40,
+        "reads": 40,
+        "bytes_read": 1400,
+        "repeat_reads": 20,
+        "repeat_reads_without_write": 20,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 256.754
+      },
+      "Coinage::PaidTokenCollectionsCreated": {
+        "ops": 20,
+        "reads": 20,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 112.416
+      },
+      "System::ExtrinsicCount": {
+        "ops": 60,
+        "writes": 40,
+        "bytes_written": 80,
+        "reads": 20,
+        "bytes_read": 80,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 110.921
+      },
+      "XcmpQueue::<unknown>": {
+        "ops": 20,
+        "reads": 20,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 68.0
+      },
+      "ParachainSystem::PoVMessagesTracker": {
+        "ops": 40,
+        "reads": 20,
+        "bytes_read": 860,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 20,
+        "bytes_written": 860,
+        "storage_us": 211.25
+      },
+      "ParachainSystem::PendingUpwardMessages": {
+        "ops": 40,
+        "reads": 20,
+        "bytes_read": 20,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 20,
+        "bytes_written": 20,
+        "storage_us": 127.20499999999998
+      },
+      "ParachainSystem::PreviousCoreCount": {
+        "ops": 20,
+        "writes": 20,
+        "bytes_written": 20,
+        "storage_us": 36.248999999999995
+      },
+      "ParachainSystem::PendingUpwardSignals": {
+        "ops": 20,
+        "reads": 20,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 61.542
+      },
+      "ParachainSystem::UpwardDeliveryFeeFactor": {
+        "ops": 40,
+        "reads": 20,
+        "bytes_read": 320,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 20,
+        "bytes_written": 320,
+        "storage_us": 150.876
+      },
+      "XcmpQueue::OutboundXcmpStatus": {
+        "ops": 40,
+        "reads": 20,
+        "bytes_read": 1100,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 20,
+        "bytes_written": 1100,
+        "storage_us": 216.585
+      },
+      "TransactionPayment::NextFeeMultiplier": {
+        "ops": 40,
+        "reads": 20,
+        "bytes_read": 320,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 20,
+        "bytes_written": 320,
+        "storage_us": 163.666
+      },
+      "TransactionPayment::TxPaymentCredit": {
+        "ops": 20,
+        "reads": 20,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 60.248999999999995
+      },
+      "System::BlocksTillUpgrade": {
+        "ops": 20,
+        "reads": 20,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 94.999
+      },
+      "<unknown>": {
+        "ops": 20,
+        "storage_us": 3931.7079999999996
+      }
+    },
+    "calls": {
+      "ParachainSystem.set_validation_data": {
+        "n": 20,
+        "median": {
+          "ops": 52.0,
+          "reads": 25.0,
+          "writes": 27.0,
+          "bytes_read": 1260.0,
+          "bytes_written": 22666.0,
+          "repeat_reads": 7.0,
+          "repeat_reads_without_write": 3.0,
+          "storage_us": 460.0
+        },
+        "ranges": {
+          "reads": [
+            25,
+            26
+          ],
+          "writes": [
+            27,
+            28
+          ],
+          "bytes_read": [
+            1174,
+            1361
+          ],
+          "bytes_written": [
+            22638,
+            22709
+          ],
+          "storage_us": [
+            371.291,
+            1044.664
+          ]
+        }
+      },
+      "Timestamp.set": {
+        "n": 20,
+        "median": {
+          "ops": 26.0,
+          "reads": 14.0,
+          "writes": 12.0,
+          "bytes_read": 59.0,
+          "bytes_written": 72.0,
+          "repeat_reads": 3.0,
+          "repeat_reads_without_write": 2.0,
+          "storage_us": 37.312
+        },
+        "ranges": {
+          "reads": [
+            14,
+            14
+          ],
+          "writes": [
+            12,
+            12
+          ],
+          "bytes_read": [
+            59,
+            59
+          ],
+          "bytes_written": [
+            72,
+            72
+          ],
+          "storage_us": [
+            32.125,
+            91.497
+          ]
+        }
+      }
+    },
+    "hooks": {},
+    "duplicates": [
+      {
+        "phase": "initialization",
+        "item": "System::BlockWeight",
+        "repeated": 980
+      },
+      {
+        "phase": "finalization",
+        "item": "ParachainSystem::RelevantMessagingState",
+        "repeated": 100
+      },
+      {
+        "phase": "finalization",
+        "item": "System::Digest",
+        "repeated": 60
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Digest",
+        "repeated": 40
+      },
+      {
+        "phase": "finalization",
+        "item": "System::BlockWeight",
+        "repeated": 40
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Number",
+        "repeated": 20
+      },
+      {
+        "phase": "initialization",
+        "item": "Aura::Authorities",
+        "repeated": 20
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::UnincludedSegment",
+        "repeated": 20
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::BlockSize",
+        "repeated": 20
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::ValidationData",
+        "repeated": 20
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::BlockWeight",
+        "repeated": 20
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": ":transaction_level:",
+        "repeated": 20
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "repeated": 20
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": ":extrinsic_index",
+        "repeated": 20
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": ":transaction_level:",
+        "repeated": 20
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "repeated": 20
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": ":extrinsic_index",
+        "repeated": 20
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "MultiBlockMigrations::Cursor",
+        "repeated": 20
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "System::BlockWeight",
+        "repeated": 20
+      },
+      {
+        "phase": "finalization",
+        "item": "ParachainSystem::AggregatedUnincludedSegment",
+        "repeated": 20
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "Timestamp::Now",
+        "repeated": 18
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::AggregatedUnincludedSegment",
+        "repeated": 6
+      }
+    ]
+  },
+  "westend": {
+    "blocks": 42,
+    "heights": [
+      18563535,
+      18563608
+    ],
+    "signed_extrinsics": 3,
+    "totals": {
+      "ops": 23654,
+      "reads": 14812,
+      "writes": 8674,
+      "distinct_keys": 6465,
+      "bytes_read": 1275911,
+      "bytes_written": 1328333,
+      "duplicate_reads": 7711,
+      "truncated_keys": 0
+    },
+    "block_us_median": 12690.541,
+    "block_us_sum": 454862.375,
+    "storage_us_sum": 197840.248,
+    "proof_bytes_median": 91313.0,
+    "proof_bytes_range": [
+      85500,
+      100957
+    ],
+    "categories": {
+      "initialization": {
+        "ops": 9412,
+        "reads": 5015,
+        "writes": 4313,
+        "bytes_read": 104420,
+        "bytes_written": 66853,
+        "repeat_reads": 3356,
+        "repeat_reads_without_write": 369,
+        "storage_us": 41951.46400000001
+      },
+      "inherents": {
+        "ops": 3178,
+        "reads": 1568,
+        "writes": 1610,
+        "bytes_read": 59688,
+        "bytes_written": 1106029,
+        "repeat_reads": 392,
+        "repeat_reads_without_write": 210,
+        "storage_us": 40385.27699999999
+      },
+      "user_extrinsics": {
+        "ops": 324,
+        "reads": 243,
+        "writes": 81,
+        "bytes_read": 10611,
+        "bytes_written": 2787,
+        "repeat_reads": 195,
+        "repeat_reads_without_write": 162,
+        "storage_us": 2185.639
+      },
+      "post_inherents": {
+        "ops": 504,
+        "reads": 420,
+        "writes": 84,
+        "bytes_read": 1512,
+        "bytes_written": 630,
+        "repeat_reads": 168,
+        "repeat_reads_without_write": 168,
+        "storage_us": 1678.288
+      },
+      "finalization": {
+        "ops": 10236,
+        "reads": 7566,
+        "writes": 2586,
+        "bytes_read": 1099680,
+        "bytes_written": 152034,
+        "repeat_reads": 3600,
+        "repeat_reads_without_write": 3471,
+        "storage_us": 111639.58
+      }
+    },
+    "items": {
+      "System::Events": {
+        "ops": 151,
+        "writes": 151,
+        "bytes_written": 2662,
+        "storage_us": 737.4909999999999
+      },
+      "System::EventCount": {
+        "ops": 260,
+        "writes": 151,
+        "bytes_written": 436,
+        "reads": 109,
+        "bytes_read": 268,
+        "repeat_reads": 67,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 18,
+        "storage_us": 603.2469999999998
+      },
+      "System::EventTopics": {
+        "ops": 84,
+        "writes": 42,
+        "bytes_written": 0,
+        "storage_us": 1027.3319999999999
+      },
+      "System::LastRuntimeUpgrade": {
+        "ops": 42,
+        "reads": 42,
+        "bytes_read": 546,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 574.712
+      },
+      "System::Number": {
+        "ops": 328,
+        "reads": 286,
+        "bytes_read": 1144,
+        "repeat_reads": 244,
+        "repeat_reads_without_write": 202,
+        "flagged_duplicate_reads": 73,
+        "writes": 42,
+        "bytes_written": 168,
+        "storage_us": 1064.9080000000001
+      },
+      "System::ExecutionPhase": {
+        "ops": 364,
+        "writes": 255,
+        "bytes_written": 729,
+        "reads": 109,
+        "bytes_read": 505,
+        "repeat_reads": 67,
+        "repeat_reads_without_write": 18,
+        "flagged_duplicate_reads": 18,
+        "storage_us": 906.4250000000001
+      },
+      ":extrinsic_index": {
+        "ops": 387,
+        "writes": 171,
+        "bytes_written": 516,
+        "reads": 216,
+        "bytes_read": 864,
+        "repeat_reads": 174,
+        "repeat_reads_without_write": 87,
+        "flagged_duplicate_reads": 87,
+        "storage_us": 826.075
+      },
+      ":intrablock_entropy": {
+        "ops": 84,
+        "writes": 84,
+        "bytes_written": 1344,
+        "storage_us": 273.25000000000006
+      },
+      "System::Digest": {
+        "ops": 420,
+        "writes": 84,
+        "bytes_written": 3192,
+        "reads": 336,
+        "bytes_read": 20244,
+        "repeat_reads": 294,
+        "repeat_reads_without_write": 252,
+        "flagged_duplicate_reads": 252,
+        "storage_us": 2279.2860000000005
+      },
+      "System::ParentHash": {
+        "ops": 126,
+        "writes": 42,
+        "bytes_written": 1344,
+        "reads": 84,
+        "bytes_read": 2688,
+        "repeat_reads": 42,
+        "repeat_reads_without_write": 42,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 579.4229999999997
+      },
+      "System::BlockHash": {
+        "ops": 144,
+        "writes": 84,
+        "bytes_written": 1344,
+        "reads": 60,
+        "bytes_read": 1728,
+        "repeat_reads": 12,
+        "repeat_reads_without_write": 12,
+        "flagged_duplicate_reads": 12,
+        "storage_us": 737.4149999999998
+      },
+      "System::BlockWeight": {
+        "ops": 6606,
+        "writes": 3240,
+        "bytes_written": 42814,
+        "reads": 3366,
+        "bytes_read": 44464,
+        "repeat_reads": 3324,
+        "repeat_reads_without_write": 126,
+        "flagged_duplicate_reads": 3153,
+        "storage_us": 20278.753
+      },
+      "System::BlockSize": {
+        "ops": 345,
+        "writes": 213,
+        "bytes_written": 684,
+        "reads": 132,
+        "bytes_read": 528,
+        "repeat_reads": 90,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 45,
+        "storage_us": 847.4810000000002
+      },
+      "ParachainSystem::DidSetValidationCode": {
+        "ops": 84,
+        "reads": 42,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 42,
+        "bytes_written": 0,
+        "storage_us": 399.00099999999986
+      },
+      "ParachainSystem::NewValidationCode": {
+        "ops": 42,
+        "writes": 42,
+        "bytes_written": 0,
+        "storage_us": 144.57899999999998
+      },
+      "ParachainSystem::UnincludedSegment": {
+        "ops": 252,
+        "reads": 126,
+        "bytes_read": 53091,
+        "repeat_reads": 84,
+        "repeat_reads_without_write": 42,
+        "flagged_duplicate_reads": 42,
+        "writes": 126,
+        "bytes_written": 34946,
+        "storage_us": 4898.201
+      },
+      "ParachainSystem::BlockWeightMode": {
+        "ops": 42,
+        "writes": 42,
+        "bytes_written": 0,
+        "storage_us": 102.87800000000001
+      },
+      "ParachainSystem::ValidationData": {
+        "ops": 252,
+        "writes": 84,
+        "bytes_written": 12138,
+        "reads": 168,
+        "bytes_read": 12138,
+        "repeat_reads": 126,
+        "repeat_reads_without_write": 84,
+        "flagged_duplicate_reads": 42,
+        "storage_us": 1542.5430000000003
+      },
+      "ParachainSystem::ProcessedDownwardMessages": {
+        "ops": 84,
+        "writes": 84,
+        "bytes_written": 168,
+        "storage_us": 196.916
+      },
+      "ParachainSystem::UpwardMessages": {
+        "ops": 210,
+        "writes": 210,
+        "bytes_written": 1974,
+        "storage_us": 466.29699999999997
+      },
+      "ParachainSystem::HrmpOutboundMessages": {
+        "ops": 84,
+        "writes": 84,
+        "bytes_written": 42,
+        "storage_us": 247.415
+      },
+      "ParachainSystem::CustomValidationHeadData": {
+        "ops": 42,
+        "writes": 42,
+        "bytes_written": 0,
+        "storage_us": 122.584
+      },
+      "ParachainSystem::HrmpWatermark": {
+        "ops": 126,
+        "reads": 84,
+        "bytes_read": 336,
+        "repeat_reads": 42,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 42,
+        "bytes_written": 168,
+        "storage_us": 485.9900000000001
+      },
+      "ParachainSystem::HostConfiguration": {
+        "ops": 126,
+        "reads": 84,
+        "bytes_read": 3696,
+        "repeat_reads": 42,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 42,
+        "bytes_written": 1848,
+        "storage_us": 881.5449999999998
+      },
+      "ParachainSystem::AnnouncedHrmpMessagesPerCandidate": {
+        "ops": 126,
+        "writes": 84,
+        "bytes_written": 168,
+        "reads": 42,
+        "bytes_read": 168,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 305.45500000000004
+      },
+      "ParachainSystem::LastRelayChainBlockNumber": {
+        "ops": 168,
+        "reads": 126,
+        "bytes_read": 504,
+        "repeat_reads": 84,
+        "repeat_reads_without_write": 84,
+        "flagged_duplicate_reads": 42,
+        "writes": 42,
+        "bytes_written": 168,
+        "storage_us": 721.7009999999999
+      },
+      "Scheduler::IncompleteSince": {
+        "ops": 126,
+        "reads": 42,
+        "bytes_read": 168,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 84,
+        "bytes_written": 168,
+        "storage_us": 558.0020000000001
+      },
+      "Authorship::Author": {
+        "ops": 126,
+        "reads": 42,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 84,
+        "bytes_written": 1344,
+        "storage_us": 779.829
+      },
+      "Aura::Authorities": {
+        "ops": 168,
+        "reads": 168,
+        "bytes_read": 21672,
+        "repeat_reads": 126,
+        "repeat_reads_without_write": 126,
+        "flagged_duplicate_reads": 84,
+        "storage_us": 2016.295
+      },
+      "Session::Validators": {
+        "ops": 84,
+        "reads": 84,
+        "bytes_read": 10836,
+        "repeat_reads": 42,
+        "repeat_reads_without_write": 42,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 1007.6690000000001
+      },
+      "System::Account": {
+        "ops": 393,
+        "reads": 369,
+        "bytes_read": 25920,
+        "repeat_reads": 189,
+        "repeat_reads_without_write": 177,
+        "flagged_duplicate_reads": 186,
+        "writes": 24,
+        "bytes_written": 1920,
+        "storage_us": 5261.793
+      },
+      "CollatorSelection::LastAuthoredBlock": {
+        "ops": 42,
+        "writes": 42,
+        "bytes_written": 168,
+        "storage_us": 173.165
+      },
+      "Aura::CurrentSlot": {
+        "ops": 168,
+        "reads": 126,
+        "bytes_read": 1008,
+        "repeat_reads": 84,
+        "repeat_reads_without_write": 42,
+        "flagged_duplicate_reads": 0,
+        "writes": 42,
+        "bytes_written": 336,
+        "storage_us": 609.4200000000001
+      },
+      "AuraExt::Authorities": {
+        "ops": 84,
+        "reads": 42,
+        "bytes_read": 5418,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 42,
+        "bytes_written": 5418,
+        "storage_us": 867.1279999999999
+      },
+      "PolkadotXcm::CurrentMigration": {
+        "ops": 42,
+        "reads": 42,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 258.082
+      },
+      "PolkadotXcm::VersionDiscoveryQueue": {
+        "ops": 126,
+        "reads": 42,
+        "bytes_read": 42,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 84,
+        "bytes_written": 42,
+        "storage_us": 461.24799999999993
+      },
+      "XcmpQueue::InboundXcmpSuspended": {
+        "ops": 42,
+        "reads": 42,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 233.66899999999998
+      },
+      "XcmpQueue::OutboundXcmpStatus": {
+        "ops": 126,
+        "reads": 84,
+        "bytes_read": 6132,
+        "repeat_reads": 42,
+        "repeat_reads_without_write": 42,
+        "flagged_duplicate_reads": 0,
+        "writes": 42,
+        "bytes_written": 3066,
+        "storage_us": 1036.836
+      },
+      "ToRococoXcmRouter::Bridge": {
+        "ops": 84,
+        "reads": 84,
+        "bytes_read": 0,
+        "repeat_reads": 42,
+        "repeat_reads_without_write": 42,
+        "flagged_duplicate_reads": 42,
+        "storage_us": 382.4549999999999
+      },
+      "MessageQueue::ServiceHead": {
+        "ops": 84,
+        "reads": 84,
+        "bytes_read": 0,
+        "repeat_reads": 42,
+        "repeat_reads_without_write": 42,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 387.5009999999999
+      },
+      "Revive::ReceiptInfoData": {
+        "ops": 84,
+        "writes": 84,
+        "bytes_written": 42,
+        "storage_us": 187.04
+      },
+      "Revive::EthereumBlock": {
+        "ops": 84,
+        "writes": 84,
+        "bytes_written": 35112,
+        "storage_us": 1569.8790000000001
+      },
+      "StateTrieMigration::AutoLimits": {
+        "ops": 42,
+        "reads": 42,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 262.91499999999996
+      },
+      "Staking::ProcessingOffence": {
+        "ops": 42,
+        "reads": 42,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 275.289
+      },
+      "Staking::OffenceQueueEras": {
+        "ops": 42,
+        "reads": 42,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 244.373
+      },
+      "Staking::ActiveEra": {
+        "ops": 84,
+        "reads": 84,
+        "bytes_read": 1092,
+        "repeat_reads": 42,
+        "repeat_reads_without_write": 42,
+        "flagged_duplicate_reads": 42,
+        "storage_us": 530.1680000000002
+      },
+      "Staking::UnappliedSlashes": {
+        "ops": 42,
+        "storage_us": 617.8720000000002
+      },
+      "StakingRcClient::OutgoingValidatorSet": {
+        "ops": 42,
+        "reads": 42,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 237.67000000000002
+      },
+      "StakingRcClient::LastSessionReportEndingIndex": {
+        "ops": 42,
+        "reads": 42,
+        "bytes_read": 168,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 198.00200000000004
+      },
+      "Staking::BondedEras": {
+        "ops": 42,
+        "reads": 42,
+        "bytes_read": 1050,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 356.749
+      },
+      "Treasury::Deactivated": {
+        "ops": 42,
+        "reads": 42,
+        "bytes_read": 672,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 309.2519999999999
+      },
+      "Treasury::LastSpendPeriod": {
+        "ops": 42,
+        "reads": 42,
+        "bytes_read": 168,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 192.16199999999998
+      },
+      "Timestamp::Now": {
+        "ops": 168,
+        "reads": 126,
+        "bytes_read": 1008,
+        "repeat_reads": 84,
+        "repeat_reads_without_write": 42,
+        "flagged_duplicate_reads": 0,
+        "writes": 42,
+        "bytes_written": 336,
+        "storage_us": 693.8749999999999
+      },
+      "Dap::LastIssuanceTimestamp": {
+        "ops": 43,
+        "reads": 42,
+        "bytes_read": 336,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 264.665,
+        "writes": 1,
+        "bytes_written": 8
+      },
+      "MultiBlockMigrations::Cursor": {
+        "ops": 168,
+        "reads": 168,
+        "bytes_read": 0,
+        "repeat_reads": 126,
+        "repeat_reads_without_write": 126,
+        "flagged_duplicate_reads": 42,
+        "storage_us": 624.202
+      },
+      "System::ExtrinsicData": {
+        "ops": 261,
+        "writes": 174,
+        "bytes_written": 521919,
+        "reads": 87,
+        "bytes_read": 521919,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 25403.834
+      },
+      ":transaction_level:": {
+        "ops": 348,
+        "reads": 174,
+        "bytes_read": 348,
+        "repeat_reads": 132,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 87,
+        "writes": 174,
+        "bytes_written": 348,
+        "storage_us": 853.5849999999999
+      },
+      "ParachainInfo::ParachainId": {
+        "ops": 42,
+        "reads": 42,
+        "bytes_read": 168,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 201.21
+      },
+      "AuraExt::RelaySlotInfo": {
+        "ops": 84,
+        "reads": 42,
+        "bytes_read": 504,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 42,
+        "bytes_written": 504,
+        "storage_us": 509.92100000000005
+      },
+      "ParachainSystem::AggregatedUnincludedSegment": {
+        "ops": 196,
+        "reads": 140,
+        "bytes_read": 2100,
+        "repeat_reads": 98,
+        "repeat_reads_without_write": 84,
+        "flagged_duplicate_reads": 56,
+        "writes": 56,
+        "bytes_written": 840,
+        "storage_us": 1075.6200000000001
+      },
+      "ParachainSystem::UpgradeRestrictionSignal": {
+        "ops": 84,
+        "writes": 84,
+        "bytes_written": 42,
+        "storage_us": 192.0
+      },
+      "ParachainSystem::UpgradeGoAhead": {
+        "ops": 126,
+        "writes": 84,
+        "bytes_written": 42,
+        "reads": 42,
+        "bytes_read": 42,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 263.16999999999996
+      },
+      "ParachainSystem::RelayStateProof": {
+        "ops": 42,
+        "writes": 42,
+        "bytes_written": 479178,
+        "storage_us": 10202.041
+      },
+      "ParachainSystem::RelevantMessagingState": {
+        "ops": 378,
+        "writes": 84,
+        "bytes_written": 99288,
+        "reads": 294,
+        "bytes_read": 347508,
+        "repeat_reads": 252,
+        "repeat_reads_without_write": 210,
+        "flagged_duplicate_reads": 252,
+        "storage_us": 17186.746
+      },
+      "ParachainSystem::PendingApprovedPeer": {
+        "ops": 126,
+        "writes": 84,
+        "bytes_written": 1638,
+        "reads": 42,
+        "bytes_read": 1638,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 452.58200000000005
+      },
+      "ParachainSystem::LastDmqMqcHead": {
+        "ops": 42,
+        "reads": 42,
+        "bytes_read": 1344,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 348.083
+      },
+      "ParachainSystem::LastHrmpMqcHeads": {
+        "ops": 84,
+        "reads": 42,
+        "bytes_read": 15162,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 42,
+        "bytes_written": 15162,
+        "storage_us": 1654.499
+      },
+      "ParachainSystem::LastProcessedHrmpMessage": {
+        "ops": 42,
+        "writes": 42,
+        "bytes_written": 336,
+        "storage_us": 197.665
+      },
+      "System::ExtrinsicWeightReclaimed": {
+        "ops": 264,
+        "reads": 174,
+        "bytes_read": 0,
+        "repeat_reads": 132,
+        "repeat_reads_without_write": 87,
+        "flagged_duplicate_reads": 87,
+        "writes": 90,
+        "bytes_written": 9,
+        "storage_us": 718.1759999999997
+      },
+      "Timestamp::DidUpdate": {
+        "ops": 168,
+        "reads": 84,
+        "bytes_read": 42,
+        "repeat_reads": 42,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 84,
+        "bytes_written": 42,
+        "storage_us": 458.16100000000006
+      },
+      "TransactionPayment::NextFeeMultiplier": {
+        "ops": 132,
+        "reads": 90,
+        "bytes_read": 1440,
+        "repeat_reads": 48,
+        "repeat_reads_without_write": 6,
+        "flagged_duplicate_reads": 45,
+        "writes": 42,
+        "bytes_written": 672,
+        "storage_us": 559.166
+      },
+      "Balances::TotalIssuance": {
+        "ops": 446,
+        "reads": 443,
+        "bytes_read": 7088,
+        "repeat_reads": 401,
+        "repeat_reads_without_write": 398,
+        "flagged_duplicate_reads": 397,
+        "storage_us": 2381.434,
+        "writes": 3,
+        "bytes_written": 48
+      },
+      "TransactionPayment::TxPaymentCredit": {
+        "ops": 54,
+        "reads": 48,
+        "bytes_read": 48,
+        "repeat_reads": 6,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 3,
+        "writes": 6,
+        "bytes_written": 48,
+        "storage_us": 247.166
+      },
+      "System::InherentsApplied": {
+        "ops": 129,
+        "reads": 45,
+        "bytes_read": 3,
+        "repeat_reads": 3,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 84,
+        "bytes_written": 42,
+        "storage_us": 332.166
+      },
+      "MultiBlockElection::CurrentPhase": {
+        "ops": 126,
+        "reads": 126,
+        "bytes_read": 126,
+        "repeat_reads": 84,
+        "repeat_reads_without_write": 84,
+        "flagged_duplicate_reads": 84,
+        "storage_us": 518.037
+      },
+      "MultiBlockElectionVerifier::StatusStorage": {
+        "ops": 42,
+        "reads": 42,
+        "bytes_read": 42,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 173.91299999999998
+      },
+      "System::ExtrinsicCount": {
+        "ops": 126,
+        "writes": 84,
+        "bytes_written": 168,
+        "reads": 42,
+        "bytes_read": 168,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 264.04400000000004
+      },
+      "VoterList::CounterForListNodes": {
+        "ops": 42,
+        "reads": 42,
+        "bytes_read": 168,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 262.45700000000005
+      },
+      "VoterList::CounterForPendingRebag": {
+        "ops": 42,
+        "reads": 42,
+        "bytes_read": 168,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 186.54199999999997
+      },
+      "VoterList::Lock": {
+        "ops": 462,
+        "reads": 462,
+        "bytes_read": 0,
+        "repeat_reads": 420,
+        "repeat_reads_without_write": 420,
+        "flagged_duplicate_reads": 420,
+        "storage_us": 1686.2859999999998
+      },
+      "VoterList::NextNodeAutoRebagged": {
+        "ops": 84,
+        "reads": 42,
+        "bytes_read": 1344,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 42,
+        "bytes_written": 1344,
+        "storage_us": 429.7930000000001
+      },
+      "VoterList::ListNodes": {
+        "ops": 2184,
+        "reads": 1764,
+        "bytes_read": 105336,
+        "repeat_reads": 1260,
+        "repeat_reads_without_write": 1260,
+        "flagged_duplicate_reads": 1260,
+        "writes": 420,
+        "bytes_written": 47880,
+        "storage_us": 22447.093
+      },
+      "VoterList::PendingRebag": {
+        "ops": 1344,
+        "reads": 882,
+        "bytes_read": 0,
+        "repeat_reads": 420,
+        "repeat_reads_without_write": 420,
+        "flagged_duplicate_reads": 420,
+        "writes": 420,
+        "bytes_written": 0,
+        "storage_us": 6309.0019999999995
+      },
+      "Staking::Bonded": {
+        "ops": 840,
+        "reads": 840,
+        "bytes_read": 26880,
+        "repeat_reads": 420,
+        "repeat_reads_without_write": 420,
+        "flagged_duplicate_reads": 420,
+        "storage_us": 8588.295
+      },
+      "Staking::Ledger": {
+        "ops": 420,
+        "reads": 420,
+        "bytes_read": 19740,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 5452.581
+      },
+      "Staking::Nominators": {
+        "ops": 420,
+        "reads": 420,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 3914.418
+      },
+      "Balances::InactiveIssuance": {
+        "ops": 8,
+        "reads": 4,
+        "bytes_read": 64,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 4,
+        "bytes_written": 64,
+        "storage_us": 39.168
+      },
+      "XcmpQueue::<unknown>": {
+        "ops": 42,
+        "reads": 42,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 157.626
+      },
+      "Revive::DeletionQueueCounter": {
+        "ops": 42,
+        "reads": 42,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 231.74800000000002
+      },
+      "ParachainSystem::PoVMessagesTracker": {
+        "ops": 84,
+        "reads": 42,
+        "bytes_read": 1806,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 42,
+        "bytes_written": 1806,
+        "storage_us": 527.6690000000001
+      },
+      "ParachainSystem::PendingUpwardMessages": {
+        "ops": 84,
+        "reads": 42,
+        "bytes_read": 42,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 42,
+        "bytes_written": 42,
+        "storage_us": 287.71299999999997
+      },
+      "ParachainSystem::PreviousCoreCount": {
+        "ops": 42,
+        "writes": 42,
+        "bytes_written": 42,
+        "storage_us": 90.921
+      },
+      "ParachainSystem::PendingUpwardSignals": {
+        "ops": 42,
+        "reads": 42,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 153.456
+      },
+      "ParachainSystem::UpwardDeliveryFeeFactor": {
+        "ops": 84,
+        "reads": 42,
+        "bytes_read": 672,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 42,
+        "bytes_written": 672,
+        "storage_us": 385.70400000000006
+      },
+      "Revive::EthBlockBuilderIR": {
+        "ops": 84,
+        "reads": 42,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 42,
+        "bytes_written": 0,
+        "storage_us": 389.11700000000013
+      },
+      "Revive::BlockHash": {
+        "ops": 126,
+        "reads": 42,
+        "bytes_read": 1344,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 84,
+        "bytes_written": 1344,
+        "storage_us": 698.2939999999999
+      },
+      "Revive::EthBlockBuilderFirstValues": {
+        "ops": 42,
+        "reads": 42,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 148.291
+      },
+      "System::BlocksTillUpgrade": {
+        "ops": 42,
+        "reads": 42,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 216.82899999999998
+      },
+      "<unknown>": {
+        "ops": 42,
+        "storage_us": 19069.251
+      },
+      "Scheduler::Agenda": {
+        "ops": 26,
+        "reads": 13,
+        "bytes_read": 0,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "writes": 13,
+        "bytes_written": 0,
+        "storage_us": 117.54200000000002
+      },
+      "Dap::BudgetAllocation": {
+        "ops": 1,
+        "reads": 1,
+        "bytes_read": 55,
+        "repeat_reads": 0,
+        "repeat_reads_without_write": 0,
+        "flagged_duplicate_reads": 0,
+        "storage_us": 9.125
+      }
+    },
+    "calls": {
+      "ParachainSystem.set_validation_data": {
+        "n": 42,
+        "median": {
+          "ops": 49.0,
+          "reads": 23.0,
+          "writes": 26.0,
+          "bytes_read": 1355.0,
+          "bytes_written": 26256.0,
+          "repeat_reads": 6.0,
+          "repeat_reads_without_write": 3.0,
+          "storage_us": 936.375
+        },
+        "ranges": {
+          "reads": [
+            23,
+            24
+          ],
+          "writes": [
+            26,
+            27
+          ],
+          "bytes_read": [
+            1269,
+            1456
+          ],
+          "bytes_written": [
+            26228,
+            26299
+          ],
+          "storage_us": [
+            415.789,
+            2764.582
+          ]
+        }
+      },
+      "Timestamp.set": {
+        "n": 42,
+        "median": {
+          "ops": 26.0,
+          "reads": 14.0,
+          "writes": 12.0,
+          "bytes_read": 59.0,
+          "bytes_written": 72.0,
+          "repeat_reads": 3.0,
+          "repeat_reads_without_write": 2.0,
+          "storage_us": 71.747
+        },
+        "ranges": {
+          "reads": [
+            14,
+            14
+          ],
+          "writes": [
+            12,
+            12
+          ],
+          "bytes_read": [
+            59,
+            59
+          ],
+          "bytes_written": [
+            72,
+            72
+          ],
+          "storage_us": [
+            32.037,
+            127.459
+          ]
+        }
+      },
+      "Balances.transfer_keep_alive": {
+        "n": 3,
+        "median": {
+          "ops": 108,
+          "reads": 81,
+          "writes": 27,
+          "bytes_read": 3537,
+          "bytes_written": 929,
+          "repeat_reads": 65,
+          "repeat_reads_without_write": 54,
+          "storage_us": 665.629
+        },
+        "ranges": {
+          "reads": [
+            81,
+            81
+          ],
+          "writes": [
+            27,
+            27
+          ],
+          "bytes_read": [
+            3537,
+            3537
+          ],
+          "bytes_written": [
+            929,
+            929
+          ],
+          "storage_us": [
+            539.718,
+            980.292
+          ]
+        }
+      }
+    },
+    "hooks": {},
+    "duplicates": [
+      {
+        "phase": "initialization",
+        "item": "System::BlockWeight",
+        "repeated": 2982
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "repeated": 1260
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::Lock",
+        "repeated": 420
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "repeated": 420
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "repeated": 420
+      },
+      {
+        "phase": "finalization",
+        "item": "Balances::TotalIssuance",
+        "repeated": 384
+      },
+      {
+        "phase": "finalization",
+        "item": "ParachainSystem::RelevantMessagingState",
+        "repeated": 252
+      },
+      {
+        "phase": "finalization",
+        "item": "System::Digest",
+        "repeated": 168
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::Account",
+        "repeated": 114
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Digest",
+        "repeated": 84
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "MultiBlockElection::CurrentPhase",
+        "repeated": 84
+      },
+      {
+        "phase": "finalization",
+        "item": "System::BlockWeight",
+        "repeated": 84
+      },
+      {
+        "phase": "finalization",
+        "item": "System::Account",
+        "repeated": 54
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Number",
+        "repeated": 46
+      },
+      {
+        "phase": "initialization",
+        "item": "Aura::Authorities",
+        "repeated": 42
+      },
+      {
+        "phase": "initialization",
+        "item": "ToRococoXcmRouter::Bridge",
+        "repeated": 42
+      },
+      {
+        "phase": "initialization",
+        "item": "Staking::ActiveEra",
+        "repeated": 42
+      },
+      {
+        "phase": "initialization",
+        "item": "ParachainSystem::ValidationData",
+        "repeated": 42
+      },
+      {
+        "phase": "initialization",
+        "item": "ParachainSystem::LastRelayChainBlockNumber",
+        "repeated": 42
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::UnincludedSegment",
+        "repeated": 42
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::BlockSize",
+        "repeated": 42
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::BlockWeight",
+        "repeated": 42
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": ":transaction_level:",
+        "repeated": 42
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "repeated": 42
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": ":extrinsic_index",
+        "repeated": 42
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": ":transaction_level:",
+        "repeated": 42
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "repeated": 42
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": ":extrinsic_index",
+        "repeated": 42
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "MultiBlockMigrations::Cursor",
+        "repeated": 42
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "System::BlockWeight",
+        "repeated": 42
+      },
+      {
+        "phase": "finalization",
+        "item": "ParachainSystem::AggregatedUnincludedSegment",
+        "repeated": 42
+      },
+      {
+        "phase": "finalization",
+        "item": "TransactionPayment::NextFeeMultiplier",
+        "repeated": 42
+      },
+      {
+        "phase": "finalization",
+        "item": "Aura::Authorities",
+        "repeated": 42
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::Number",
+        "repeated": 21
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Account",
+        "repeated": 18
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::AggregatedUnincludedSegment",
+        "repeated": 14
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::ExecutionPhase",
+        "repeated": 12
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::EventCount",
+        "repeated": 12
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::BlockHash",
+        "repeated": 12
+      },
+      {
+        "phase": "initialization",
+        "item": "Balances::TotalIssuance",
+        "repeated": 10
+      },
+      {
+        "phase": "finalization",
+        "item": "System::Number",
+        "repeated": 6
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "Balances::TotalIssuance",
+        "repeated": 3
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": ":transaction_level:",
+        "repeated": 3
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "TransactionPayment::NextFeeMultiplier",
+        "repeated": 3
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "TransactionPayment::TxPaymentCredit",
+        "repeated": 3
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::BlockWeight",
+        "repeated": 3
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "repeated": 3
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::BlockSize",
+        "repeated": 3
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": ":extrinsic_index",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "System::ExecutionPhase",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "System::EventCount",
+        "repeated": 3
+      },
+      {
+        "phase": "initialization",
+        "item": "System::ExecutionPhase",
+        "repeated": 3
+      },
+      {
+        "phase": "initialization",
+        "item": "System::EventCount",
+        "repeated": 3
+      }
+    ]
+  }
+}

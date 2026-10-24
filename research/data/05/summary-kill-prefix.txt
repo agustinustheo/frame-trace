@@ -1,0 +1,134 @@
+block 0x7d99aaa134e6ecea7fbeea635f4225e839ca31da4b1702a3f1eb6e697eec712b (parent 0x82fa5200a8c46f651e8aed7bad1dd72e1615c2bf28d90c367f9838b014216a4c)
+
+Storage per phase
+┌──────────────────────────────────────────────────┬─────┬───────┬────────┬──────┬────────────┬───────────────┬───────────┐
+│ phase                                            ┆ ops ┆ reads ┆ writes ┆ keys ┆ bytes read ┆ bytes written ┆ dup reads │
+╞══════════════════════════════════════════════════╪═════╪═══════╪════════╪══════╪════════════╪═══════════════╪═══════════╡
+│ initialization                                   ┆ 152 ┆    74 ┆     77 ┆   37 ┆        910 ┆           804 ┆        53 │
+│ extrinsic 0: ParachainSystem.set_validation_data ┆  54 ┆    26 ┆     28 ┆   30 ┆        279 ┆          2904 ┆         8 │
+│ extrinsic 1: Timestamp.set                       ┆  26 ┆    14 ┆     12 ┆   13 ┆         59 ┆            72 ┆         3 │
+│ extrinsic 2: Sudo.sudo                           ┆  93 ┆    63 ┆     28 ┆   18 ┆       2025 ┆           683 ┆        48 │
+│   └ post inherents (on_poll)                     ┆  14 ┆    12 ┆      2 ┆   10 ┆         40 ┆            15 ┆         2 │
+│ finalization                                     ┆  72 ┆    40 ┆     31 ┆   44 ┆       2438 ┆           208 ┆         8 │
+│ total                                            ┆ 411 ┆   229 ┆    178 ┆   79 ┆       5751 ┆          4686 ┆       122 │
+└──────────────────────────────────────────────────┴─────┴───────┴────────┴──────┴────────────┴───────────────┴───────────┘
+
+Top 100 storage items by reads + writes
+┌────────────────────────────────────────────────────┬───────┬────────┬───────────┬────────────┬───────────────┐
+│ item                                               ┆ reads ┆ writes ┆ dup reads ┆ bytes read ┆ bytes written │
+╞════════════════════════════════════════════════════╪═══════╪════════╪═══════════╪════════════╪═══════════════╡
+│ System::BlockWeight                                ┆    60 ┆     58 ┆        54 ┆        722 ┆           690 │
+│ System::Account                                    ┆    23 ┆      3 ┆        21 ┆       1680 ┆           240 │
+│ :transaction_level:                                ┆     8 ┆      8 ┆         5 ┆         20 ┆            20 │
+│ System::EventCount                                 ┆     7 ┆      8 ┆         4 ┆         24 ┆            28 │
+│ System::Number                                     ┆    14 ┆      1 ┆         8 ┆         56 ┆             4 │
+│ System::ExecutionPhase                             ┆     7 ┆      7 ┆         4 ┆         35 ┆            22 │
+│ :extrinsic_index                                   ┆     7 ┆      5 ┆         3 ┆         28 ┆            16 │
+│ System::BlockSize                                  ┆     5 ┆      6 ┆         2 ┆         20 ┆            20 │
+│ System::ExtrinsicWeightReclaimed                   ┆     6 ┆      4 ┆         3 ┆          0 ┆             3 │
+│ System::Digest                                     ┆     7 ┆      2 ┆         5 ┆        273 ┆            57 │
+│ System::ExtrinsicData                              ┆     3 ┆      6 ┆         0 ┆       1750 ┆          1750 │
+│ System::BlockHash                                  ┆     7 ┆      1 ┆         4 ┆        160 ┆            32 │
+│ System::Events                                     ┆     0 ┆      8 ┆         0 ┆          0 ┆           240 │
+│ ParachainSystem::AggregatedUnincludedSegment       ┆     4 ┆      2 ┆         2 ┆         60 ┆            30 │
+│ ParachainSystem::UnincludedSegment                 ┆     3 ┆      3 ┆         1 ┆        100 ┆            56 │
+│ ParachainSystem::RelevantMessagingState            ┆     3 ┆      2 ┆         2 ┆        126 ┆            84 │
+│ ParachainSystem::ValidationData                    ┆     3 ┆      2 ┆         1 ┆         82 ┆            41 │
+│ TransactionPayment::TxPaymentCredit                ┆     3 ┆      2 ┆         1 ┆         16 ┆            16 │
+│ Aura::CurrentSlot                                  ┆     3 ┆      1 ┆         0 ┆         24 ┆             8 │
+│ MultiBlockMigrations::Cursor                       ┆     4 ┆      0 ┆         1 ┆          0 ┆             0 │
+│ System::InherentsApplied                           ┆     2 ┆      2 ┆         0 ┆          1 ┆             1 │
+│ Timestamp::DidUpdate                               ┆     2 ┆      2 ┆         0 ┆          1 ┆             1 │
+│ <unknown>                                          ┆     0 ┆      3 ┆         0 ┆          0 ┆             0 │
+│ Aura::Authorities                                  ┆     3 ┆      0 ┆         1 ┆         99 ┆             0 │
+│ Authorship::Author                                 ┆     1 ┆      2 ┆         0 ┆          0 ┆            32 │
+│ ParachainSystem::AnnouncedHrmpMessagesPerCandidate ┆     1 ┆      2 ┆         0 ┆          4 ┆             4 │
+│ ParachainSystem::HostConfiguration                 ┆     2 ┆      1 ┆         0 ┆         88 ┆            44 │
+│ ParachainSystem::HrmpWatermark                     ┆     2 ┆      1 ┆         0 ┆          8 ┆             4 │
+│ ParachainSystem::UpgradeGoAhead                    ┆     1 ┆      2 ┆         0 ┆          1 ┆             1 │
+│ PolkadotXcm::VersionDiscoveryQueue                 ┆     1 ┆      2 ┆         0 ┆          1 ┆             1 │
+│ System::ExtrinsicCount                             ┆     1 ┆      2 ┆         0 ┆          4 ┆             4 │
+│ System::ParentHash                                 ┆     2 ┆      1 ┆         0 ┆         64 ┆            32 │
+│ Timestamp::Now                                     ┆     2 ┆      1 ┆         0 ┆         16 ┆             8 │
+│ TransactionPayment::NextFeeMultiplier              ┆     2 ┆      1 ┆         0 ┆         32 ┆            16 │
+│ :intrablock_entropy                                ┆     0 ┆      2 ┆         0 ┆          0 ┆            32 │
+│ AuraExt::Authorities                               ┆     1 ┆      1 ┆         0 ┆         33 ┆            33 │
+│ AuraExt::RelaySlotInfo                             ┆     1 ┆      1 ┆         0 ┆         12 ┆            12 │
+│ Game::Game                                         ┆     2 ┆      0 ┆         0 ┆          0 ┆             0 │
+│ MessageQueue::ServiceHead                          ┆     2 ┆      0 ┆         0 ┆          0 ┆             0 │
+│ ParachainSystem::DidSetValidationCode              ┆     1 ┆      1 ┆         0 ┆          0 ┆             0 │
+│ ParachainSystem::HrmpOutboundMessages              ┆     0 ┆      2 ┆         0 ┆          0 ┆             1 │
+│ ParachainSystem::LastHrmpMqcHeads                  ┆     1 ┆      1 ┆         0 ┆          1 ┆             1 │
+│ ParachainSystem::LastRelayChainBlockNumber         ┆     1 ┆      1 ┆         0 ┆          4 ┆             4 │
+│ ParachainSystem::PendingApprovedPeer               ┆     1 ┆      1 ┆         0 ┆          0 ┆             0 │
+│ ParachainSystem::PendingUpwardMessages             ┆     1 ┆      1 ┆         0 ┆          1 ┆             1 │
+│ ParachainSystem::PoVMessagesTracker                ┆     1 ┆      1 ┆         0 ┆         43 ┆            43 │
+│ ParachainSystem::ProcessedDownwardMessages         ┆     0 ┆      2 ┆         0 ┆          0 ┆             4 │
+│ ParachainSystem::UpgradeRestrictionSignal          ┆     0 ┆      2 ┆         0 ┆          0 ┆             1 │
+│ ParachainSystem::UpwardDeliveryFeeFactor           ┆     1 ┆      1 ┆         0 ┆         16 ┆            16 │
+│ ParachainSystem::UpwardMessages                    ┆     0 ┆      2 ┆         0 ┆          0 ┆             1 │
+│ RelayRandomness::Randomness                        ┆     1 ┆      1 ┆         0 ┆         38 ┆            38 │
+│ System::EventTopics                                ┆     0 ┆      2 ┆         0 ┆          0 ┆             0 │
+│ XcmpQueue::OutboundXcmpStatus                      ┆     1 ┆      1 ┆         0 ┆          1 ┆             1 │
+│ Balances::TotalIssuance                            ┆     1 ┆      0 ┆         0 ┆         16 ┆             0 │
+│ Coinage::PaidTokenCollectionsCreated               ┆     1 ┆      0 ┆         0 ┆          0 ┆             0 │
+│ CollatorSelection::LastAuthoredBlock               ┆     0 ┆      1 ┆         0 ┆          0 ┆             4 │
+│ Game::GameSchedules                                ┆     1 ┆      0 ┆         0 ┆          0 ┆             0 │
+│ Members::ActiveMembers                             ┆     1 ┆      0 ┆         0 ┆          0 ┆             0 │
+│ MobRule::ActiveSince                               ┆     1 ┆      0 ┆         0 ┆          0 ┆             0 │
+│ NftCredits::CreditBuffers                          ┆     1 ┆      0 ┆         0 ┆          0 ┆             0 │
+│ ParachainInfo::ParachainId                         ┆     1 ┆      0 ┆         0 ┆          4 ┆             0 │
+│ ParachainSystem::BlockWeightMode                   ┆     0 ┆      1 ┆         0 ┆          0 ┆             0 │
+│ ParachainSystem::CustomValidationHeadData          ┆     0 ┆      1 ┆         0 ┆          0 ┆             0 │
+│ ParachainSystem::LastDmqMqcHead                    ┆     1 ┆      0 ┆         0 ┆          0 ┆             0 │
+│ ParachainSystem::LastProcessedHrmpMessage          ┆     0 ┆      1 ┆         0 ┆          0 ┆             8 │
+│ ParachainSystem::NewValidationCode                 ┆     0 ┆      1 ┆         0 ┆          0 ┆             0 │
+│ ParachainSystem::PendingUpwardSignals              ┆     1 ┆      0 ┆         0 ┆          0 ┆             0 │
+│ ParachainSystem::PreviousCoreCount                 ┆     0 ┆      1 ┆         0 ┆          0 ┆             1 │
+│ ParachainSystem::RelayStateProof                   ┆     0 ┆      1 ┆         0 ┆          0 ┆           980 │
+│ PolkadotXcm::CurrentMigration                      ┆     1 ┆      0 ┆         0 ┆          0 ┆             0 │
+│ Session::Validators                                ┆     1 ┆      0 ┆         0 ┆         33 ┆             0 │
+│ Sudo::Key                                          ┆     1 ┆      0 ┆         0 ┆         32 ┆             0 │
+│ System::BlocksTillUpgrade                          ┆     1 ┆      0 ┆         0 ┆          0 ┆             0 │
+│ System::LastRuntimeUpgrade                         ┆     1 ┆      0 ┆         0 ┆         22 ┆             0 │
+│ XcmpQueue::<unknown>                               ┆     1 ┆      0 ┆         0 ┆          0 ┆             0 │
+└────────────────────────────────────────────────────┴───────┴────────┴───────────┴────────────┴───────────────┘
+
+Duplicate reads per phase (top 100 each)
+┌──────────────────────────────────────────────────┬───────────────────────────────────────────────────────────────────┬───────────┐
+│ phase                                            ┆ key                                                               ┆ dup reads │
+╞══════════════════════════════════════════════════╪═══════════════════════════════════════════════════════════════════╪═══════════╡
+│ initialization                                   ┆ System::BlockWeight                                               ┆        49 │
+│ initialization                                   ┆ System::Digest                                                    ┆         2 │
+│ initialization                                   ┆ System::Number                                                    ┆         1 │
+│ initialization                                   ┆ Aura::Authorities                                                 ┆         1 │
+│ extrinsic 0: ParachainSystem.set_validation_data ┆ ParachainSystem::UnincludedSegment                                ┆         1 │
+│ extrinsic 0: ParachainSystem.set_validation_data ┆ System::BlockSize                                                 ┆         1 │
+│ extrinsic 0: ParachainSystem.set_validation_data ┆ ParachainSystem::AggregatedUnincludedSegment                      ┆         1 │
+│ extrinsic 0: ParachainSystem.set_validation_data ┆ ParachainSystem::ValidationData                                   ┆         1 │
+│ extrinsic 0: ParachainSystem.set_validation_data ┆ System::BlockWeight                                               ┆         1 │
+│ extrinsic 0: ParachainSystem.set_validation_data ┆ :transaction_level:                                               ┆         1 │
+│ extrinsic 0: ParachainSystem.set_validation_data ┆ System::ExtrinsicWeightReclaimed                                  ┆         1 │
+│ extrinsic 0: ParachainSystem.set_validation_data ┆ :extrinsic_index                                                  ┆         1 │
+│ extrinsic 1: Timestamp.set                       ┆ :transaction_level:                                               ┆         1 │
+│ extrinsic 1: Timestamp.set                       ┆ System::ExtrinsicWeightReclaimed                                  ┆         1 │
+│ extrinsic 1: Timestamp.set                       ┆ :extrinsic_index                                                  ┆         1 │
+│ extrinsic 2: Sudo.sudo                           ┆ System::Account(5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY) ┆        21 │
+│ extrinsic 2: Sudo.sudo                           ┆ System::Number                                                    ┆         7 │
+│ extrinsic 2: Sudo.sudo                           ┆ System::ExecutionPhase                                            ┆         4 │
+│ extrinsic 2: Sudo.sudo                           ┆ System::EventCount                                                ┆         4 │
+│ extrinsic 2: Sudo.sudo                           ┆ System::BlockHash(7)                                              ┆         3 │
+│ extrinsic 2: Sudo.sudo                           ┆ :transaction_level:                                               ┆         3 │
+│ extrinsic 2: Sudo.sudo                           ┆ System::BlockHash(0)                                              ┆         1 │
+│ extrinsic 2: Sudo.sudo                           ┆ TransactionPayment::TxPaymentCredit                               ┆         1 │
+│ extrinsic 2: Sudo.sudo                           ┆ System::BlockWeight                                               ┆         1 │
+│ extrinsic 2: Sudo.sudo                           ┆ System::ExtrinsicWeightReclaimed                                  ┆         1 │
+│ extrinsic 2: Sudo.sudo                           ┆ System::BlockSize                                                 ┆         1 │
+│ extrinsic 2: Sudo.sudo                           ┆ :extrinsic_index                                                  ┆         1 │
+│ post inherents (on_poll)                         ┆ MultiBlockMigrations::Cursor                                      ┆         1 │
+│ post inherents (on_poll)                         ┆ System::BlockWeight                                               ┆         1 │
+│ finalization                                     ┆ System::Digest                                                    ┆         3 │
+│ finalization                                     ┆ System::BlockWeight                                               ┆         2 │
+│ finalization                                     ┆ ParachainSystem::RelevantMessagingState                           ┆         2 │
+│ finalization                                     ┆ ParachainSystem::AggregatedUnincludedSegment                      ┆         1 │
+└──────────────────────────────────────────────────┴───────────────────────────────────────────────────────────────────┴───────────┘

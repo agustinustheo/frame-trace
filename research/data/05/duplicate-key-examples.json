@@ -1,0 +1,3003 @@
+[
+  {
+    "tag": "fixture-people-kill-prefix",
+    "duplicates": [
+      {
+        "phase": "initialization",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 49
+      },
+      {
+        "phase": "extrinsic 2: Sudo.sudo",
+        "item": "System::Account",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+        "name": "System::Account(5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY)",
+        "repeated": 21
+      },
+      {
+        "phase": "extrinsic 2: Sudo.sudo",
+        "item": "System::Number",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef702a5c1b19ab7a04f536c519aca4983ac",
+        "name": "System::Number",
+        "repeated": 7
+      },
+      {
+        "phase": "extrinsic 2: Sudo.sudo",
+        "item": "System::ExecutionPhase",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7ff553b5a9862a516939d82b3d3d8661a",
+        "name": "System::ExecutionPhase",
+        "repeated": 4
+      },
+      {
+        "phase": "extrinsic 2: Sudo.sudo",
+        "item": "System::EventCount",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70a98fdbe9ce6c55837576c60c7af3850",
+        "name": "System::EventCount",
+        "repeated": 4
+      },
+      {
+        "phase": "extrinsic 2: Sudo.sudo",
+        "item": "System::BlockHash",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7a44704b568d21667356a5a050c1187460e0d969b0e48cab707000000",
+        "name": "System::BlockHash(7)",
+        "repeated": 3
+      },
+      {
+        "phase": "extrinsic 2: Sudo.sudo",
+        "item": ":transaction_level:",
+        "key": "0x3a7472616e73616374696f6e5f6c6576656c3a",
+        "name": ":transaction_level:",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "System::Digest",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef799e7f93fc6a98f0874fd057f111c4d2d",
+        "name": "System::Digest",
+        "repeated": 3
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Digest",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef799e7f93fc6a98f0874fd057f111c4d2d",
+        "name": "System::Digest",
+        "repeated": 2
+      },
+      {
+        "phase": "finalization",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 2
+      },
+      {
+        "phase": "finalization",
+        "item": "ParachainSystem::RelevantMessagingState",
+        "key": "0x45323df7cc47150b3930e2666b0aa3132a47b0ddcc4fcdffe6c6b0b119e45c28",
+        "name": "ParachainSystem::RelevantMessagingState",
+        "repeated": 2
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Number",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef702a5c1b19ab7a04f536c519aca4983ac",
+        "name": "System::Number",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "Aura::Authorities",
+        "key": "0x57f8dc2f5ab09467896f47300f0424385e0621c4869aa60c02be9adcc98a0d1d",
+        "name": "Aura::Authorities",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::UnincludedSegment",
+        "key": "0x45323df7cc47150b3930e2666b0aa313814b57463709b05d35c5acae79a17726",
+        "name": "ParachainSystem::UnincludedSegment",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::BlockSize",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7dd2ecd4efaa88c313bb2e876dc3521ea",
+        "name": "System::BlockSize",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::AggregatedUnincludedSegment",
+        "key": "0x45323df7cc47150b3930e2666b0aa31383b1f3dac9e48c445ffcc08273cf02fc",
+        "name": "ParachainSystem::AggregatedUnincludedSegment",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::ValidationData",
+        "key": "0x45323df7cc47150b3930e2666b0aa313d422e17d2affdce4a912d187a734dd67",
+        "name": "ParachainSystem::ValidationData",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": ":transaction_level:",
+        "key": "0x3a7472616e73616374696f6e5f6c6576656c3a",
+        "name": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70ccf055743738b7a91a6fb88ece33cac",
+        "name": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": ":extrinsic_index",
+        "key": "0x3a65787472696e7369635f696e646578",
+        "name": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": ":transaction_level:",
+        "key": "0x3a7472616e73616374696f6e5f6c6576656c3a",
+        "name": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70ccf055743738b7a91a6fb88ece33cac",
+        "name": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": ":extrinsic_index",
+        "key": "0x3a65787472696e7369635f696e646578",
+        "name": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Sudo.sudo",
+        "item": "System::BlockHash",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7a44704b568d21667356a5a050c118746b4def25cfda6ef3a00000000",
+        "name": "System::BlockHash(0)",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Sudo.sudo",
+        "item": "TransactionPayment::TxPaymentCredit",
+        "key": "0x3f1467a096bcd71a5b6a0c8155e208100cc287492ef5475a4197b7ed4d36b3f6",
+        "name": "TransactionPayment::TxPaymentCredit",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Sudo.sudo",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Sudo.sudo",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70ccf055743738b7a91a6fb88ece33cac",
+        "name": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Sudo.sudo",
+        "item": "System::BlockSize",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7dd2ecd4efaa88c313bb2e876dc3521ea",
+        "name": "System::BlockSize",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Sudo.sudo",
+        "item": ":extrinsic_index",
+        "key": "0x3a65787472696e7369635f696e646578",
+        "name": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "MultiBlockMigrations::Cursor",
+        "key": "0x0b20199ace3564d0964e2c4d4a9ba46987b188618944a73221aaabb35521b0a1",
+        "name": "MultiBlockMigrations::Cursor",
+        "repeated": 1
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "ParachainSystem::AggregatedUnincludedSegment",
+        "key": "0x45323df7cc47150b3930e2666b0aa31383b1f3dac9e48c445ffcc08273cf02fc",
+        "name": "ParachainSystem::AggregatedUnincludedSegment",
+        "repeated": 1
+      }
+    ]
+  },
+  {
+    "tag": "fixture-people-traced",
+    "duplicates": [
+      {
+        "phase": "initialization",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 49
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": "System::Account",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+        "name": "System::Account(5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY)",
+        "repeated": 47
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": "System::Number",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef702a5c1b19ab7a04f536c519aca4983ac",
+        "name": "System::Number",
+        "repeated": 15
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": "System::Account",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da94f9aea1afa791265fae359272badc1cf8eaf04151687736326c9fea17e25fc5287613693c912909cb226aa4794f26a48",
+        "name": "System::Account(5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty)",
+        "repeated": 15
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": "System::ExecutionPhase",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7ff553b5a9862a516939d82b3d3d8661a",
+        "name": "System::ExecutionPhase",
+        "repeated": 12
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": "System::EventCount",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70a98fdbe9ce6c55837576c60c7af3850",
+        "name": "System::EventCount",
+        "repeated": 12
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": ":transaction_level:",
+        "key": "0x3a7472616e73616374696f6e5f6c6576656c3a",
+        "name": ":transaction_level:",
+        "repeated": 7
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": "System::Account",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9b0edae20838083f2cde1c4080db8cf8090b5ab205c6974c9ea841be688864633dc9ca8a357843eeacf2314649965fe22",
+        "name": "System::Account(5FLSigC9HGRKVhB9FiEo4Y3koPsNmBmLJbpXg2mp1hXcS59Y)",
+        "repeated": 7
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": "Balances::TotalIssuance",
+        "key": "0xc2261276cc9d1f8598ea4b6a74b15c2f57c875e4cff74148e4628f264b974c80",
+        "name": "Balances::TotalIssuance",
+        "repeated": 4
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": "System::BlockHash",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7a44704b568d21667356a5a050c118746bfb27f1eaef06bb903000000",
+        "name": "System::BlockHash(3)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "System::Digest",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef799e7f93fc6a98f0874fd057f111c4d2d",
+        "name": "System::Digest",
+        "repeated": 3
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Digest",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef799e7f93fc6a98f0874fd057f111c4d2d",
+        "name": "System::Digest",
+        "repeated": 2
+      },
+      {
+        "phase": "finalization",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 2
+      },
+      {
+        "phase": "finalization",
+        "item": "ParachainSystem::RelevantMessagingState",
+        "key": "0x45323df7cc47150b3930e2666b0aa3132a47b0ddcc4fcdffe6c6b0b119e45c28",
+        "name": "ParachainSystem::RelevantMessagingState",
+        "repeated": 2
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Number",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef702a5c1b19ab7a04f536c519aca4983ac",
+        "name": "System::Number",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "Aura::Authorities",
+        "key": "0x57f8dc2f5ab09467896f47300f0424385e0621c4869aa60c02be9adcc98a0d1d",
+        "name": "Aura::Authorities",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::UnincludedSegment",
+        "key": "0x45323df7cc47150b3930e2666b0aa313814b57463709b05d35c5acae79a17726",
+        "name": "ParachainSystem::UnincludedSegment",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::BlockSize",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7dd2ecd4efaa88c313bb2e876dc3521ea",
+        "name": "System::BlockSize",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::AggregatedUnincludedSegment",
+        "key": "0x45323df7cc47150b3930e2666b0aa31383b1f3dac9e48c445ffcc08273cf02fc",
+        "name": "ParachainSystem::AggregatedUnincludedSegment",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::ValidationData",
+        "key": "0x45323df7cc47150b3930e2666b0aa313d422e17d2affdce4a912d187a734dd67",
+        "name": "ParachainSystem::ValidationData",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": ":transaction_level:",
+        "key": "0x3a7472616e73616374696f6e5f6c6576656c3a",
+        "name": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70ccf055743738b7a91a6fb88ece33cac",
+        "name": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": ":extrinsic_index",
+        "key": "0x3a65787472696e7369635f696e646578",
+        "name": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": ":transaction_level:",
+        "key": "0x3a7472616e73616374696f6e5f6c6576656c3a",
+        "name": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70ccf055743738b7a91a6fb88ece33cac",
+        "name": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": ":extrinsic_index",
+        "key": "0x3a65787472696e7369635f696e646578",
+        "name": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": "System::BlockHash",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7a44704b568d21667356a5a050c118746b4def25cfda6ef3a00000000",
+        "name": "System::BlockHash(0)",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": "TransactionPayment::NextFeeMultiplier",
+        "key": "0x3f1467a096bcd71a5b6a0c8155e208103f2edf3bdf381debe331ab7446addfdc",
+        "name": "TransactionPayment::NextFeeMultiplier",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": "TransactionPayment::TxPaymentCredit",
+        "key": "0x3f1467a096bcd71a5b6a0c8155e208100cc287492ef5475a4197b7ed4d36b3f6",
+        "name": "TransactionPayment::TxPaymentCredit",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70ccf055743738b7a91a6fb88ece33cac",
+        "name": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": "System::BlockSize",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7dd2ecd4efaa88c313bb2e876dc3521ea",
+        "name": "System::BlockSize",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Utility.batch",
+        "item": ":extrinsic_index",
+        "key": "0x3a65787472696e7369635f696e646578",
+        "name": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "MultiBlockMigrations::Cursor",
+        "key": "0x0b20199ace3564d0964e2c4d4a9ba46987b188618944a73221aaabb35521b0a1",
+        "name": "MultiBlockMigrations::Cursor",
+        "repeated": 1
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "ParachainSystem::AggregatedUnincludedSegment",
+        "key": "0x45323df7cc47150b3930e2666b0aa31383b1f3dac9e48c445ffcc08273cf02fc",
+        "name": "ParachainSystem::AggregatedUnincludedSegment",
+        "repeated": 1
+      }
+    ]
+  },
+  {
+    "tag": "fixture-people-transfer",
+    "duplicates": [
+      {
+        "phase": "initialization",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 49
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::Account",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9de1e86a9a8c739864cf3cc5ec2bea59fd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d",
+        "name": "System::Account(5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY)",
+        "repeated": 25
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::Number",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef702a5c1b19ab7a04f536c519aca4983ac",
+        "name": "System::Number",
+        "repeated": 7
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::Account",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da94f9aea1afa791265fae359272badc1cf8eaf04151687736326c9fea17e25fc5287613693c912909cb226aa4794f26a48",
+        "name": "System::Account(5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty)",
+        "repeated": 7
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::ExecutionPhase",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7ff553b5a9862a516939d82b3d3d8661a",
+        "name": "System::ExecutionPhase",
+        "repeated": 4
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::EventCount",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70a98fdbe9ce6c55837576c60c7af3850",
+        "name": "System::EventCount",
+        "repeated": 4
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::BlockHash",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7a44704b568d21667356a5a050c1187465153cb1f00942ff401000000",
+        "name": "System::BlockHash(1)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "System::Digest",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef799e7f93fc6a98f0874fd057f111c4d2d",
+        "name": "System::Digest",
+        "repeated": 3
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Digest",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef799e7f93fc6a98f0874fd057f111c4d2d",
+        "name": "System::Digest",
+        "repeated": 2
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "Balances::TotalIssuance",
+        "key": "0xc2261276cc9d1f8598ea4b6a74b15c2f57c875e4cff74148e4628f264b974c80",
+        "name": "Balances::TotalIssuance",
+        "repeated": 2
+      },
+      {
+        "phase": "finalization",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 2
+      },
+      {
+        "phase": "finalization",
+        "item": "ParachainSystem::RelevantMessagingState",
+        "key": "0x45323df7cc47150b3930e2666b0aa3132a47b0ddcc4fcdffe6c6b0b119e45c28",
+        "name": "ParachainSystem::RelevantMessagingState",
+        "repeated": 2
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Number",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef702a5c1b19ab7a04f536c519aca4983ac",
+        "name": "System::Number",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "Aura::Authorities",
+        "key": "0x57f8dc2f5ab09467896f47300f0424385e0621c4869aa60c02be9adcc98a0d1d",
+        "name": "Aura::Authorities",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::UnincludedSegment",
+        "key": "0x45323df7cc47150b3930e2666b0aa313814b57463709b05d35c5acae79a17726",
+        "name": "ParachainSystem::UnincludedSegment",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::BlockSize",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7dd2ecd4efaa88c313bb2e876dc3521ea",
+        "name": "System::BlockSize",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::AggregatedUnincludedSegment",
+        "key": "0x45323df7cc47150b3930e2666b0aa31383b1f3dac9e48c445ffcc08273cf02fc",
+        "name": "ParachainSystem::AggregatedUnincludedSegment",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::ValidationData",
+        "key": "0x45323df7cc47150b3930e2666b0aa313d422e17d2affdce4a912d187a734dd67",
+        "name": "ParachainSystem::ValidationData",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": ":transaction_level:",
+        "key": "0x3a7472616e73616374696f6e5f6c6576656c3a",
+        "name": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70ccf055743738b7a91a6fb88ece33cac",
+        "name": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": ":extrinsic_index",
+        "key": "0x3a65787472696e7369635f696e646578",
+        "name": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": ":transaction_level:",
+        "key": "0x3a7472616e73616374696f6e5f6c6576656c3a",
+        "name": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70ccf055743738b7a91a6fb88ece33cac",
+        "name": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": ":extrinsic_index",
+        "key": "0x3a65787472696e7369635f696e646578",
+        "name": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::BlockHash",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7a44704b568d21667356a5a050c118746b4def25cfda6ef3a00000000",
+        "name": "System::BlockHash(0)",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": ":transaction_level:",
+        "key": "0x3a7472616e73616374696f6e5f6c6576656c3a",
+        "name": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "TransactionPayment::NextFeeMultiplier",
+        "key": "0x3f1467a096bcd71a5b6a0c8155e208103f2edf3bdf381debe331ab7446addfdc",
+        "name": "TransactionPayment::NextFeeMultiplier",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "TransactionPayment::TxPaymentCredit",
+        "key": "0x3f1467a096bcd71a5b6a0c8155e208100cc287492ef5475a4197b7ed4d36b3f6",
+        "name": "TransactionPayment::TxPaymentCredit",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70ccf055743738b7a91a6fb88ece33cac",
+        "name": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::BlockSize",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7dd2ecd4efaa88c313bb2e876dc3521ea",
+        "name": "System::BlockSize",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": ":extrinsic_index",
+        "key": "0x3a65787472696e7369635f696e646578",
+        "name": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "MultiBlockMigrations::Cursor",
+        "key": "0x0b20199ace3564d0964e2c4d4a9ba46987b188618944a73221aaabb35521b0a1",
+        "name": "MultiBlockMigrations::Cursor",
+        "repeated": 1
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "ParachainSystem::AggregatedUnincludedSegment",
+        "key": "0x45323df7cc47150b3930e2666b0aa31383b1f3dac9e48c445ffcc08273cf02fc",
+        "name": "ParachainSystem::AggregatedUnincludedSegment",
+        "repeated": 1
+      }
+    ]
+  },
+  {
+    "tag": "nextpeople-2227668",
+    "duplicates": [
+      {
+        "phase": "initialization",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 49
+      },
+      {
+        "phase": "finalization",
+        "item": "ParachainSystem::RelevantMessagingState",
+        "key": "0x45323df7cc47150b3930e2666b0aa3132a47b0ddcc4fcdffe6c6b0b119e45c28",
+        "name": "ParachainSystem::RelevantMessagingState",
+        "repeated": 5
+      },
+      {
+        "phase": "finalization",
+        "item": "System::Digest",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef799e7f93fc6a98f0874fd057f111c4d2d",
+        "name": "System::Digest",
+        "repeated": 3
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Digest",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef799e7f93fc6a98f0874fd057f111c4d2d",
+        "name": "System::Digest",
+        "repeated": 2
+      },
+      {
+        "phase": "finalization",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 2
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Number",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef702a5c1b19ab7a04f536c519aca4983ac",
+        "name": "System::Number",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "Aura::Authorities",
+        "key": "0x57f8dc2f5ab09467896f47300f0424385e0621c4869aa60c02be9adcc98a0d1d",
+        "name": "Aura::Authorities",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::UnincludedSegment",
+        "key": "0x45323df7cc47150b3930e2666b0aa313814b57463709b05d35c5acae79a17726",
+        "name": "ParachainSystem::UnincludedSegment",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::BlockSize",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7dd2ecd4efaa88c313bb2e876dc3521ea",
+        "name": "System::BlockSize",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::ValidationData",
+        "key": "0x45323df7cc47150b3930e2666b0aa313d422e17d2affdce4a912d187a734dd67",
+        "name": "ParachainSystem::ValidationData",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": ":transaction_level:",
+        "key": "0x3a7472616e73616374696f6e5f6c6576656c3a",
+        "name": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70ccf055743738b7a91a6fb88ece33cac",
+        "name": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": ":extrinsic_index",
+        "key": "0x3a65787472696e7369635f696e646578",
+        "name": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": ":transaction_level:",
+        "key": "0x3a7472616e73616374696f6e5f6c6576656c3a",
+        "name": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70ccf055743738b7a91a6fb88ece33cac",
+        "name": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": ":extrinsic_index",
+        "key": "0x3a65787472696e7369635f696e646578",
+        "name": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "MultiBlockMigrations::Cursor",
+        "key": "0x0b20199ace3564d0964e2c4d4a9ba46987b188618944a73221aaabb35521b0a1",
+        "name": "MultiBlockMigrations::Cursor",
+        "repeated": 1
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "Timestamp::Now",
+        "key": "0xf0c365c3cf59d671eb72da0e7a4113c49f1f0515f462cdcf84e0f1d6045dfcbb",
+        "name": "Timestamp::Now",
+        "repeated": 1
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "ParachainSystem::AggregatedUnincludedSegment",
+        "key": "0x45323df7cc47150b3930e2666b0aa31383b1f3dac9e48c445ffcc08273cf02fc",
+        "name": "ParachainSystem::AggregatedUnincludedSegment",
+        "repeated": 1
+      }
+    ]
+  },
+  {
+    "tag": "westend-18563535",
+    "duplicates": [
+      {
+        "phase": "initialization",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 71
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::Account",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9644c83c91fbfb1e52261fd4be62c1526207ecd96dd52aef4df38010d5d78a7900a5751e927c492108b4103f16684da47",
+        "name": "System::Account(5CoK4Jsp47RP5zzMQ3AseaznD3mNaXYDN8fkRaGFfgYs1fip)",
+        "repeated": 25
+      },
+      {
+        "phase": "finalization",
+        "item": "Balances::TotalIssuance",
+        "key": "0xc2261276cc9d1f8598ea4b6a74b15c2f57c875e4cff74148e4628f264b974c80",
+        "name": "Balances::TotalIssuance",
+        "repeated": 11
+      },
+      {
+        "phase": "finalization",
+        "item": "System::Account",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9e06aa0993e3384b5131e5263ad87e5036d6f646c6461702f627566661c73746167696e67000000000000000000000000",
+        "name": "System::Account(5EYCAe5gKBMwLZyq5dw41Hw3V68nsCVTZQ2d4AYfbMb4kF29)",
+        "repeated": 11
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::Lock",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7dfb1ef94455cc6b5a3840206754686d98",
+        "name": "VoterList::Lock",
+        "repeated": 10
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::Number",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef702a5c1b19ab7a04f536c519aca4983ac",
+        "name": "System::Number",
+        "repeated": 7
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::Account",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da967ef5ab9c7c825ee83af02175102251692d9a77d1df37348f886454908c26557b741afbeac2c3d835476b9089b1f1c74",
+        "name": "System::Account(5FPFWFZefZF9343WLnGGUN3jdFhnasXNb8ZmvRTP1m4Fmtup)",
+        "repeated": 7
+      },
+      {
+        "phase": "finalization",
+        "item": "System::Account",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da92acc3fa3d0cc237b2a5c1df9335875dc6d6f646c6461702f627566660000000000000000000000000000000000000000",
+        "name": "System::Account(5EYCAe5gKBMwLZyq5doL8n26pkA5pV6HSXdnmN4YawhPc2HH)",
+        "repeated": 7
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::Account",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9e06aa0993e3384b5131e5263ad87e5036d6f646c6461702f627566661c73746167696e67000000000000000000000000",
+        "name": "System::Account(5EYCAe5gKBMwLZyq5dw41Hw3V68nsCVTZQ2d4AYfbMb4kF29)",
+        "repeated": 6
+      },
+      {
+        "phase": "finalization",
+        "item": "ParachainSystem::RelevantMessagingState",
+        "key": "0x45323df7cc47150b3930e2666b0aa3132a47b0ddcc4fcdffe6c6b0b119e45c28",
+        "name": "ParachainSystem::RelevantMessagingState",
+        "repeated": 6
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::ExecutionPhase",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7ff553b5a9862a516939d82b3d3d8661a",
+        "name": "System::ExecutionPhase",
+        "repeated": 4
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::EventCount",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70a98fdbe9ce6c55837576c60c7af3850",
+        "name": "System::EventCount",
+        "repeated": 4
+      },
+      {
+        "phase": "finalization",
+        "item": "System::Digest",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef799e7f93fc6a98f0874fd057f111c4d2d",
+        "name": "System::Digest",
+        "repeated": 4
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::BlockHash",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7a44704b568d21667356a5a050c11874651242afb94676692c1411b01",
+        "name": "System::BlockHash(18563521)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b152ab3597a1b8407b48e233e1969f9b0b5e735166985bfe58a604745bc2992cd9834c1939342eaba05",
+        "name": "VoterList::ListNodes(5FH58GBgrttXQjvngFQgs6jqbokPRPZkGMeQohAyh34P7kVk)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b156b296c2d9e53fc970a8c7b432612c89847ad20035101ea25a1e4c0ee14fd826c4ca7c9a415d9fd02",
+        "name": "VoterList::ListNodes(5CJY4t6AFiysPNFMMMXHZd8hhdXUv62YFmPCnzduLWoJxPHK)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b15b13b631f8bbc13ea868bac29f77be7c94a50f68dacc526ddc7838b2532392023ac8ebe12f4801a4e",
+        "name": "VoterList::ListNodes(5F77mL6g8gcwV6VZBwjcuVFs7Fog8guiNvEJFZGyKLEnSrdm)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b15e106f969b7008bd974ff42d0753a195fec89de20a7f6db69cab9a8704295fc9b063a20a8b3194e06",
+        "name": "VoterList::ListNodes(5Ei7Et5rD9ZriXvbz9cgBecGuTbKHB8WMrz4gKuX783xbYyt)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b1599632b01127f0da95e96e02ce41916e51a82e7d497fa2c0eaa1f05c17461fd8b8455de7a9648c759",
+        "name": "VoterList::ListNodes(5ECjBGFKVgt7BCg9ieDi1rzsx1Jg5xkZfZw2diYqcRgiVx3V)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b15489edd7ac16e5a2bdc26cdee7601a6c7e346b3beea452a188e9764ad6e3fabc7a5aa72d23cf3fa25",
+        "name": "VoterList::ListNodes(5H3MvGACSeqfeSqUT5ReKYYnuhhHUNB8b4VvpkszXSKaJ4Yf)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b15f74a83128816064306cc42a9ff7911a9a692ce8877d53e32f614ff00fd3425408f4def87c8ce3f40",
+        "name": "VoterList::ListNodes(5CDcpf65buTxHAt5nimDJrbNZZk9C4EWLsD1qKosqxPyxLS3)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b15d68a7822c36b101bbab2b2a99f3ee4996e6e740d42bbccd49b9db50af6444a7fab50217126f67240",
+        "name": "VoterList::ListNodes(5GHVr9CG3W7BHxmDLjGkmhXbV9jsgffNRfnZnDTwBmaq2E3a)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b1580ddc77789076e6bc6841944320548bc95e245a32ecc0e9984bd3c1115456958339063025e8a386e",
+        "name": "VoterList::ListNodes(5GYzaaqhPKuau2z4GKGFb4ufN7JbaCUpKENvw7kPb4vgWEeX)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b158a02017c335db873881c6798a727051309193ea75766650023c00e431a20b97c14db560e00e09612",
+        "name": "VoterList::ListNodes(5F9AonT4GdkYmWwfSB8dkwTBpi6bPxcxrBNfFneoqBTXfDAE)",
+        "repeated": 3
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Digest",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef799e7f93fc6a98f0874fd057f111c4d2d",
+        "name": "System::Digest",
+        "repeated": 2
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "MultiBlockElection::CurrentPhase",
+        "key": "0xb4033c147baa712e4c2772a8afe0f1a9d9764401941df7f707a47ba7db64a6ea",
+        "name": "MultiBlockElection::CurrentPhase",
+        "repeated": 2
+      },
+      {
+        "phase": "finalization",
+        "item": "System::Number",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef702a5c1b19ab7a04f536c519aca4983ac",
+        "name": "System::Number",
+        "repeated": 2
+      },
+      {
+        "phase": "finalization",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 2
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Number",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef702a5c1b19ab7a04f536c519aca4983ac",
+        "name": "System::Number",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "Aura::Authorities",
+        "key": "0x57f8dc2f5ab09467896f47300f0424385e0621c4869aa60c02be9adcc98a0d1d",
+        "name": "Aura::Authorities",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "ToRococoXcmRouter::Bridge",
+        "key": "0x5bdfcd0c43765de6dd54ccc0fe974e696bbd34f158a9e1a5e5600b03adee7932",
+        "name": "ToRococoXcmRouter::Bridge",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "Staking::ActiveEra",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca487df464e44a534ba6b0cbb32407b587",
+        "name": "Staking::ActiveEra",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "ParachainSystem::ValidationData",
+        "key": "0x45323df7cc47150b3930e2666b0aa313d422e17d2affdce4a912d187a734dd67",
+        "name": "ParachainSystem::ValidationData",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "ParachainSystem::LastRelayChainBlockNumber",
+        "key": "0x45323df7cc47150b3930e2666b0aa313a2bca190d36bd834cc73a38fc213ecbd",
+        "name": "ParachainSystem::LastRelayChainBlockNumber",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::UnincludedSegment",
+        "key": "0x45323df7cc47150b3930e2666b0aa313814b57463709b05d35c5acae79a17726",
+        "name": "ParachainSystem::UnincludedSegment",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::BlockSize",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7dd2ecd4efaa88c313bb2e876dc3521ea",
+        "name": "System::BlockSize",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": ":transaction_level:",
+        "key": "0x3a7472616e73616374696f6e5f6c6576656c3a",
+        "name": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70ccf055743738b7a91a6fb88ece33cac",
+        "name": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": ":extrinsic_index",
+        "key": "0x3a65787472696e7369635f696e646578",
+        "name": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": ":transaction_level:",
+        "key": "0x3a7472616e73616374696f6e5f6c6576656c3a",
+        "name": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70ccf055743738b7a91a6fb88ece33cac",
+        "name": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": ":extrinsic_index",
+        "key": "0x3a65787472696e7369635f696e646578",
+        "name": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::BlockHash",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7a44704b568d21667356a5a050c118746b4def25cfda6ef3a00000000",
+        "name": "System::BlockHash(0)",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "Balances::TotalIssuance",
+        "key": "0xc2261276cc9d1f8598ea4b6a74b15c2f57c875e4cff74148e4628f264b974c80",
+        "name": "Balances::TotalIssuance",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": ":transaction_level:",
+        "key": "0x3a7472616e73616374696f6e5f6c6576656c3a",
+        "name": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "TransactionPayment::NextFeeMultiplier",
+        "key": "0x3f1467a096bcd71a5b6a0c8155e208103f2edf3bdf381debe331ab7446addfdc",
+        "name": "TransactionPayment::NextFeeMultiplier",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "TransactionPayment::TxPaymentCredit",
+        "key": "0x3f1467a096bcd71a5b6a0c8155e208100cc287492ef5475a4197b7ed4d36b3f6",
+        "name": "TransactionPayment::TxPaymentCredit",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70ccf055743738b7a91a6fb88ece33cac",
+        "name": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::BlockSize",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7dd2ecd4efaa88c313bb2e876dc3521ea",
+        "name": "System::BlockSize",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": ":extrinsic_index",
+        "key": "0x3a65787472696e7369635f696e646578",
+        "name": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "MultiBlockMigrations::Cursor",
+        "key": "0x0b20199ace3564d0964e2c4d4a9ba46987b188618944a73221aaabb35521b0a1",
+        "name": "MultiBlockMigrations::Cursor",
+        "repeated": 1
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8d2ab3597a1b8407b48e233e1969f9b0b5e735166985bfe58a604745bc2992cd9834c1939342eaba05",
+        "name": "VoterList::PendingRebag(5FH58GBgrttXQjvngFQgs6jqbokPRPZkGMeQohAyh34P7kVk)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe702ab3597a1b8407b48e233e1969f9b0b5e735166985bfe58a604745bc2992cd9834c1939342eaba05",
+        "name": "Staking::Bonded(5FH58GBgrttXQjvngFQgs6jqbokPRPZkGMeQohAyh34P7kVk)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8d6b296c2d9e53fc970a8c7b432612c89847ad20035101ea25a1e4c0ee14fd826c4ca7c9a415d9fd02",
+        "name": "VoterList::PendingRebag(5CJY4t6AFiysPNFMMMXHZd8hhdXUv62YFmPCnzduLWoJxPHK)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe706b296c2d9e53fc970a8c7b432612c89847ad20035101ea25a1e4c0ee14fd826c4ca7c9a415d9fd02",
+        "name": "Staking::Bonded(5CJY4t6AFiysPNFMMMXHZd8hhdXUv62YFmPCnzduLWoJxPHK)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8db13b631f8bbc13ea868bac29f77be7c94a50f68dacc526ddc7838b2532392023ac8ebe12f4801a4e",
+        "name": "VoterList::PendingRebag(5F77mL6g8gcwV6VZBwjcuVFs7Fog8guiNvEJFZGyKLEnSrdm)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe70b13b631f8bbc13ea868bac29f77be7c94a50f68dacc526ddc7838b2532392023ac8ebe12f4801a4e",
+        "name": "Staking::Bonded(5F77mL6g8gcwV6VZBwjcuVFs7Fog8guiNvEJFZGyKLEnSrdm)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8de106f969b7008bd974ff42d0753a195fec89de20a7f6db69cab9a8704295fc9b063a20a8b3194e06",
+        "name": "VoterList::PendingRebag(5Ei7Et5rD9ZriXvbz9cgBecGuTbKHB8WMrz4gKuX783xbYyt)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe70e106f969b7008bd974ff42d0753a195fec89de20a7f6db69cab9a8704295fc9b063a20a8b3194e06",
+        "name": "Staking::Bonded(5Ei7Et5rD9ZriXvbz9cgBecGuTbKHB8WMrz4gKuX783xbYyt)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8d99632b01127f0da95e96e02ce41916e51a82e7d497fa2c0eaa1f05c17461fd8b8455de7a9648c759",
+        "name": "VoterList::PendingRebag(5ECjBGFKVgt7BCg9ieDi1rzsx1Jg5xkZfZw2diYqcRgiVx3V)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe7099632b01127f0da95e96e02ce41916e51a82e7d497fa2c0eaa1f05c17461fd8b8455de7a9648c759",
+        "name": "Staking::Bonded(5ECjBGFKVgt7BCg9ieDi1rzsx1Jg5xkZfZw2diYqcRgiVx3V)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8d489edd7ac16e5a2bdc26cdee7601a6c7e346b3beea452a188e9764ad6e3fabc7a5aa72d23cf3fa25",
+        "name": "VoterList::PendingRebag(5H3MvGACSeqfeSqUT5ReKYYnuhhHUNB8b4VvpkszXSKaJ4Yf)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe70489edd7ac16e5a2bdc26cdee7601a6c7e346b3beea452a188e9764ad6e3fabc7a5aa72d23cf3fa25",
+        "name": "Staking::Bonded(5H3MvGACSeqfeSqUT5ReKYYnuhhHUNB8b4VvpkszXSKaJ4Yf)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8df74a83128816064306cc42a9ff7911a9a692ce8877d53e32f614ff00fd3425408f4def87c8ce3f40",
+        "name": "VoterList::PendingRebag(5CDcpf65buTxHAt5nimDJrbNZZk9C4EWLsD1qKosqxPyxLS3)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe70f74a83128816064306cc42a9ff7911a9a692ce8877d53e32f614ff00fd3425408f4def87c8ce3f40",
+        "name": "Staking::Bonded(5CDcpf65buTxHAt5nimDJrbNZZk9C4EWLsD1qKosqxPyxLS3)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8dd68a7822c36b101bbab2b2a99f3ee4996e6e740d42bbccd49b9db50af6444a7fab50217126f67240",
+        "name": "VoterList::PendingRebag(5GHVr9CG3W7BHxmDLjGkmhXbV9jsgffNRfnZnDTwBmaq2E3a)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe70d68a7822c36b101bbab2b2a99f3ee4996e6e740d42bbccd49b9db50af6444a7fab50217126f67240",
+        "name": "Staking::Bonded(5GHVr9CG3W7BHxmDLjGkmhXbV9jsgffNRfnZnDTwBmaq2E3a)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8d80ddc77789076e6bc6841944320548bc95e245a32ecc0e9984bd3c1115456958339063025e8a386e",
+        "name": "VoterList::PendingRebag(5GYzaaqhPKuau2z4GKGFb4ufN7JbaCUpKENvw7kPb4vgWEeX)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe7080ddc77789076e6bc6841944320548bc95e245a32ecc0e9984bd3c1115456958339063025e8a386e",
+        "name": "Staking::Bonded(5GYzaaqhPKuau2z4GKGFb4ufN7JbaCUpKENvw7kPb4vgWEeX)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8d8a02017c335db873881c6798a727051309193ea75766650023c00e431a20b97c14db560e00e09612",
+        "name": "VoterList::PendingRebag(5F9AonT4GdkYmWwfSB8dkwTBpi6bPxcxrBNfFneoqBTXfDAE)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe708a02017c335db873881c6798a727051309193ea75766650023c00e431a20b97c14db560e00e09612",
+        "name": "Staking::Bonded(5F9AonT4GdkYmWwfSB8dkwTBpi6bPxcxrBNfFneoqBTXfDAE)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "System::ExecutionPhase",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7ff553b5a9862a516939d82b3d3d8661a",
+        "name": "System::ExecutionPhase",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "System::EventCount",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70a98fdbe9ce6c55837576c60c7af3850",
+        "name": "System::EventCount",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "ParachainSystem::AggregatedUnincludedSegment",
+        "key": "0x45323df7cc47150b3930e2666b0aa31383b1f3dac9e48c445ffcc08273cf02fc",
+        "name": "ParachainSystem::AggregatedUnincludedSegment",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "TransactionPayment::NextFeeMultiplier",
+        "key": "0x3f1467a096bcd71a5b6a0c8155e208103f2edf3bdf381debe331ab7446addfdc",
+        "name": "TransactionPayment::NextFeeMultiplier",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Aura::Authorities",
+        "key": "0x57f8dc2f5ab09467896f47300f0424385e0621c4869aa60c02be9adcc98a0d1d",
+        "name": "Aura::Authorities",
+        "repeated": 1
+      }
+    ]
+  },
+  {
+    "tag": "westend-18563565",
+    "duplicates": [
+      {
+        "phase": "initialization",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 71
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::Account",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da967ef5ab9c7c825ee83af02175102251692d9a77d1df37348f886454908c26557b741afbeac2c3d835476b9089b1f1c74",
+        "name": "System::Account(5FPFWFZefZF9343WLnGGUN3jdFhnasXNb8ZmvRTP1m4Fmtup)",
+        "repeated": 25
+      },
+      {
+        "phase": "finalization",
+        "item": "Balances::TotalIssuance",
+        "key": "0xc2261276cc9d1f8598ea4b6a74b15c2f57c875e4cff74148e4628f264b974c80",
+        "name": "Balances::TotalIssuance",
+        "repeated": 11
+      },
+      {
+        "phase": "finalization",
+        "item": "System::Account",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9e06aa0993e3384b5131e5263ad87e5036d6f646c6461702f627566661c73746167696e67000000000000000000000000",
+        "name": "System::Account(5EYCAe5gKBMwLZyq5dw41Hw3V68nsCVTZQ2d4AYfbMb4kF29)",
+        "repeated": 11
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::Lock",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7dfb1ef94455cc6b5a3840206754686d98",
+        "name": "VoterList::Lock",
+        "repeated": 10
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::Number",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef702a5c1b19ab7a04f536c519aca4983ac",
+        "name": "System::Number",
+        "repeated": 7
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::Account",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9644c83c91fbfb1e52261fd4be62c1526207ecd96dd52aef4df38010d5d78a7900a5751e927c492108b4103f16684da47",
+        "name": "System::Account(5CoK4Jsp47RP5zzMQ3AseaznD3mNaXYDN8fkRaGFfgYs1fip)",
+        "repeated": 7
+      },
+      {
+        "phase": "finalization",
+        "item": "System::Account",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da92acc3fa3d0cc237b2a5c1df9335875dc6d6f646c6461702f627566660000000000000000000000000000000000000000",
+        "name": "System::Account(5EYCAe5gKBMwLZyq5doL8n26pkA5pV6HSXdnmN4YawhPc2HH)",
+        "repeated": 7
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::Account",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9e06aa0993e3384b5131e5263ad87e5036d6f646c6461702f627566661c73746167696e67000000000000000000000000",
+        "name": "System::Account(5EYCAe5gKBMwLZyq5dw41Hw3V68nsCVTZQ2d4AYfbMb4kF29)",
+        "repeated": 6
+      },
+      {
+        "phase": "finalization",
+        "item": "ParachainSystem::RelevantMessagingState",
+        "key": "0x45323df7cc47150b3930e2666b0aa3132a47b0ddcc4fcdffe6c6b0b119e45c28",
+        "name": "ParachainSystem::RelevantMessagingState",
+        "repeated": 6
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::ExecutionPhase",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7ff553b5a9862a516939d82b3d3d8661a",
+        "name": "System::ExecutionPhase",
+        "repeated": 4
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::EventCount",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70a98fdbe9ce6c55837576c60c7af3850",
+        "name": "System::EventCount",
+        "repeated": 4
+      },
+      {
+        "phase": "finalization",
+        "item": "System::Digest",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef799e7f93fc6a98f0874fd057f111c4d2d",
+        "name": "System::Digest",
+        "repeated": 4
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::BlockHash",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7a44704b568d21667356a5a050c11874602981e1af4388cd5df411b01",
+        "name": "System::BlockHash(18563551)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b15510cacd907ce2e970cd679b8583405ece8ccc93b31eb4ded8679bcd4e9ccb8a5b1431d7da3936e65",
+        "name": "VoterList::ListNodes(5CMY9KgBSoCpUdGhU1omowHHYYa4uDtwBdbxzcm8PpH1W4op)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b15ab3164f7fe48aef0aa7df86767a722563d5e80cf7e6bea804e40faddbe5192f67c7836364df2c218",
+        "name": "VoterList::ListNodes(5FvFREJWG7dq1ci6jCrDgE8SbR5e3wYcg2QxCHjX32SismD8)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b15f8bc5b6c0225081644e495bb4d451517ddc9f798aeae3af7767a2111f62da072816c4dbaba818366",
+        "name": "VoterList::ListNodes(5Dd31xAhzdBBf8TmL8J6YAeTyLJBp1DraeJZ8NX7Mci9WVYd)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b1528fa0c2f727a5b365c5e61f0110be005e38f48b98dcf4106b2c835b3c5dc96b57168e8d1a669c76e",
+        "name": "VoterList::ListNodes(5E9pJMZe69bdWtNHFKPznJvn4NvzAyZVoXPB5NSZ2q9hWfgu)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b15d82b9c94083d21d7ace0152f09c49f2f53c1da2984ddf3126c11ea8152b6f2d8d9ad6c7839317a5d",
+        "name": "VoterList::ListNodes(5FyNfDrZRoNJxgxqr2afjSnkLsjKczsXmtBMr5XXQ9vw3eJh)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b157cf23bcd07e7028f16812365a009290172ee855316f3cd23efa222472d38a82c311c7adf879e8e3a",
+        "name": "VoterList::ListNodes(5CaDGmdGCqvq2NZRqvpygLMjYhJ43Lt1Zwb4YVbeasm2Vrsh)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b1578f945f979afbb71044ef393a6c0f9ed2e8409a47f7e05688f356b9acddd9fb3ad8f8b7102162f76",
+        "name": "VoterList::ListNodes(5CAMW5c25BpuutwDrkToxPG1hSVak2RUwqTshw1ny5j3n179)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b156c04c2c5fbcd78b70e4248e4eea31d5cf17dbe0efac08164304797a8b3208a8294440f7c6f97331d",
+        "name": "VoterList::ListNodes(5CPQDcNYb3radLnjJHTY6s2aEbFSaLdVQuzeRphHXQpDL5aW)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b1547407f8d723451aa40459e6709b13d4de41d50baf115b9d71df3696f4c5b0153b938c5a649cf0651",
+        "name": "VoterList::ListNodes(5DWybvKQFtx5eWPngHCu4nYCkR9R5JM2vUm29gVdPtU5FiW8)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b1570223a37ad39b47b784c557ac807bbd670fbaa1c8a01a564e02bf9950e30023a8dbfb8ea587c3f54",
+        "name": "VoterList::ListNodes(5EnSH9b16VtsHcKfa8hhdVuTh7Z32twZnSx8NsDNgcvrR1z6)",
+        "repeated": 3
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Digest",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef799e7f93fc6a98f0874fd057f111c4d2d",
+        "name": "System::Digest",
+        "repeated": 2
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "MultiBlockElection::CurrentPhase",
+        "key": "0xb4033c147baa712e4c2772a8afe0f1a9d9764401941df7f707a47ba7db64a6ea",
+        "name": "MultiBlockElection::CurrentPhase",
+        "repeated": 2
+      },
+      {
+        "phase": "finalization",
+        "item": "System::Number",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef702a5c1b19ab7a04f536c519aca4983ac",
+        "name": "System::Number",
+        "repeated": 2
+      },
+      {
+        "phase": "finalization",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 2
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Number",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef702a5c1b19ab7a04f536c519aca4983ac",
+        "name": "System::Number",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "Aura::Authorities",
+        "key": "0x57f8dc2f5ab09467896f47300f0424385e0621c4869aa60c02be9adcc98a0d1d",
+        "name": "Aura::Authorities",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "ToRococoXcmRouter::Bridge",
+        "key": "0x5bdfcd0c43765de6dd54ccc0fe974e696bbd34f158a9e1a5e5600b03adee7932",
+        "name": "ToRococoXcmRouter::Bridge",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "Staking::ActiveEra",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca487df464e44a534ba6b0cbb32407b587",
+        "name": "Staking::ActiveEra",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "ParachainSystem::ValidationData",
+        "key": "0x45323df7cc47150b3930e2666b0aa313d422e17d2affdce4a912d187a734dd67",
+        "name": "ParachainSystem::ValidationData",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "ParachainSystem::LastRelayChainBlockNumber",
+        "key": "0x45323df7cc47150b3930e2666b0aa313a2bca190d36bd834cc73a38fc213ecbd",
+        "name": "ParachainSystem::LastRelayChainBlockNumber",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::UnincludedSegment",
+        "key": "0x45323df7cc47150b3930e2666b0aa313814b57463709b05d35c5acae79a17726",
+        "name": "ParachainSystem::UnincludedSegment",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::BlockSize",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7dd2ecd4efaa88c313bb2e876dc3521ea",
+        "name": "System::BlockSize",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": ":transaction_level:",
+        "key": "0x3a7472616e73616374696f6e5f6c6576656c3a",
+        "name": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70ccf055743738b7a91a6fb88ece33cac",
+        "name": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": ":extrinsic_index",
+        "key": "0x3a65787472696e7369635f696e646578",
+        "name": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": ":transaction_level:",
+        "key": "0x3a7472616e73616374696f6e5f6c6576656c3a",
+        "name": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70ccf055743738b7a91a6fb88ece33cac",
+        "name": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": ":extrinsic_index",
+        "key": "0x3a65787472696e7369635f696e646578",
+        "name": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::BlockHash",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7a44704b568d21667356a5a050c118746b4def25cfda6ef3a00000000",
+        "name": "System::BlockHash(0)",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "Balances::TotalIssuance",
+        "key": "0xc2261276cc9d1f8598ea4b6a74b15c2f57c875e4cff74148e4628f264b974c80",
+        "name": "Balances::TotalIssuance",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": ":transaction_level:",
+        "key": "0x3a7472616e73616374696f6e5f6c6576656c3a",
+        "name": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "TransactionPayment::NextFeeMultiplier",
+        "key": "0x3f1467a096bcd71a5b6a0c8155e208103f2edf3bdf381debe331ab7446addfdc",
+        "name": "TransactionPayment::NextFeeMultiplier",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "TransactionPayment::TxPaymentCredit",
+        "key": "0x3f1467a096bcd71a5b6a0c8155e208100cc287492ef5475a4197b7ed4d36b3f6",
+        "name": "TransactionPayment::TxPaymentCredit",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70ccf055743738b7a91a6fb88ece33cac",
+        "name": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::BlockSize",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7dd2ecd4efaa88c313bb2e876dc3521ea",
+        "name": "System::BlockSize",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": ":extrinsic_index",
+        "key": "0x3a65787472696e7369635f696e646578",
+        "name": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "MultiBlockMigrations::Cursor",
+        "key": "0x0b20199ace3564d0964e2c4d4a9ba46987b188618944a73221aaabb35521b0a1",
+        "name": "MultiBlockMigrations::Cursor",
+        "repeated": 1
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8d510cacd907ce2e970cd679b8583405ece8ccc93b31eb4ded8679bcd4e9ccb8a5b1431d7da3936e65",
+        "name": "VoterList::PendingRebag(5CMY9KgBSoCpUdGhU1omowHHYYa4uDtwBdbxzcm8PpH1W4op)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe70510cacd907ce2e970cd679b8583405ece8ccc93b31eb4ded8679bcd4e9ccb8a5b1431d7da3936e65",
+        "name": "Staking::Bonded(5CMY9KgBSoCpUdGhU1omowHHYYa4uDtwBdbxzcm8PpH1W4op)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8dab3164f7fe48aef0aa7df86767a722563d5e80cf7e6bea804e40faddbe5192f67c7836364df2c218",
+        "name": "VoterList::PendingRebag(5FvFREJWG7dq1ci6jCrDgE8SbR5e3wYcg2QxCHjX32SismD8)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe70ab3164f7fe48aef0aa7df86767a722563d5e80cf7e6bea804e40faddbe5192f67c7836364df2c218",
+        "name": "Staking::Bonded(5FvFREJWG7dq1ci6jCrDgE8SbR5e3wYcg2QxCHjX32SismD8)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8df8bc5b6c0225081644e495bb4d451517ddc9f798aeae3af7767a2111f62da072816c4dbaba818366",
+        "name": "VoterList::PendingRebag(5Dd31xAhzdBBf8TmL8J6YAeTyLJBp1DraeJZ8NX7Mci9WVYd)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe70f8bc5b6c0225081644e495bb4d451517ddc9f798aeae3af7767a2111f62da072816c4dbaba818366",
+        "name": "Staking::Bonded(5Dd31xAhzdBBf8TmL8J6YAeTyLJBp1DraeJZ8NX7Mci9WVYd)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8d28fa0c2f727a5b365c5e61f0110be005e38f48b98dcf4106b2c835b3c5dc96b57168e8d1a669c76e",
+        "name": "VoterList::PendingRebag(5E9pJMZe69bdWtNHFKPznJvn4NvzAyZVoXPB5NSZ2q9hWfgu)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe7028fa0c2f727a5b365c5e61f0110be005e38f48b98dcf4106b2c835b3c5dc96b57168e8d1a669c76e",
+        "name": "Staking::Bonded(5E9pJMZe69bdWtNHFKPznJvn4NvzAyZVoXPB5NSZ2q9hWfgu)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8dd82b9c94083d21d7ace0152f09c49f2f53c1da2984ddf3126c11ea8152b6f2d8d9ad6c7839317a5d",
+        "name": "VoterList::PendingRebag(5FyNfDrZRoNJxgxqr2afjSnkLsjKczsXmtBMr5XXQ9vw3eJh)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe70d82b9c94083d21d7ace0152f09c49f2f53c1da2984ddf3126c11ea8152b6f2d8d9ad6c7839317a5d",
+        "name": "Staking::Bonded(5FyNfDrZRoNJxgxqr2afjSnkLsjKczsXmtBMr5XXQ9vw3eJh)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8d7cf23bcd07e7028f16812365a009290172ee855316f3cd23efa222472d38a82c311c7adf879e8e3a",
+        "name": "VoterList::PendingRebag(5CaDGmdGCqvq2NZRqvpygLMjYhJ43Lt1Zwb4YVbeasm2Vrsh)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe707cf23bcd07e7028f16812365a009290172ee855316f3cd23efa222472d38a82c311c7adf879e8e3a",
+        "name": "Staking::Bonded(5CaDGmdGCqvq2NZRqvpygLMjYhJ43Lt1Zwb4YVbeasm2Vrsh)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8d78f945f979afbb71044ef393a6c0f9ed2e8409a47f7e05688f356b9acddd9fb3ad8f8b7102162f76",
+        "name": "VoterList::PendingRebag(5CAMW5c25BpuutwDrkToxPG1hSVak2RUwqTshw1ny5j3n179)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe7078f945f979afbb71044ef393a6c0f9ed2e8409a47f7e05688f356b9acddd9fb3ad8f8b7102162f76",
+        "name": "Staking::Bonded(5CAMW5c25BpuutwDrkToxPG1hSVak2RUwqTshw1ny5j3n179)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8d6c04c2c5fbcd78b70e4248e4eea31d5cf17dbe0efac08164304797a8b3208a8294440f7c6f97331d",
+        "name": "VoterList::PendingRebag(5CPQDcNYb3radLnjJHTY6s2aEbFSaLdVQuzeRphHXQpDL5aW)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe706c04c2c5fbcd78b70e4248e4eea31d5cf17dbe0efac08164304797a8b3208a8294440f7c6f97331d",
+        "name": "Staking::Bonded(5CPQDcNYb3radLnjJHTY6s2aEbFSaLdVQuzeRphHXQpDL5aW)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8d47407f8d723451aa40459e6709b13d4de41d50baf115b9d71df3696f4c5b0153b938c5a649cf0651",
+        "name": "VoterList::PendingRebag(5DWybvKQFtx5eWPngHCu4nYCkR9R5JM2vUm29gVdPtU5FiW8)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe7047407f8d723451aa40459e6709b13d4de41d50baf115b9d71df3696f4c5b0153b938c5a649cf0651",
+        "name": "Staking::Bonded(5DWybvKQFtx5eWPngHCu4nYCkR9R5JM2vUm29gVdPtU5FiW8)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8d70223a37ad39b47b784c557ac807bbd670fbaa1c8a01a564e02bf9950e30023a8dbfb8ea587c3f54",
+        "name": "VoterList::PendingRebag(5EnSH9b16VtsHcKfa8hhdVuTh7Z32twZnSx8NsDNgcvrR1z6)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe7070223a37ad39b47b784c557ac807bbd670fbaa1c8a01a564e02bf9950e30023a8dbfb8ea587c3f54",
+        "name": "Staking::Bonded(5EnSH9b16VtsHcKfa8hhdVuTh7Z32twZnSx8NsDNgcvrR1z6)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "System::ExecutionPhase",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7ff553b5a9862a516939d82b3d3d8661a",
+        "name": "System::ExecutionPhase",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "System::EventCount",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70a98fdbe9ce6c55837576c60c7af3850",
+        "name": "System::EventCount",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "ParachainSystem::AggregatedUnincludedSegment",
+        "key": "0x45323df7cc47150b3930e2666b0aa31383b1f3dac9e48c445ffcc08273cf02fc",
+        "name": "ParachainSystem::AggregatedUnincludedSegment",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "TransactionPayment::NextFeeMultiplier",
+        "key": "0x3f1467a096bcd71a5b6a0c8155e208103f2edf3bdf381debe331ab7446addfdc",
+        "name": "TransactionPayment::NextFeeMultiplier",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Aura::Authorities",
+        "key": "0x57f8dc2f5ab09467896f47300f0424385e0621c4869aa60c02be9adcc98a0d1d",
+        "name": "Aura::Authorities",
+        "repeated": 1
+      }
+    ]
+  },
+  {
+    "tag": "westend-18563595",
+    "duplicates": [
+      {
+        "phase": "initialization",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 71
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::Account",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9644c83c91fbfb1e52261fd4be62c1526207ecd96dd52aef4df38010d5d78a7900a5751e927c492108b4103f16684da47",
+        "name": "System::Account(5CoK4Jsp47RP5zzMQ3AseaznD3mNaXYDN8fkRaGFfgYs1fip)",
+        "repeated": 25
+      },
+      {
+        "phase": "finalization",
+        "item": "Balances::TotalIssuance",
+        "key": "0xc2261276cc9d1f8598ea4b6a74b15c2f57c875e4cff74148e4628f264b974c80",
+        "name": "Balances::TotalIssuance",
+        "repeated": 11
+      },
+      {
+        "phase": "finalization",
+        "item": "System::Account",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9e06aa0993e3384b5131e5263ad87e5036d6f646c6461702f627566661c73746167696e67000000000000000000000000",
+        "name": "System::Account(5EYCAe5gKBMwLZyq5dw41Hw3V68nsCVTZQ2d4AYfbMb4kF29)",
+        "repeated": 11
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::Lock",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7dfb1ef94455cc6b5a3840206754686d98",
+        "name": "VoterList::Lock",
+        "repeated": 10
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::Number",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef702a5c1b19ab7a04f536c519aca4983ac",
+        "name": "System::Number",
+        "repeated": 7
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::Account",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da967ef5ab9c7c825ee83af02175102251692d9a77d1df37348f886454908c26557b741afbeac2c3d835476b9089b1f1c74",
+        "name": "System::Account(5FPFWFZefZF9343WLnGGUN3jdFhnasXNb8ZmvRTP1m4Fmtup)",
+        "repeated": 7
+      },
+      {
+        "phase": "finalization",
+        "item": "System::Account",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da92acc3fa3d0cc237b2a5c1df9335875dc6d6f646c6461702f627566660000000000000000000000000000000000000000",
+        "name": "System::Account(5EYCAe5gKBMwLZyq5doL8n26pkA5pV6HSXdnmN4YawhPc2HH)",
+        "repeated": 7
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::Account",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7b99d880ec681799c0cf30e8886371da9e06aa0993e3384b5131e5263ad87e5036d6f646c6461702f627566661c73746167696e67000000000000000000000000",
+        "name": "System::Account(5EYCAe5gKBMwLZyq5dw41Hw3V68nsCVTZQ2d4AYfbMb4kF29)",
+        "repeated": 6
+      },
+      {
+        "phase": "finalization",
+        "item": "ParachainSystem::RelevantMessagingState",
+        "key": "0x45323df7cc47150b3930e2666b0aa3132a47b0ddcc4fcdffe6c6b0b119e45c28",
+        "name": "ParachainSystem::RelevantMessagingState",
+        "repeated": 6
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::ExecutionPhase",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7ff553b5a9862a516939d82b3d3d8661a",
+        "name": "System::ExecutionPhase",
+        "repeated": 4
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::EventCount",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70a98fdbe9ce6c55837576c60c7af3850",
+        "name": "System::EventCount",
+        "repeated": 4
+      },
+      {
+        "phase": "finalization",
+        "item": "System::Digest",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef799e7f93fc6a98f0874fd057f111c4d2d",
+        "name": "System::Digest",
+        "repeated": 4
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::BlockHash",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7a44704b568d21667356a5a050c1187460b2db1b1ab709340fd411b01",
+        "name": "System::BlockHash(18563581)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b15aea3c1327f4741786844687f61f8492e876eb5b99c2243639f924a6304e54f8e9e78a88bc637aa29",
+        "name": "VoterList::ListNodes(5ERRA9wmMAZ2Bp2o7QZ3xAqykuwbp57a827ZgD95ZcBZuxNt)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b15c8e2333bc4ed07a2729478b8be0740e9345f7ab48669ebb6c3561d59e51444ed5938d4acbe81b713",
+        "name": "VoterList::ListNodes(5EewRPTUNMZ6CoXmd3Lyzxm9TqwngxWVip13PxPSizk6hxAy)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b1587af2bc4ce389dc28c681bf308895e8bf2202324b0a483a9600081ad2965371a47af3423b0910e63",
+        "name": "VoterList::ListNodes(5FEoVFZhEwYp81oQuvc4QzxnnMLF6yeA3fZm3vCYZKj5Xweo)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b155a32c1c890cd2b41c203ae76c3bd39cde847989acb88d52789d8bd8c9007813ec1053b293d30180b",
+        "name": "VoterList::ListNodes(5GT6Eu3qP2f2kAFMznZ2Wf9QFrgqLXuaZZ7UVjxGCuUZ6JG8)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b15bf0b057405079c36b8b7f3a09b1cd7966ffed39ce37c3ec298856f3e47b295cbe22991157f58e316",
+        "name": "VoterList::ListNodes(5GEuK7CsvUtq48FK634nE7M27KrcfGRkYW2MTAALbxhVEaQ5)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b152400e8629b113016e02de62c8cabb7d0cab4c3c0c59407a3344ea4a6f8ce5f4cf07dbe440bdbf613",
+        "name": "VoterList::ListNodes(5H8eDcM1Zose8dJRktBhRwrtNSe6vnDqFueoAW2mdHr4rSgo)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b15ea4e644e8c8546cc1a8152047871d7a031466480fc9ea2cba750ac389f0e0ccdf0c54196a89c9e3d",
+        "name": "VoterList::ListNodes(5CfTX1x2GKAhxAaikp7ucopM2hwuaMibvJsFx4L6ajpbjRuL)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b1551d0bf627e89ab2eca7637875c1b10cc675c905835119233224b617bbefca79509b5383f389fa20a",
+        "name": "VoterList::ListNodes(5GeAeWsfLHNp2XS8WqS2PxnLJUWCUi162d351z3XALhSW8L3)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b15a97d1fcdcf39e3932689e467af4205d692b3548d55f805da6a31cc6e1e08436a1f04f60231ba4114",
+        "name": "VoterList::ListNodes(5CwEe2vpfwfUFmHhZSaSVDmVPThdvh4ShXyAVaNy1y4tX7PE)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b153e88f39c8e9f4e7d8a2e9bd7fc2731490b03740561603868bd3df0dc862323c28331018bc765d07a",
+        "name": "VoterList::ListNodes(5FBtJzGhc3em88WnGTSZNZfmCobxtPpqjnsL8vCYwZApLsKC)",
+        "repeated": 3
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Digest",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef799e7f93fc6a98f0874fd057f111c4d2d",
+        "name": "System::Digest",
+        "repeated": 2
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "MultiBlockElection::CurrentPhase",
+        "key": "0xb4033c147baa712e4c2772a8afe0f1a9d9764401941df7f707a47ba7db64a6ea",
+        "name": "MultiBlockElection::CurrentPhase",
+        "repeated": 2
+      },
+      {
+        "phase": "finalization",
+        "item": "System::Number",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef702a5c1b19ab7a04f536c519aca4983ac",
+        "name": "System::Number",
+        "repeated": 2
+      },
+      {
+        "phase": "finalization",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 2
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Number",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef702a5c1b19ab7a04f536c519aca4983ac",
+        "name": "System::Number",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "Aura::Authorities",
+        "key": "0x57f8dc2f5ab09467896f47300f0424385e0621c4869aa60c02be9adcc98a0d1d",
+        "name": "Aura::Authorities",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "ToRococoXcmRouter::Bridge",
+        "key": "0x5bdfcd0c43765de6dd54ccc0fe974e696bbd34f158a9e1a5e5600b03adee7932",
+        "name": "ToRococoXcmRouter::Bridge",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "Staking::ActiveEra",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca487df464e44a534ba6b0cbb32407b587",
+        "name": "Staking::ActiveEra",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "ParachainSystem::ValidationData",
+        "key": "0x45323df7cc47150b3930e2666b0aa313d422e17d2affdce4a912d187a734dd67",
+        "name": "ParachainSystem::ValidationData",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "ParachainSystem::LastRelayChainBlockNumber",
+        "key": "0x45323df7cc47150b3930e2666b0aa313a2bca190d36bd834cc73a38fc213ecbd",
+        "name": "ParachainSystem::LastRelayChainBlockNumber",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::UnincludedSegment",
+        "key": "0x45323df7cc47150b3930e2666b0aa313814b57463709b05d35c5acae79a17726",
+        "name": "ParachainSystem::UnincludedSegment",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::BlockSize",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7dd2ecd4efaa88c313bb2e876dc3521ea",
+        "name": "System::BlockSize",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": ":transaction_level:",
+        "key": "0x3a7472616e73616374696f6e5f6c6576656c3a",
+        "name": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70ccf055743738b7a91a6fb88ece33cac",
+        "name": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": ":extrinsic_index",
+        "key": "0x3a65787472696e7369635f696e646578",
+        "name": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": ":transaction_level:",
+        "key": "0x3a7472616e73616374696f6e5f6c6576656c3a",
+        "name": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70ccf055743738b7a91a6fb88ece33cac",
+        "name": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": ":extrinsic_index",
+        "key": "0x3a65787472696e7369635f696e646578",
+        "name": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::BlockHash",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7a44704b568d21667356a5a050c118746b4def25cfda6ef3a00000000",
+        "name": "System::BlockHash(0)",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "Balances::TotalIssuance",
+        "key": "0xc2261276cc9d1f8598ea4b6a74b15c2f57c875e4cff74148e4628f264b974c80",
+        "name": "Balances::TotalIssuance",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": ":transaction_level:",
+        "key": "0x3a7472616e73616374696f6e5f6c6576656c3a",
+        "name": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "TransactionPayment::NextFeeMultiplier",
+        "key": "0x3f1467a096bcd71a5b6a0c8155e208103f2edf3bdf381debe331ab7446addfdc",
+        "name": "TransactionPayment::NextFeeMultiplier",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "TransactionPayment::TxPaymentCredit",
+        "key": "0x3f1467a096bcd71a5b6a0c8155e208100cc287492ef5475a4197b7ed4d36b3f6",
+        "name": "TransactionPayment::TxPaymentCredit",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70ccf055743738b7a91a6fb88ece33cac",
+        "name": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": "System::BlockSize",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7dd2ecd4efaa88c313bb2e876dc3521ea",
+        "name": "System::BlockSize",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 2: Balances.transfer_keep_alive",
+        "item": ":extrinsic_index",
+        "key": "0x3a65787472696e7369635f696e646578",
+        "name": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "MultiBlockMigrations::Cursor",
+        "key": "0x0b20199ace3564d0964e2c4d4a9ba46987b188618944a73221aaabb35521b0a1",
+        "name": "MultiBlockMigrations::Cursor",
+        "repeated": 1
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8daea3c1327f4741786844687f61f8492e876eb5b99c2243639f924a6304e54f8e9e78a88bc637aa29",
+        "name": "VoterList::PendingRebag(5ERRA9wmMAZ2Bp2o7QZ3xAqykuwbp57a827ZgD95ZcBZuxNt)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe70aea3c1327f4741786844687f61f8492e876eb5b99c2243639f924a6304e54f8e9e78a88bc637aa29",
+        "name": "Staking::Bonded(5ERRA9wmMAZ2Bp2o7QZ3xAqykuwbp57a827ZgD95ZcBZuxNt)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8dc8e2333bc4ed07a2729478b8be0740e9345f7ab48669ebb6c3561d59e51444ed5938d4acbe81b713",
+        "name": "VoterList::PendingRebag(5EewRPTUNMZ6CoXmd3Lyzxm9TqwngxWVip13PxPSizk6hxAy)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe70c8e2333bc4ed07a2729478b8be0740e9345f7ab48669ebb6c3561d59e51444ed5938d4acbe81b713",
+        "name": "Staking::Bonded(5EewRPTUNMZ6CoXmd3Lyzxm9TqwngxWVip13PxPSizk6hxAy)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8d87af2bc4ce389dc28c681bf308895e8bf2202324b0a483a9600081ad2965371a47af3423b0910e63",
+        "name": "VoterList::PendingRebag(5FEoVFZhEwYp81oQuvc4QzxnnMLF6yeA3fZm3vCYZKj5Xweo)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe7087af2bc4ce389dc28c681bf308895e8bf2202324b0a483a9600081ad2965371a47af3423b0910e63",
+        "name": "Staking::Bonded(5FEoVFZhEwYp81oQuvc4QzxnnMLF6yeA3fZm3vCYZKj5Xweo)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8d5a32c1c890cd2b41c203ae76c3bd39cde847989acb88d52789d8bd8c9007813ec1053b293d30180b",
+        "name": "VoterList::PendingRebag(5GT6Eu3qP2f2kAFMznZ2Wf9QFrgqLXuaZZ7UVjxGCuUZ6JG8)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe705a32c1c890cd2b41c203ae76c3bd39cde847989acb88d52789d8bd8c9007813ec1053b293d30180b",
+        "name": "Staking::Bonded(5GT6Eu3qP2f2kAFMznZ2Wf9QFrgqLXuaZZ7UVjxGCuUZ6JG8)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8dbf0b057405079c36b8b7f3a09b1cd7966ffed39ce37c3ec298856f3e47b295cbe22991157f58e316",
+        "name": "VoterList::PendingRebag(5GEuK7CsvUtq48FK634nE7M27KrcfGRkYW2MTAALbxhVEaQ5)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe70bf0b057405079c36b8b7f3a09b1cd7966ffed39ce37c3ec298856f3e47b295cbe22991157f58e316",
+        "name": "Staking::Bonded(5GEuK7CsvUtq48FK634nE7M27KrcfGRkYW2MTAALbxhVEaQ5)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8d2400e8629b113016e02de62c8cabb7d0cab4c3c0c59407a3344ea4a6f8ce5f4cf07dbe440bdbf613",
+        "name": "VoterList::PendingRebag(5H8eDcM1Zose8dJRktBhRwrtNSe6vnDqFueoAW2mdHr4rSgo)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe702400e8629b113016e02de62c8cabb7d0cab4c3c0c59407a3344ea4a6f8ce5f4cf07dbe440bdbf613",
+        "name": "Staking::Bonded(5H8eDcM1Zose8dJRktBhRwrtNSe6vnDqFueoAW2mdHr4rSgo)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8dea4e644e8c8546cc1a8152047871d7a031466480fc9ea2cba750ac389f0e0ccdf0c54196a89c9e3d",
+        "name": "VoterList::PendingRebag(5CfTX1x2GKAhxAaikp7ucopM2hwuaMibvJsFx4L6ajpbjRuL)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe70ea4e644e8c8546cc1a8152047871d7a031466480fc9ea2cba750ac389f0e0ccdf0c54196a89c9e3d",
+        "name": "Staking::Bonded(5CfTX1x2GKAhxAaikp7ucopM2hwuaMibvJsFx4L6ajpbjRuL)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8d51d0bf627e89ab2eca7637875c1b10cc675c905835119233224b617bbefca79509b5383f389fa20a",
+        "name": "VoterList::PendingRebag(5GeAeWsfLHNp2XS8WqS2PxnLJUWCUi162d351z3XALhSW8L3)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe7051d0bf627e89ab2eca7637875c1b10cc675c905835119233224b617bbefca79509b5383f389fa20a",
+        "name": "Staking::Bonded(5GeAeWsfLHNp2XS8WqS2PxnLJUWCUi162d351z3XALhSW8L3)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8da97d1fcdcf39e3932689e467af4205d692b3548d55f805da6a31cc6e1e08436a1f04f60231ba4114",
+        "name": "VoterList::PendingRebag(5CwEe2vpfwfUFmHhZSaSVDmVPThdvh4ShXyAVaNy1y4tX7PE)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe70a97d1fcdcf39e3932689e467af4205d692b3548d55f805da6a31cc6e1e08436a1f04f60231ba4114",
+        "name": "Staking::Bonded(5CwEe2vpfwfUFmHhZSaSVDmVPThdvh4ShXyAVaNy1y4tX7PE)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8d3e88f39c8e9f4e7d8a2e9bd7fc2731490b03740561603868bd3df0dc862323c28331018bc765d07a",
+        "name": "VoterList::PendingRebag(5FBtJzGhc3em88WnGTSZNZfmCobxtPpqjnsL8vCYwZApLsKC)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe703e88f39c8e9f4e7d8a2e9bd7fc2731490b03740561603868bd3df0dc862323c28331018bc765d07a",
+        "name": "Staking::Bonded(5FBtJzGhc3em88WnGTSZNZfmCobxtPpqjnsL8vCYwZApLsKC)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "System::ExecutionPhase",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7ff553b5a9862a516939d82b3d3d8661a",
+        "name": "System::ExecutionPhase",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "System::EventCount",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70a98fdbe9ce6c55837576c60c7af3850",
+        "name": "System::EventCount",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "ParachainSystem::AggregatedUnincludedSegment",
+        "key": "0x45323df7cc47150b3930e2666b0aa31383b1f3dac9e48c445ffcc08273cf02fc",
+        "name": "ParachainSystem::AggregatedUnincludedSegment",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "TransactionPayment::NextFeeMultiplier",
+        "key": "0x3f1467a096bcd71a5b6a0c8155e208103f2edf3bdf381debe331ab7446addfdc",
+        "name": "TransactionPayment::NextFeeMultiplier",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Aura::Authorities",
+        "key": "0x57f8dc2f5ab09467896f47300f0424385e0621c4869aa60c02be9adcc98a0d1d",
+        "name": "Aura::Authorities",
+        "repeated": 1
+      }
+    ]
+  },
+  {
+    "tag": "westend-18563608",
+    "duplicates": [
+      {
+        "phase": "initialization",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 71
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::Lock",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7dfb1ef94455cc6b5a3840206754686d98",
+        "name": "VoterList::Lock",
+        "repeated": 10
+      },
+      {
+        "phase": "finalization",
+        "item": "Balances::TotalIssuance",
+        "key": "0xc2261276cc9d1f8598ea4b6a74b15c2f57c875e4cff74148e4628f264b974c80",
+        "name": "Balances::TotalIssuance",
+        "repeated": 9
+      },
+      {
+        "phase": "finalization",
+        "item": "ParachainSystem::RelevantMessagingState",
+        "key": "0x45323df7cc47150b3930e2666b0aa3132a47b0ddcc4fcdffe6c6b0b119e45c28",
+        "name": "ParachainSystem::RelevantMessagingState",
+        "repeated": 6
+      },
+      {
+        "phase": "finalization",
+        "item": "System::Digest",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef799e7f93fc6a98f0874fd057f111c4d2d",
+        "name": "System::Digest",
+        "repeated": 4
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b151d2912b28e735cffe05dac2b87120844788ce49a40a14da6a6314be3ac9214ed44971f971de2ae62",
+        "name": "VoterList::ListNodes(5H8tQj8FUiu1A8gx1aMEa1Cuw8ReQefz2zfuBZWP6zPDhf8b)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b1522598d50eaa4364ca6ca52fa5c0f8275b834f6aea771ca7d896d2e100ddc9bc03efeba0ec056a626",
+        "name": "VoterList::ListNodes(5FqPufbp1YdWwFs71HFuckkzHH9oZPSYRBkBuH3nqgr4ZzKq)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b155618f4f5bd6234a6d09302585c7054e1e322ec4c21c633887186a3f734d3790b24b7ce7106633128",
+        "name": "VoterList::ListNodes(5GnBVFxX3tuQGENZHojFnxJJzWYAWwmGhD3R7oB4mmadvzcD)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b1515c7ea63fe73764efad5e19aa79c4820fa145fa951cdaf2f8f8e5eec59b0815c5c65397da0ebf34f",
+        "name": "VoterList::ListNodes(5HjbN5uWPbSk2xAv17f8DHCvpczp5nUqvNKKg3kRdm2EnsLB)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b154cc2297182455b92ec45c1fc19c9bbf5894d7236bb5f7275778936a509f7b161936c4361feaa9c5a",
+        "name": "VoterList::ListNodes(5HQVt1gwpPoKTsUeE91BQL54Jzsc1iNcmucb9Phnbxm54Syy)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b15c4621896ae7f2ee988d7d8266f1d89121879034f36d7616ff37d7c75ee4d5130fb35cf371b6d2c20",
+        "name": "VoterList::ListNodes(5FA8VJ3RE4VfsRmC4VJHAqVcLod8w6yZqEgyGFXf77DAce74)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b15b859ae3ab9767b5976dc611cf99d2524c13e3ed49eba03bbd9be1b3921714a0e973b9d719a2d6138",
+        "name": "VoterList::ListNodes(5EkYySSYMN82BwaFX1UD8xgaz6iXv5u8NPWPQV4fUmY1esCW)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b15f44739864bf6901d805b3fb5161c81c8fc4937d16abfcd9f28332874ef6d81489b00b20488deaf53",
+        "name": "VoterList::ListNodes(5Ey16M2CeR95WGcKaEUSCeVCabvXm3oYnMbjGtL3d44rLpBL)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b1569bb851744c1c7800263e9b2493d2ddf121c9ab86301ad9ea99633ebeb0ddc4b50e5208726fe2d2d",
+        "name": "VoterList::ListNodes(5C7qdgX4KReX3TNNiGQrhiTGqMfdGEruwKq1zrfu28Un2GsP)",
+        "repeated": 3
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::ListNodes",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7d62556a85fcb7c61b2c6c750924846b15bf40e864122618e8408386088f1372e51bc46ff70ada23cf0a74fe2df08af2f748a62246ec2cbc1e",
+        "name": "VoterList::ListNodes(5DXHzWq3At3cWXyfaZ1KV3x5SRnUy1nisosAt9poHKow3Tdz)",
+        "repeated": 3
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Digest",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef799e7f93fc6a98f0874fd057f111c4d2d",
+        "name": "System::Digest",
+        "repeated": 2
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "MultiBlockElection::CurrentPhase",
+        "key": "0xb4033c147baa712e4c2772a8afe0f1a9d9764401941df7f707a47ba7db64a6ea",
+        "name": "MultiBlockElection::CurrentPhase",
+        "repeated": 2
+      },
+      {
+        "phase": "finalization",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 2
+      },
+      {
+        "phase": "initialization",
+        "item": "System::Number",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef702a5c1b19ab7a04f536c519aca4983ac",
+        "name": "System::Number",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "Aura::Authorities",
+        "key": "0x57f8dc2f5ab09467896f47300f0424385e0621c4869aa60c02be9adcc98a0d1d",
+        "name": "Aura::Authorities",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "ToRococoXcmRouter::Bridge",
+        "key": "0x5bdfcd0c43765de6dd54ccc0fe974e696bbd34f158a9e1a5e5600b03adee7932",
+        "name": "ToRococoXcmRouter::Bridge",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "Staking::ActiveEra",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca487df464e44a534ba6b0cbb32407b587",
+        "name": "Staking::ActiveEra",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "ParachainSystem::ValidationData",
+        "key": "0x45323df7cc47150b3930e2666b0aa313d422e17d2affdce4a912d187a734dd67",
+        "name": "ParachainSystem::ValidationData",
+        "repeated": 1
+      },
+      {
+        "phase": "initialization",
+        "item": "ParachainSystem::LastRelayChainBlockNumber",
+        "key": "0x45323df7cc47150b3930e2666b0aa313a2bca190d36bd834cc73a38fc213ecbd",
+        "name": "ParachainSystem::LastRelayChainBlockNumber",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::UnincludedSegment",
+        "key": "0x45323df7cc47150b3930e2666b0aa313814b57463709b05d35c5acae79a17726",
+        "name": "ParachainSystem::UnincludedSegment",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::BlockSize",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef7dd2ecd4efaa88c313bb2e876dc3521ea",
+        "name": "System::BlockSize",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "ParachainSystem::AggregatedUnincludedSegment",
+        "key": "0x45323df7cc47150b3930e2666b0aa31383b1f3dac9e48c445ffcc08273cf02fc",
+        "name": "ParachainSystem::AggregatedUnincludedSegment",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": ":transaction_level:",
+        "key": "0x3a7472616e73616374696f6e5f6c6576656c3a",
+        "name": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70ccf055743738b7a91a6fb88ece33cac",
+        "name": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 0: ParachainSystem.set_validation_data",
+        "item": ":extrinsic_index",
+        "key": "0x3a65787472696e7369635f696e646578",
+        "name": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": ":transaction_level:",
+        "key": "0x3a7472616e73616374696f6e5f6c6576656c3a",
+        "name": ":transaction_level:",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": "System::ExtrinsicWeightReclaimed",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef70ccf055743738b7a91a6fb88ece33cac",
+        "name": "System::ExtrinsicWeightReclaimed",
+        "repeated": 1
+      },
+      {
+        "phase": "extrinsic 1: Timestamp.set",
+        "item": ":extrinsic_index",
+        "key": "0x3a65787472696e7369635f696e646578",
+        "name": ":extrinsic_index",
+        "repeated": 1
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "MultiBlockMigrations::Cursor",
+        "key": "0x0b20199ace3564d0964e2c4d4a9ba46987b188618944a73221aaabb35521b0a1",
+        "name": "MultiBlockMigrations::Cursor",
+        "repeated": 1
+      },
+      {
+        "phase": "post inherents (on_poll)",
+        "item": "System::BlockWeight",
+        "key": "0x26aa394eea5630e07c48ae0c9558cef734abf5cb34d6244378cddbf18e849d96",
+        "name": "System::BlockWeight",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8d1d2912b28e735cffe05dac2b87120844788ce49a40a14da6a6314be3ac9214ed44971f971de2ae62",
+        "name": "VoterList::PendingRebag(5H8tQj8FUiu1A8gx1aMEa1Cuw8ReQefz2zfuBZWP6zPDhf8b)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe701d2912b28e735cffe05dac2b87120844788ce49a40a14da6a6314be3ac9214ed44971f971de2ae62",
+        "name": "Staking::Bonded(5H8tQj8FUiu1A8gx1aMEa1Cuw8ReQefz2zfuBZWP6zPDhf8b)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8d22598d50eaa4364ca6ca52fa5c0f8275b834f6aea771ca7d896d2e100ddc9bc03efeba0ec056a626",
+        "name": "VoterList::PendingRebag(5FqPufbp1YdWwFs71HFuckkzHH9oZPSYRBkBuH3nqgr4ZzKq)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe7022598d50eaa4364ca6ca52fa5c0f8275b834f6aea771ca7d896d2e100ddc9bc03efeba0ec056a626",
+        "name": "Staking::Bonded(5FqPufbp1YdWwFs71HFuckkzHH9oZPSYRBkBuH3nqgr4ZzKq)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8d5618f4f5bd6234a6d09302585c7054e1e322ec4c21c633887186a3f734d3790b24b7ce7106633128",
+        "name": "VoterList::PendingRebag(5GnBVFxX3tuQGENZHojFnxJJzWYAWwmGhD3R7oB4mmadvzcD)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe705618f4f5bd6234a6d09302585c7054e1e322ec4c21c633887186a3f734d3790b24b7ce7106633128",
+        "name": "Staking::Bonded(5GnBVFxX3tuQGENZHojFnxJJzWYAWwmGhD3R7oB4mmadvzcD)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8d15c7ea63fe73764efad5e19aa79c4820fa145fa951cdaf2f8f8e5eec59b0815c5c65397da0ebf34f",
+        "name": "VoterList::PendingRebag(5HjbN5uWPbSk2xAv17f8DHCvpczp5nUqvNKKg3kRdm2EnsLB)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe7015c7ea63fe73764efad5e19aa79c4820fa145fa951cdaf2f8f8e5eec59b0815c5c65397da0ebf34f",
+        "name": "Staking::Bonded(5HjbN5uWPbSk2xAv17f8DHCvpczp5nUqvNKKg3kRdm2EnsLB)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8d4cc2297182455b92ec45c1fc19c9bbf5894d7236bb5f7275778936a509f7b161936c4361feaa9c5a",
+        "name": "VoterList::PendingRebag(5HQVt1gwpPoKTsUeE91BQL54Jzsc1iNcmucb9Phnbxm54Syy)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe704cc2297182455b92ec45c1fc19c9bbf5894d7236bb5f7275778936a509f7b161936c4361feaa9c5a",
+        "name": "Staking::Bonded(5HQVt1gwpPoKTsUeE91BQL54Jzsc1iNcmucb9Phnbxm54Syy)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8dc4621896ae7f2ee988d7d8266f1d89121879034f36d7616ff37d7c75ee4d5130fb35cf371b6d2c20",
+        "name": "VoterList::PendingRebag(5FA8VJ3RE4VfsRmC4VJHAqVcLod8w6yZqEgyGFXf77DAce74)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe70c4621896ae7f2ee988d7d8266f1d89121879034f36d7616ff37d7c75ee4d5130fb35cf371b6d2c20",
+        "name": "Staking::Bonded(5FA8VJ3RE4VfsRmC4VJHAqVcLod8w6yZqEgyGFXf77DAce74)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8db859ae3ab9767b5976dc611cf99d2524c13e3ed49eba03bbd9be1b3921714a0e973b9d719a2d6138",
+        "name": "VoterList::PendingRebag(5EkYySSYMN82BwaFX1UD8xgaz6iXv5u8NPWPQV4fUmY1esCW)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe70b859ae3ab9767b5976dc611cf99d2524c13e3ed49eba03bbd9be1b3921714a0e973b9d719a2d6138",
+        "name": "Staking::Bonded(5EkYySSYMN82BwaFX1UD8xgaz6iXv5u8NPWPQV4fUmY1esCW)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8df44739864bf6901d805b3fb5161c81c8fc4937d16abfcd9f28332874ef6d81489b00b20488deaf53",
+        "name": "VoterList::PendingRebag(5Ey16M2CeR95WGcKaEUSCeVCabvXm3oYnMbjGtL3d44rLpBL)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe70f44739864bf6901d805b3fb5161c81c8fc4937d16abfcd9f28332874ef6d81489b00b20488deaf53",
+        "name": "Staking::Bonded(5Ey16M2CeR95WGcKaEUSCeVCabvXm3oYnMbjGtL3d44rLpBL)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8d69bb851744c1c7800263e9b2493d2ddf121c9ab86301ad9ea99633ebeb0ddc4b50e5208726fe2d2d",
+        "name": "VoterList::PendingRebag(5C7qdgX4KReX3TNNiGQrhiTGqMfdGEruwKq1zrfu28Un2GsP)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe7069bb851744c1c7800263e9b2493d2ddf121c9ab86301ad9ea99633ebeb0ddc4b50e5208726fe2d2d",
+        "name": "Staking::Bonded(5C7qdgX4KReX3TNNiGQrhiTGqMfdGEruwKq1zrfu28Un2GsP)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "VoterList::PendingRebag",
+        "key": "0x74dd702da46f77d7acf77f5a48d4af7deddd02fa09717be308a73ee5f90dad8dbf40e864122618e8408386088f1372e51bc46ff70ada23cf0a74fe2df08af2f748a62246ec2cbc1e",
+        "name": "VoterList::PendingRebag(5DXHzWq3At3cWXyfaZ1KV3x5SRnUy1nisosAt9poHKow3Tdz)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Staking::Bonded",
+        "key": "0x5f3e4907f716ac89b6347d15ececedca3ed14b45ed20d054f05e37e2542cfe70bf40e864122618e8408386088f1372e51bc46ff70ada23cf0a74fe2df08af2f748a62246ec2cbc1e",
+        "name": "Staking::Bonded(5DXHzWq3At3cWXyfaZ1KV3x5SRnUy1nisosAt9poHKow3Tdz)",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "ParachainSystem::AggregatedUnincludedSegment",
+        "key": "0x45323df7cc47150b3930e2666b0aa31383b1f3dac9e48c445ffcc08273cf02fc",
+        "name": "ParachainSystem::AggregatedUnincludedSegment",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "TransactionPayment::NextFeeMultiplier",
+        "key": "0x3f1467a096bcd71a5b6a0c8155e208103f2edf3bdf381debe331ab7446addfdc",
+        "name": "TransactionPayment::NextFeeMultiplier",
+        "repeated": 1
+      },
+      {
+        "phase": "finalization",
+        "item": "Aura::Authorities",
+        "key": "0x57f8dc2f5ab09467896f47300f0424385e0621c4869aa60c02be9adcc98a0d1d",
+        "name": "Aura::Authorities",
+        "repeated": 1
+      }
+    ]
+  }
+]

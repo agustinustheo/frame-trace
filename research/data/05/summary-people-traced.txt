@@ -1,0 +1,77 @@
+block 0x0661899538bf75f600c05c9cc31a01d34e95be6ea6096230a2af6a0074d90637 (parent 0xaa9b6d9f7f0d74a603f7d763724d812f468139427ba81f5f22dc82a7d4026de6)
+
+Storage per phase
+┌──────────────────────────────────────────────────┬─────┬───────┬────────┬──────┬────────────┬───────────────┬───────────┐
+│ phase                                            ┆ ops ┆ reads ┆ writes ┆ keys ┆ bytes read ┆ bytes written ┆ dup reads │
+╞══════════════════════════════════════════════════╪═════╪═══════╪════════╪══════╪════════════╪═══════════════╪═══════════╡
+│ initialization                                   ┆ 152 ┆    74 ┆     77 ┆   37 ┆        910 ┆           804 ┆        53 │
+│ extrinsic 0: ParachainSystem.set_validation_data ┆  54 ┆    26 ┆     28 ┆   30 ┆        279 ┆          2904 ┆         8 │
+│ extrinsic 1: Timestamp.set                       ┆  26 ┆    14 ┆     12 ┆   13 ┆         59 ┆            72 ┆         3 │
+│ extrinsic 2: Utility.batch                       ┆ 200 ┆   146 ┆     54 ┆   19 ┆       5715 ┆          1683 ┆       129 │
+│   └ post inherents (on_poll)                     ┆  14 ┆    12 ┆      2 ┆   10 ┆         40 ┆            15 ┆         2 │
+│ finalization                                     ┆  72 ┆    40 ┆     31 ┆   44 ┆       2539 ┆           208 ┆         8 │
+│ total                                            ┆ 518 ┆   312 ┆    204 ┆   79 ┆       9542 ┆          5686 ┆       203 │
+└──────────────────────────────────────────────────┴─────┴───────┴────────┴──────┴────────────┴───────────────┴───────────┘
+
+Top 15 storage items by reads + writes
+┌──────────────────────────────────────────────┬───────┬────────┬───────────┬────────────┬───────────────┐
+│ item                                         ┆ reads ┆ writes ┆ dup reads ┆ bytes read ┆ bytes written │
+╞══════════════════════════════════════════════╪═══════╪════════╪═══════════╪════════════╪═══════════════╡
+│ System::BlockWeight                          ┆    60 ┆     58 ┆        54 ┆        724 ┆           692 │
+│ System::Account                              ┆    74 ┆      9 ┆        69 ┆       5200 ┆           720 │
+│ System::EventCount                           ┆    15 ┆     16 ┆        12 ┆         56 ┆            60 │
+│ :transaction_level:                          ┆    12 ┆     12 ┆         9 ┆         36 ┆            36 │
+│ System::Number                               ┆    22 ┆      1 ┆        16 ┆         88 ┆             4 │
+│ System::ExecutionPhase                       ┆    15 ┆      7 ┆        12 ┆         75 ┆            22 │
+│ System::Events                               ┆     0 ┆     16 ┆         0 ┆          0 ┆           591 │
+│ :extrinsic_index                             ┆     7 ┆      5 ┆         3 ┆         28 ┆            16 │
+│ System::BlockSize                            ┆     5 ┆      6 ┆         2 ┆         20 ┆            20 │
+│ System::ExtrinsicWeightReclaimed             ┆     6 ┆      4 ┆         3 ┆          0 ┆             5 │
+│ System::Digest                               ┆     7 ┆      2 ┆         5 ┆        273 ┆            57 │
+│ System::ExtrinsicData                        ┆     3 ┆      6 ┆         0 ┆       1851 ┆          1851 │
+│ System::BlockHash                            ┆     7 ┆      1 ┆         4 ┆        160 ┆            32 │
+│ Balances::TotalIssuance                      ┆     5 ┆      1 ┆         4 ┆         80 ┆            16 │
+│ ParachainSystem::AggregatedUnincludedSegment ┆     4 ┆      2 ┆         2 ┆         60 ┆            30 │
+└──────────────────────────────────────────────┴───────┴────────┴───────────┴────────────┴───────────────┘
+
+Duplicate reads per phase (top 15 each)
+┌──────────────────────────────────────────────────┬───────────────────────────────────────────────────────────────────┬───────────┐
+│ phase                                            ┆ key                                                               ┆ dup reads │
+╞══════════════════════════════════════════════════╪═══════════════════════════════════════════════════════════════════╪═══════════╡
+│ initialization                                   ┆ System::BlockWeight                                               ┆        49 │
+│ initialization                                   ┆ System::Digest                                                    ┆         2 │
+│ initialization                                   ┆ System::Number                                                    ┆         1 │
+│ initialization                                   ┆ Aura::Authorities                                                 ┆         1 │
+│ extrinsic 0: ParachainSystem.set_validation_data ┆ ParachainSystem::UnincludedSegment                                ┆         1 │
+│ extrinsic 0: ParachainSystem.set_validation_data ┆ System::BlockSize                                                 ┆         1 │
+│ extrinsic 0: ParachainSystem.set_validation_data ┆ ParachainSystem::AggregatedUnincludedSegment                      ┆         1 │
+│ extrinsic 0: ParachainSystem.set_validation_data ┆ ParachainSystem::ValidationData                                   ┆         1 │
+│ extrinsic 0: ParachainSystem.set_validation_data ┆ System::BlockWeight                                               ┆         1 │
+│ extrinsic 0: ParachainSystem.set_validation_data ┆ :transaction_level:                                               ┆         1 │
+│ extrinsic 0: ParachainSystem.set_validation_data ┆ System::ExtrinsicWeightReclaimed                                  ┆         1 │
+│ extrinsic 0: ParachainSystem.set_validation_data ┆ :extrinsic_index                                                  ┆         1 │
+│ extrinsic 1: Timestamp.set                       ┆ :transaction_level:                                               ┆         1 │
+│ extrinsic 1: Timestamp.set                       ┆ System::ExtrinsicWeightReclaimed                                  ┆         1 │
+│ extrinsic 1: Timestamp.set                       ┆ :extrinsic_index                                                  ┆         1 │
+│ extrinsic 2: Utility.batch                       ┆ System::Account(5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY) ┆        47 │
+│ extrinsic 2: Utility.batch                       ┆ System::Number                                                    ┆        15 │
+│ extrinsic 2: Utility.batch                       ┆ System::Account(5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty) ┆        15 │
+│ extrinsic 2: Utility.batch                       ┆ System::ExecutionPhase                                            ┆        12 │
+│ extrinsic 2: Utility.batch                       ┆ System::EventCount                                                ┆        12 │
+│ extrinsic 2: Utility.batch                       ┆ :transaction_level:                                               ┆         7 │
+│ extrinsic 2: Utility.batch                       ┆ System::Account(5FLSigC9HGRKVhB9FiEo4Y3koPsNmBmLJbpXg2mp1hXcS59Y) ┆         7 │
+│ extrinsic 2: Utility.batch                       ┆ Balances::TotalIssuance                                           ┆         4 │
+│ extrinsic 2: Utility.batch                       ┆ System::BlockHash(3)                                              ┆         3 │
+│ extrinsic 2: Utility.batch                       ┆ System::BlockHash(0)                                              ┆         1 │
+│ extrinsic 2: Utility.batch                       ┆ TransactionPayment::NextFeeMultiplier                             ┆         1 │
+│ extrinsic 2: Utility.batch                       ┆ TransactionPayment::TxPaymentCredit                               ┆         1 │
+│ extrinsic 2: Utility.batch                       ┆ System::BlockWeight                                               ┆         1 │
+│ extrinsic 2: Utility.batch                       ┆ System::ExtrinsicWeightReclaimed                                  ┆         1 │
+│ extrinsic 2: Utility.batch                       ┆ System::BlockSize                                                 ┆         1 │
+│ post inherents (on_poll)                         ┆ MultiBlockMigrations::Cursor                                      ┆         1 │
+│ post inherents (on_poll)                         ┆ System::BlockWeight                                               ┆         1 │
+│ finalization                                     ┆ System::Digest                                                    ┆         3 │
+│ finalization                                     ┆ System::BlockWeight                                               ┆         2 │
+│ finalization                                     ┆ ParachainSystem::RelevantMessagingState                           ┆         2 │
+│ finalization                                     ┆ ParachainSystem::AggregatedUnincludedSegment                      ┆         1 │
+└──────────────────────────────────────────────────┴───────────────────────────────────────────────────────────────────┴───────────┘

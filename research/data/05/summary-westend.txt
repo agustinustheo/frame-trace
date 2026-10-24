@@ -1,0 +1,91 @@
+block 0x31fb5d06531014e1bf1fff5f29073355c1af14bf1501d3e7881cd0fbb099280b (parent 0xe1cc266b943508c5ec7fc5b3a3ed816279a160a76903dec48a7d8ff1a7de1cd0)
+
+Storage per phase
+┌──────────────────────────────────────────────────┬─────┬───────┬────────┬──────┬────────────┬───────────────┬───────────┐
+│ phase                                            ┆ ops ┆ reads ┆ writes ┆ keys ┆ bytes read ┆ bytes written ┆ dup reads │
+╞══════════════════════════════════════════════════╪═════╪═══════╪════════╪══════╪════════════╪═══════════════╪═══════════╡
+│ initialization                                   ┆ 222 ┆   118 ┆    102 ┆   57 ┆       2428 ┆          1568 ┆        79 │
+│ extrinsic 0: ParachainSystem.set_validation_data ┆  49 ┆    23 ┆     26 ┆   29 ┆       1355 ┆         26299 ┆         6 │
+│ extrinsic 1: Timestamp.set                       ┆  26 ┆    14 ┆     12 ┆   13 ┆         59 ┆            72 ┆         3 │
+│ extrinsic 2: Balances.transfer_keep_alive        ┆ 108 ┆    81 ┆     27 ┆   18 ┆       3537 ┆           929 ┆        65 │
+│   └ post inherents (on_poll)                     ┆  12 ┆    10 ┆      2 ┆    6 ┆         36 ┆            15 ┆         4 │
+│ finalization                                     ┆ 279 ┆   208 ┆     69 ┆  118 ┆      27806 ┆          3891 ┆       108 │
+│ total                                            ┆ 696 ┆   454 ┆    238 ┆  160 ┆      35221 ┆         32774 ┆       265 │
+└──────────────────────────────────────────────────┴─────┴───────┴────────┴──────┴────────────┴───────────────┴───────────┘
+
+Top 15 storage items by reads + writes
+┌─────────────────────────┬───────┬────────┬───────────┬────────────┬───────────────┐
+│ item                    ┆ reads ┆ writes ┆ dup reads ┆ bytes read ┆ bytes written │
+╞═════════════════════════╪═══════╪════════╪═══════════╪════════════╪═══════════════╡
+│ System::BlockWeight     ┆    82 ┆     79 ┆        76 ┆       1089 ┆          1046 │
+│ System::Account         ┆    64 ┆      7 ┆        56 ┆       4960 ┆           560 │
+│ VoterList::ListNodes    ┆    42 ┆     10 ┆        30 ┆       2508 ┆          1140 │
+│ VoterList::PendingRebag ┆    21 ┆     11 ┆        10 ┆          0 ┆             0 │
+│ Staking::Bonded         ┆    20 ┆      0 ┆        10 ┆        640 ┆             0 │
+│ System::EventCount      ┆     9 ┆     10 ┆         5 ┆         32 ┆            36 │
+│ System::Number          ┆    16 ┆      1 ┆        10 ┆         64 ┆             4 │
+│ System::ExecutionPhase  ┆     9 ┆      7 ┆         5 ┆         37 ┆            22 │
+│ Balances::TotalIssuance ┆    14 ┆      0 ┆        12 ┆        224 ┆             0 │
+│ :extrinsic_index        ┆     7 ┆      5 ┆         3 ┆         28 ┆            16 │
+│ :transaction_level:     ┆     6 ┆      6 ┆         3 ┆         12 ┆            12 │
+│ System::BlockSize       ┆     5 ┆      6 ┆         2 ┆         20 ┆            20 │
+│ VoterList::Lock         ┆    11 ┆      0 ┆        10 ┆          0 ┆             0 │
+│ Staking::Ledger         ┆    10 ┆      0 ┆         0 ┆        470 ┆             0 │
+│ Staking::Nominators     ┆    10 ┆      0 ┆         0 ┆          0 ┆             0 │
+└─────────────────────────┴───────┴────────┴───────────┴────────────┴───────────────┘
+
+Duplicate reads per phase (top 15 each)
+┌──────────────────────────────────────────────────┬────────────────────────────────────────────────────────────────────────┬───────────┐
+│ phase                                            ┆ key                                                                    ┆ dup reads │
+╞══════════════════════════════════════════════════╪════════════════════════════════════════════════════════════════════════╪═══════════╡
+│ initialization                                   ┆ System::BlockWeight                                                    ┆        71 │
+│ initialization                                   ┆ System::Digest                                                         ┆         2 │
+│ initialization                                   ┆ System::Number                                                         ┆         1 │
+│ initialization                                   ┆ Aura::Authorities                                                      ┆         1 │
+│ initialization                                   ┆ ToRococoXcmRouter::Bridge                                              ┆         1 │
+│ initialization                                   ┆ Staking::ActiveEra                                                     ┆         1 │
+│ initialization                                   ┆ ParachainSystem::ValidationData                                        ┆         1 │
+│ initialization                                   ┆ ParachainSystem::LastRelayChainBlockNumber                             ┆         1 │
+│ extrinsic 0: ParachainSystem.set_validation_data ┆ ParachainSystem::UnincludedSegment                                     ┆         1 │
+│ extrinsic 0: ParachainSystem.set_validation_data ┆ System::BlockSize                                                      ┆         1 │
+│ extrinsic 0: ParachainSystem.set_validation_data ┆ System::BlockWeight                                                    ┆         1 │
+│ extrinsic 0: ParachainSystem.set_validation_data ┆ :transaction_level:                                                    ┆         1 │
+│ extrinsic 0: ParachainSystem.set_validation_data ┆ System::ExtrinsicWeightReclaimed                                       ┆         1 │
+│ extrinsic 0: ParachainSystem.set_validation_data ┆ :extrinsic_index                                                       ┆         1 │
+│ extrinsic 1: Timestamp.set                       ┆ :transaction_level:                                                    ┆         1 │
+│ extrinsic 1: Timestamp.set                       ┆ System::ExtrinsicWeightReclaimed                                       ┆         1 │
+│ extrinsic 1: Timestamp.set                       ┆ :extrinsic_index                                                       ┆         1 │
+│ extrinsic 2: Balances.transfer_keep_alive        ┆ System::Account(5CoK4Jsp47RP5zzMQ3AseaznD3mNaXYDN8fkRaGFfgYs1fip)      ┆        25 │
+│ extrinsic 2: Balances.transfer_keep_alive        ┆ System::Number                                                         ┆         7 │
+│ extrinsic 2: Balances.transfer_keep_alive        ┆ System::Account(5FPFWFZefZF9343WLnGGUN3jdFhnasXNb8ZmvRTP1m4Fmtup)      ┆         7 │
+│ extrinsic 2: Balances.transfer_keep_alive        ┆ System::Account(5EYCAe5gKBMwLZyq5dw41Hw3V68nsCVTZQ2d4AYfbMb4kF29)      ┆         6 │
+│ extrinsic 2: Balances.transfer_keep_alive        ┆ System::ExecutionPhase                                                 ┆         4 │
+│ extrinsic 2: Balances.transfer_keep_alive        ┆ System::EventCount                                                     ┆         4 │
+│ extrinsic 2: Balances.transfer_keep_alive        ┆ System::BlockHash(18563581)                                            ┆         3 │
+│ extrinsic 2: Balances.transfer_keep_alive        ┆ System::BlockHash(0)                                                   ┆         1 │
+│ extrinsic 2: Balances.transfer_keep_alive        ┆ Balances::TotalIssuance                                                ┆         1 │
+│ extrinsic 2: Balances.transfer_keep_alive        ┆ :transaction_level:                                                    ┆         1 │
+│ extrinsic 2: Balances.transfer_keep_alive        ┆ TransactionPayment::NextFeeMultiplier                                  ┆         1 │
+│ extrinsic 2: Balances.transfer_keep_alive        ┆ TransactionPayment::TxPaymentCredit                                    ┆         1 │
+│ extrinsic 2: Balances.transfer_keep_alive        ┆ System::BlockWeight                                                    ┆         1 │
+│ extrinsic 2: Balances.transfer_keep_alive        ┆ System::ExtrinsicWeightReclaimed                                       ┆         1 │
+│ extrinsic 2: Balances.transfer_keep_alive        ┆ System::BlockSize                                                      ┆         1 │
+│ post inherents (on_poll)                         ┆ MultiBlockElection::CurrentPhase                                       ┆         2 │
+│ post inherents (on_poll)                         ┆ MultiBlockMigrations::Cursor                                           ┆         1 │
+│ post inherents (on_poll)                         ┆ System::BlockWeight                                                    ┆         1 │
+│ finalization                                     ┆ Balances::TotalIssuance                                                ┆        11 │
+│ finalization                                     ┆ System::Account(5EYCAe5gKBMwLZyq5dw41Hw3V68nsCVTZQ2d4AYfbMb4kF29)      ┆        11 │
+│ finalization                                     ┆ VoterList::Lock                                                        ┆        10 │
+│ finalization                                     ┆ System::Account(5EYCAe5gKBMwLZyq5doL8n26pkA5pV6HSXdnmN4YawhPc2HH)      ┆         7 │
+│ finalization                                     ┆ ParachainSystem::RelevantMessagingState                                ┆         6 │
+│ finalization                                     ┆ System::Digest                                                         ┆         4 │
+│ finalization                                     ┆ VoterList::ListNodes(5ERRA9wmMAZ2Bp2o7QZ3xAqykuwbp57a827ZgD95ZcBZuxNt) ┆         3 │
+│ finalization                                     ┆ VoterList::ListNodes(5EewRPTUNMZ6CoXmd3Lyzxm9TqwngxWVip13PxPSizk6hxAy) ┆         3 │
+│ finalization                                     ┆ VoterList::ListNodes(5FEoVFZhEwYp81oQuvc4QzxnnMLF6yeA3fZm3vCYZKj5Xweo) ┆         3 │
+│ finalization                                     ┆ VoterList::ListNodes(5GT6Eu3qP2f2kAFMznZ2Wf9QFrgqLXuaZZ7UVjxGCuUZ6JG8) ┆         3 │
+│ finalization                                     ┆ VoterList::ListNodes(5GEuK7CsvUtq48FK634nE7M27KrcfGRkYW2MTAALbxhVEaQ5) ┆         3 │
+│ finalization                                     ┆ VoterList::ListNodes(5H8eDcM1Zose8dJRktBhRwrtNSe6vnDqFueoAW2mdHr4rSgo) ┆         3 │
+│ finalization                                     ┆ VoterList::ListNodes(5CfTX1x2GKAhxAaikp7ucopM2hwuaMibvJsFx4L6ajpbjRuL) ┆         3 │
+│ finalization                                     ┆ VoterList::ListNodes(5GeAeWsfLHNp2XS8WqS2PxnLJUWCUi162d351z3XALhSW8L3) ┆         3 │
+│ finalization                                     ┆ VoterList::ListNodes(5CwEe2vpfwfUFmHhZSaSVDmVPThdvh4ShXyAVaNy1y4tX7PE) ┆         3 │
+└──────────────────────────────────────────────────┴────────────────────────────────────────────────────────────────────────┴───────────┘
