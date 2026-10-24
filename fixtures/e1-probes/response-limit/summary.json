@@ -1,0 +1,11 @@
+{
+  "hash": "0x07cfefae800c6ea172c90d25b5241cad3d9ab3724490406899af59249125016f",
+  "items": 120,
+  "valueBytes": 4096,
+  "fullError": {
+    "code": -32008,
+    "message": "Response is too big",
+    "data": "Exceeded max limit of 1048576"
+  },
+  "filteredEvents": 1
+}

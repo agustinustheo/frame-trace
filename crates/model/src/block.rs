@@ -94,6 +94,6 @@ impl TracedBlock {
 fn extrinsic_bytes(ops: &[StorageOp], index: u32) -> Option<Vec<u8>> {
     ops.iter()
         .filter(|op| op.kind == OpKind::Put && op.child_trie.is_none())
-        .find(|op| keys::extrinsic_data_index(&op.key) == Some(index))
+        .find(|op| op.key.complete().and_then(keys::extrinsic_data_index) == Some(index))
         .and_then(|op| Vec::<u8>::decode(&mut op.value.as_deref()?).ok())
 }

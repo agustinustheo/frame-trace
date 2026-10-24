@@ -15,6 +15,15 @@ pub const EXECUTION_PHASE: [u8; 32] =
 pub const EXTRINSIC_DATA_PREFIX: [u8; 32] =
     concat(SYSTEM_PREFIX, hex16("df1daeb8986837f21cc5d17596bb78d1"));
 
+/// `System::ExtrinsicWeightReclaimed`, killed by `note_applied_extrinsic` right after it writes
+/// the next `ExecutionPhase`.
+pub const EXTRINSIC_WEIGHT_RECLAIMED: [u8; 32] =
+    concat(SYSTEM_PREFIX, hex16("0ccf055743738b7a91a6fb88ece33cac"));
+
+/// `System::InherentsApplied`, set to `true` once per block by `note_inherents_applied`.
+pub const INHERENTS_APPLIED: [u8; 32] =
+    concat(SYSTEM_PREFIX, hex16("156afe25323c70e43eb722ed7c886297"));
+
 /// The extrinsic index of a `System::ExtrinsicData` key, if `key` is one.
 pub fn extrinsic_data_index(key: &[u8]) -> Option<u32> {
     // prefix (32) ++ twox64 (8) ++ u32 little endian (4)
@@ -70,6 +79,14 @@ mod tests {
         assert_eq!(
             EXTRINSIC_DATA_PREFIX.to_vec(),
             prefix("System", "ExtrinsicData")
+        );
+        assert_eq!(
+            EXTRINSIC_WEIGHT_RECLAIMED.to_vec(),
+            prefix("System", "ExtrinsicWeightReclaimed")
+        );
+        assert_eq!(
+            INHERENTS_APPLIED.to_vec(),
+            prefix("System", "InherentsApplied")
         );
     }
 

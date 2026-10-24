@@ -1,0 +1,2015 @@
+[
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "chain_getBlockHash",
+      "params": [
+        1
+      ]
+    },
+    "elapsedMs": 8.169125,
+    "responseBytes": 102,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 2,
+      "method": "state_traceBlock",
+      "params": [
+        "0x8c07003f3bcfe033bfd9b722abc97a9c6f1334107446a958e42fa5ad7cdf8ebc",
+        "state",
+        "",
+        ""
+      ]
+    },
+    "elapsedMs": 6.770208,
+    "responseBytes": 90001,
+    "file": "trace-before.json"
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 3,
+      "method": "chain_getBlock",
+      "params": [
+        "0x8c07003f3bcfe033bfd9b722abc97a9c6f1334107446a958e42fa5ad7cdf8ebc"
+      ]
+    },
+    "elapsedMs": 0.862957999999997,
+    "responseBytes": 3623,
+    "file": "block.json"
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 4,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.7194999999999979,
+    "responseBytes": 441,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 5,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 1.3464580000000086,
+    "responseBytes": 102,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 6,
+      "method": "chain_getHeader",
+      "params": [
+        "0x1dfe5301efb5a63d63dc609679e78b73680314c1798d924d6702bcbaee134231"
+      ]
+    },
+    "elapsedMs": 0.8194579999999951,
+    "responseBytes": 441,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 7,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 1.0155000000000025,
+    "responseBytes": 442,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 8,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 1.0224589999999756,
+    "responseBytes": 102,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 9,
+      "method": "chain_getHeader",
+      "params": [
+        "0x3f57e86b8bdc76691a8943a0ec696f395c32fbc2b0e716d766cbf0999fe09371"
+      ]
+    },
+    "elapsedMs": 0.7769170000000436,
+    "responseBytes": 442,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 10,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.6697919999999469,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 11,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.3473749999999276,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 12,
+      "method": "chain_getHeader",
+      "params": [
+        "0x15d0a93565be096059f4b49d65cc93bb35ac441ac2ef50b10115eba7b5b40aab"
+      ]
+    },
+    "elapsedMs": 0.3606250000000033,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 13,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.867417000000037,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 14,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.6500000000000394,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 15,
+      "method": "chain_getHeader",
+      "params": [
+        "0xef5c4bc23e047bd84860e488d68aba38fc904b89809efc15862ddf5d60938a85"
+      ]
+    },
+    "elapsedMs": 0.6315420000000405,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 16,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.9257089999998858,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 17,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.6450419999999291,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 18,
+      "method": "chain_getHeader",
+      "params": [
+        "0xe7d94a011cf26a370f44e5e0acb74a7abc8a6ab0a195167e14ca6dba061cbed6"
+      ]
+    },
+    "elapsedMs": 0.6409579999999693,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 19,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.9839590000000342,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 20,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.8312919999999835,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 21,
+      "method": "chain_getHeader",
+      "params": [
+        "0xa50954a943e24a41ec8a36d3d22e2aff3e108d3a7aa8aa5cc46d332a31e07641"
+      ]
+    },
+    "elapsedMs": 0.6301670000001813,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 22,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 1.0861249999998268,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 23,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.7122500000000809,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 24,
+      "method": "chain_getHeader",
+      "params": [
+        "0xc7dcacd56f3e68068a69dc5f0e107e99d1077e5d3c3fa07f088cb2fd3f557bce"
+      ]
+    },
+    "elapsedMs": 0.592415999999929,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 25,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.8858749999998139,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 26,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 2.0367500000002536,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 27,
+      "method": "chain_getHeader",
+      "params": [
+        "0x3dee1767bc49deefd0b6f1927cb6bceecb078aecbd38e688e5768728b6372236"
+      ]
+    },
+    "elapsedMs": 0.7352499999999651,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 28,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.9207500000001367,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 29,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.7667919999998496,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 30,
+      "method": "chain_getHeader",
+      "params": [
+        "0x3ab2eab0f04b3d4fb85a0210db734b274cfea184fecba9c67d13aded89ba74ef"
+      ]
+    },
+    "elapsedMs": 0.6252089999998489,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 31,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.9839579999999515,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 32,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.8312080000001387,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 33,
+      "method": "chain_getHeader",
+      "params": [
+        "0xafd59063f00946e881d48d9196ebb7205fb39f8a6f67a0ff9c8fd6835a1c04a9"
+      ]
+    },
+    "elapsedMs": 0.6190830000001313,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 34,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.9304170000001832,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 35,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.6522909999997495,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 36,
+      "method": "chain_getHeader",
+      "params": [
+        "0xd3346d2a864e90fef529e036cdc579c8f81c1a37e1150a709d4cd0826c93f10e"
+      ]
+    },
+    "elapsedMs": 0.6634160000000833,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 37,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 11.050833000000093,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 38,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.8585839999999401,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 39,
+      "method": "chain_getHeader",
+      "params": [
+        "0x9a785159296a4f41b40f3424fbe149141736bba009fb4a53fa65c6674320e181"
+      ]
+    },
+    "elapsedMs": 0.9319579999997885,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 40,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 1.1247079999998633,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 41,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.7152920000002005,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 42,
+      "method": "chain_getHeader",
+      "params": [
+        "0x5fd0ca14177e6bc52557553f3e62abdd1de431f461d8a2691593216c2d87a612"
+      ]
+    },
+    "elapsedMs": 0.610791000000166,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 43,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 3.7829580000003915,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 44,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.7460420000002799,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 45,
+      "method": "chain_getHeader",
+      "params": [
+        "0xf74e3c9528f06ddbc81715d9e0c548256bfcd94703194253e7754b06f09b4e13"
+      ]
+    },
+    "elapsedMs": 0.6104589999997856,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 46,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 5.216375000000717,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 47,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 5.679874999999335,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 48,
+      "method": "chain_getHeader",
+      "params": [
+        "0x67a05ab93f4d56134885ac88b526a4b266907e6f196f0e46a5511456ab760b05"
+      ]
+    },
+    "elapsedMs": 2.6826660000001112,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 49,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.8516670000000559,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 50,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.5748329999999413,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 51,
+      "method": "chain_getHeader",
+      "params": [
+        "0x05572893191312c13e916c49e0d3441b1d85672ee4a0d81e16200deede3df5e6"
+      ]
+    },
+    "elapsedMs": 0.5209160000001489,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 52,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.8213750000001241,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 53,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 1.385292000000149,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 54,
+      "method": "chain_getHeader",
+      "params": [
+        "0xad23327b68317c73d83cad0dbd8960c30998099bf85438336f7fd692b7ee7180"
+      ]
+    },
+    "elapsedMs": 0.6664169999996972,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 55,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.883249999999336,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 56,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.6415840000002504,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 57,
+      "method": "chain_getHeader",
+      "params": [
+        "0x324f2faf318785939d7262605b85c7c7fde6f06edc9f3c2740cc8db056f44d44"
+      ]
+    },
+    "elapsedMs": 0.593624999999598,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 58,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 1.3581670000002433,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 59,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 1.0070830000001862,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 60,
+      "method": "chain_getHeader",
+      "params": [
+        "0xf45d9cbb6e6961ec34a7de17a93eb4d7fa16d00969125152bae76873dc22842c"
+      ]
+    },
+    "elapsedMs": 0.7108340000003821,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 61,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 1.1603750000004354,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 62,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.8713330000000852,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 63,
+      "method": "chain_getHeader",
+      "params": [
+        "0x57c03da758f87c502b9c9f97de46b91fdf901dadd2e640119c0dca752596516c"
+      ]
+    },
+    "elapsedMs": 0.7830000000002002,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 64,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 1.016208999999435,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 65,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.7067499999999782,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 66,
+      "method": "chain_getHeader",
+      "params": [
+        "0xfb354c69289da3e2db3a7702a10384529b08d4841270b4aa65f24edb76e168d2"
+      ]
+    },
+    "elapsedMs": 0.721874999999983,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 67,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.7876669999999919,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 68,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.5255410000000182,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 69,
+      "method": "chain_getHeader",
+      "params": [
+        "0xb9933a7948e91fd269b9f4bf781bfb933452f07c49546965f7556571fc8574a4"
+      ]
+    },
+    "elapsedMs": 2.0225409999996558,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 70,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.8332910000001803,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 71,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.5690000000004858,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 72,
+      "method": "chain_getHeader",
+      "params": [
+        "0x96e88a8144acffacd2aaa4f7218375778cee955dc5fcc07a8159a1c0dd4d0235"
+      ]
+    },
+    "elapsedMs": 0.8420839999994101,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 73,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 1.7148339999994988,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 74,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 1.14187500000007,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 75,
+      "method": "chain_getHeader",
+      "params": [
+        "0x09ae422d8164d5984b3ce5245aa6f28b9b9fa119ccaeb17d0f562257e2070a04"
+      ]
+    },
+    "elapsedMs": 0.8900000000000574,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 76,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.9705420000001297,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 77,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.7693339999992332,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 78,
+      "method": "chain_getHeader",
+      "params": [
+        "0xa700588da667949f0d8603f0fd96d6b6b24c2db0025f3e4732fc3d6f70f802c6"
+      ]
+    },
+    "elapsedMs": 0.8425000000000793,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 79,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.8670000000003952,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 80,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.4647909999997424,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 81,
+      "method": "chain_getHeader",
+      "params": [
+        "0x923d4c181f425bfc44ae0e740d1c584c53eecc7256127545761743db83fd5ddf"
+      ]
+    },
+    "elapsedMs": 0.5980409999999381,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 82,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.9114160000009974,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 83,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.6888329999998888,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 84,
+      "method": "chain_getHeader",
+      "params": [
+        "0x86318ba8d917fdfbc1e2e1d72bd1e8082c1d7d58abdb031244c99ddc19ded08a"
+      ]
+    },
+    "elapsedMs": 0.7450000000002177,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 85,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.90299999999921,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 86,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.5710000000007653,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 87,
+      "method": "chain_getHeader",
+      "params": [
+        "0x2a6f1b058722a32853fcdf59ab99cb9e68b55b1c8fee8e4be2cc5ca09864100d"
+      ]
+    },
+    "elapsedMs": 0.4982500000014767,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 88,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.7880419999999333,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 89,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.5386250000007919,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 90,
+      "method": "chain_getHeader",
+      "params": [
+        "0x634df7a9bd6546a6aceb391c45462e82ab93ee5e112adebe720386c2b6227bf0"
+      ]
+    },
+    "elapsedMs": 0.5208749999994211,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 91,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.9327910000003214,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 92,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.5910000000000082,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 93,
+      "method": "chain_getHeader",
+      "params": [
+        "0x0114183c42e469de46de451046bc8ea4aa69f2fbcca9ee5797686d403fc77f6f"
+      ]
+    },
+    "elapsedMs": 0.5207089999998971,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 94,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.744415999999859,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 95,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.5234160000000543,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 96,
+      "method": "chain_getHeader",
+      "params": [
+        "0x34dc7fe6e15ab4c924f9e93a408038cbfaa809d992c8c2a079f73a433f7b357a"
+      ]
+    },
+    "elapsedMs": 0.48070800000132863,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 97,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.9127080000013166,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 98,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 1.0372920000012442,
+    "responseBytes": 103,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 99,
+      "method": "chain_getHeader",
+      "params": [
+        "0x3d33da16129c91f57109c760cac7a2d5ac671422d42c60d2f0d57ecf620a594a"
+      ]
+    },
+    "elapsedMs": 0.8311250000012649,
+    "responseBytes": 443,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 100,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.784374999998505,
+    "responseBytes": 444,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 101,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.6174580000006813,
+    "responseBytes": 104,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 102,
+      "method": "chain_getHeader",
+      "params": [
+        "0x0e883d018f7f784603132df6d35d011c581d900eac89aadda3c4e7a6e2a5a477"
+      ]
+    },
+    "elapsedMs": 0.7228339999993949,
+    "responseBytes": 444,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 103,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.9499579999996399,
+    "responseBytes": 444,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 104,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.7156249999997755,
+    "responseBytes": 104,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 105,
+      "method": "chain_getHeader",
+      "params": [
+        "0xab66cfce20c6b3ab4199804f9331d47e72189606e0e5fb47886784bb6bdbb4fe"
+      ]
+    },
+    "elapsedMs": 0.684167000001068,
+    "responseBytes": 444,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 106,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.8539170000005925,
+    "responseBytes": 444,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 107,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.8112080000000077,
+    "responseBytes": 104,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 108,
+      "method": "chain_getHeader",
+      "params": [
+        "0x9e13bb817b1d477a46c32e05370a57e949c0e3b23bc7b0fecfae122aa8eb7b5e"
+      ]
+    },
+    "elapsedMs": 0.6988749999994326,
+    "responseBytes": 444,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 109,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.954375000000951,
+    "responseBytes": 444,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 110,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.5623329999995264,
+    "responseBytes": 104,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 111,
+      "method": "chain_getHeader",
+      "params": [
+        "0x51278eb84227d19c856b1361b48e4df6f4ec88b986b07a000e682fa412e2b7c1"
+      ]
+    },
+    "elapsedMs": 0.5791670000014904,
+    "responseBytes": 444,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 112,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.7064999999997212,
+    "responseBytes": 444,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 113,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.4999580000006887,
+    "responseBytes": 104,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 114,
+      "method": "chain_getHeader",
+      "params": [
+        "0x212a49fa0db5273ca7e26fc035f74ef96a10cd4a479916486ebda63057249e7e"
+      ]
+    },
+    "elapsedMs": 0.4669589999988233,
+    "responseBytes": 444,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 115,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.6430420000000936,
+    "responseBytes": 444,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 116,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.4948329999994172,
+    "responseBytes": 104,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 117,
+      "method": "chain_getHeader",
+      "params": [
+        "0xe38eed596693b6a616cb989eb2c98f5915e5eaf5470440a22232ff76daa6a8c4"
+      ]
+    },
+    "elapsedMs": 0.4616669999997214,
+    "responseBytes": 444,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 118,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.7296659999997956,
+    "responseBytes": 444,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 119,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.44187499999992497,
+    "responseBytes": 104,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 120,
+      "method": "chain_getHeader",
+      "params": [
+        "0xe9c2592fa853d3ed52b3d0c13b03e8815acc6b198a43b320f0782193c51e42f7"
+      ]
+    },
+    "elapsedMs": 0.3682920000009915,
+    "responseBytes": 444,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 121,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.7239160000001021,
+    "responseBytes": 444,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 122,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.43691700000003664,
+    "responseBytes": 104,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 123,
+      "method": "chain_getHeader",
+      "params": [
+        "0xa8e401a4aab572ff4ff357393b9260431d445f37f84d340d3f2690b1cfd6269b"
+      ]
+    },
+    "elapsedMs": 0.3444580000007136,
+    "responseBytes": 444,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 124,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.5860420000001199,
+    "responseBytes": 444,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 125,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.4832080000003458,
+    "responseBytes": 104,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 126,
+      "method": "chain_getHeader",
+      "params": [
+        "0x7bb9f253cc6866225234b93dc091507485f892c75972f815f6c61f89c5e3ce70"
+      ]
+    },
+    "elapsedMs": 0.4235829999998941,
+    "responseBytes": 444,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 127,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.6381250000000449,
+    "responseBytes": 444,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 128,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.501459000000537,
+    "responseBytes": 104,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 129,
+      "method": "chain_getHeader",
+      "params": [
+        "0x933140e4000b9b0cb01913246ef9ffc1a530fb75efcec98ba39ca7e0410b0c18"
+      ]
+    },
+    "elapsedMs": 0.4821249999995558,
+    "responseBytes": 444,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 130,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.6372920000004001,
+    "responseBytes": 444,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 131,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.4182080000010302,
+    "responseBytes": 104,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 132,
+      "method": "chain_getHeader",
+      "params": [
+        "0xadecb84079ec9fb027169f8a062784367a94e17b05f34189002d353c95506f6c"
+      ]
+    },
+    "elapsedMs": 0.3887910000006656,
+    "responseBytes": 444,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 133,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.6347079999997618,
+    "responseBytes": 444,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 134,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.439166999999685,
+    "responseBytes": 104,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 135,
+      "method": "chain_getHeader",
+      "params": [
+        "0xccbbcd1aab528bacaf3be5fb9fc12fa1e0e9024b993ef227e881f97be407e45f"
+      ]
+    },
+    "elapsedMs": 0.373542000000171,
+    "responseBytes": 444,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 136,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.6966250000015606,
+    "responseBytes": 444,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 137,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.4322909999991964,
+    "responseBytes": 104,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 138,
+      "method": "chain_getHeader",
+      "params": [
+        "0x2a5bb98866308e95a100565b0f1a156fc4218012c599b9fd67059a4aae5a2ef3"
+      ]
+    },
+    "elapsedMs": 0.3344170000012525,
+    "responseBytes": 444,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 139,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.6187919999991465,
+    "responseBytes": 445,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 140,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.5922090000005653,
+    "responseBytes": 104,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 141,
+      "method": "chain_getHeader",
+      "params": [
+        "0xf646a796fba589bc52c07c0d78500b40bf75a42c026b1169a94cabd9f1d79e5e"
+      ]
+    },
+    "elapsedMs": 0.42824999999879765,
+    "responseBytes": 445,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 142,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.6696670000003735,
+    "responseBytes": 445,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 143,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.3882080000003896,
+    "responseBytes": 104,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 144,
+      "method": "chain_getHeader",
+      "params": [
+        "0x9618f59ef2ff68cae6221f4f37c34a135cc1419b6323b144b80bdaece64b0fd6"
+      ]
+    },
+    "elapsedMs": 0.3504579999997759,
+    "responseBytes": 445,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 145,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.6470830000004923,
+    "responseBytes": 445,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 146,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.3969169999997746,
+    "responseBytes": 104,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 147,
+      "method": "chain_getHeader",
+      "params": [
+        "0x6e127f510f729cdf91940b4f08f7e470c4839a7352f28914fa2e5d2da54d181c"
+      ]
+    },
+    "elapsedMs": 0.3537919999985206,
+    "responseBytes": 445,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 148,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.576958999999988,
+    "responseBytes": 445,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 149,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.42108300000087695,
+    "responseBytes": 104,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 150,
+      "method": "chain_getHeader",
+      "params": [
+        "0x86153cc20d1b1c1565cf5ad8663233fcc25b19699694888f284e4cfdcdd4e3b2"
+      ]
+    },
+    "elapsedMs": 0.40487500000097043,
+    "responseBytes": 445,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 151,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.6145409999991358,
+    "responseBytes": 445,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 152,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.4190830000005974,
+    "responseBytes": 104,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 153,
+      "method": "chain_getHeader",
+      "params": [
+        "0x9aa7f122e99ecda3c36a4e6b89125a735a6c48643e7ddd2a024c39bce838be74"
+      ]
+    },
+    "elapsedMs": 0.4024170000000993,
+    "responseBytes": 445,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 154,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.5725000000005309,
+    "responseBytes": 445,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 155,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.3928749999992931,
+    "responseBytes": 104,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 156,
+      "method": "chain_getHeader",
+      "params": [
+        "0x2e464b44e029842809c6f6429c7d39f3ccec5d19a73bb304572f4a20e93d6a8a"
+      ]
+    },
+    "elapsedMs": 0.3448749999996892,
+    "responseBytes": 445,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 157,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.6850420000006352,
+    "responseBytes": 445,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 158,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.4447499999997717,
+    "responseBytes": 104,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 159,
+      "method": "chain_getHeader",
+      "params": [
+        "0x2d1db1641feadff93d63a0b0e13be88680d1753ca83bda118cfccdde158e9b30"
+      ]
+    },
+    "elapsedMs": 0.39216700000110905,
+    "responseBytes": 445,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 160,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.6712079999999787,
+    "responseBytes": 445,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 161,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.40124999999946453,
+    "responseBytes": 104,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 162,
+      "method": "chain_getHeader",
+      "params": [
+        "0xf7a581f62d55245fb4589b99182ba7c67168adbb35665cc3f7a0bc231590ea3f"
+      ]
+    },
+    "elapsedMs": 0.33862499999770534,
+    "responseBytes": 445,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 163,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.6281659999984868,
+    "responseBytes": 445,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 164,
+      "method": "chain_getFinalizedHead",
+      "params": []
+    },
+    "elapsedMs": 0.42254200000257924,
+    "responseBytes": 104,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 165,
+      "method": "chain_getHeader",
+      "params": [
+        "0x5949610ea89a123ebb6c287a4a98c6b32235bd5427a8f6060f3769342c0b6378"
+      ]
+    },
+    "elapsedMs": 0.36670800000138115,
+    "responseBytes": 445,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 166,
+      "method": "chain_getHeader",
+      "params": []
+    },
+    "elapsedMs": 0.3283749999987151,
+    "responseBytes": 445,
+    "file": "head.json"
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 167,
+      "method": "chain_getHeader",
+      "params": [
+        "0x5949610ea89a123ebb6c287a4a98c6b32235bd5427a8f6060f3769342c0b6378"
+      ]
+    },
+    "elapsedMs": 0.31179200000153173,
+    "responseBytes": 445,
+    "file": "finalized-header.json"
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 168,
+      "method": "state_traceBlock",
+      "params": [
+        "0x8c07003f3bcfe033bfd9b722abc97a9c6f1334107446a958e42fa5ad7cdf8ebc",
+        "state",
+        "",
+        ""
+      ]
+    },
+    "elapsedMs": 0.37658300000131817,
+    "responseBytes": 369,
+    "file": "trace-after.json"
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 169,
+      "method": "state_getStorage",
+      "params": [
+        "0x3a65787472696e7369635f696e646578",
+        "0x8c07003f3bcfe033bfd9b722abc97a9c6f1334107446a958e42fa5ad7cdf8ebc"
+      ]
+    },
+    "elapsedMs": 0.38345800000172403,
+    "responseBytes": 183,
+    "file": "storage-old.json"
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 170,
+      "method": "chain_getBlockHash",
+      "params": []
+    },
+    "elapsedMs": 0.32616600000068274,
+    "responseBytes": 104,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 171,
+      "method": "state_traceBlock",
+      "params": [
+        "0x5949610ea89a123ebb6c287a4a98c6b32235bd5427a8f6060f3769342c0b6378",
+        "state",
+        "",
+        ""
+      ]
+    },
+    "elapsedMs": 2.313916999998611,
+    "responseBytes": 91351,
+    "file": "trace-recent.json"
+  }
+]

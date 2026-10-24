@@ -1,11 +1,11 @@
 //! Runtime metadata loading and the storage prefix index.
 
-use std::collections::HashMap;
+use std::{borrow::Cow, collections::HashMap};
 
 use frame_decode::{
     constants::ConstantTypeInfo,
     extrinsics::decode_extrinsic,
-    storage::{StorageEntryInfo, StorageInfo, StorageTypeInfo, decode_storage_key_with_info},
+    storage::{StorageInfo, StorageTypeInfo, decode_storage_key_with_info},
 };
 use frame_metadata::{RuntimeMetadata, RuntimeMetadataPrefixed};
 use parity_scale_codec::Decode;
@@ -86,21 +86,35 @@ impl Metadata {
         Self::index(runtime)
     }
 
+    /// Loads metadata from hex text, as `state_getMetadata` returns it (`0x` and surrounding
+    /// quotes or whitespace are allowed).
+    pub fn from_hex(text: &str) -> Result<Self, Error> {
+        let text = text.trim().trim_matches('"');
+        let bytes = hex::decode(text.strip_prefix("0x").unwrap_or(text))?;
+        Self::from_bytes(&bytes)
+    }
+
     fn index(runtime: Runtime) -> Result<Self, Error> {
         let mut items = HashMap::new();
         let mut pallets = HashMap::new();
         with_runtime!(&runtime, md => {
-            for (pallet, name) in md.storage_tuples() {
-                let info = md
-                    .storage_info(&pallet, &name)
-                    .map_err(|e| Error::Metadata(e.to_string()))?
-                    .into_owned();
-                let pallet_hash = twox_128(pallet.as_bytes());
-                pallets.entry(pallet_hash).or_insert_with(|| pallet.to_string());
-                let mut prefix = [0u8; 32];
-                prefix[..16].copy_from_slice(&pallet_hash);
-                prefix[16..].copy_from_slice(&twox_128(name.as_bytes()));
-                items.insert(prefix, Item { pallet: pallet.to_string(), name: name.to_string(), info });
+            for pallet in &md.pallets {
+                let Some(storage) = &pallet.storage else { continue };
+                // Keys start with twox128 of the storage prefix, which is usually but not
+                // always the pallet name.
+                let prefix_hash = twox_128(storage.prefix.as_bytes());
+                pallets.entry(prefix_hash).or_insert_with(|| pallet.name.to_string());
+                for entry in &storage.entries {
+                    let info = md
+                        .storage_info(&pallet.name, &entry.name)
+                        .map_err(|e| Error::Metadata(e.to_string()))?
+                        .into_owned();
+                    let mut prefix = [0u8; 32];
+                    prefix[..16].copy_from_slice(&prefix_hash);
+                    prefix[16..].copy_from_slice(&twox_128(entry.name.as_bytes()));
+                    let item = Item { pallet: pallet.name.to_string(), name: entry.name.to_string(), info };
+                    items.insert(prefix, item);
+                }
             }
         });
         let ss58_prefix = with_runtime!(&runtime, md => md.constant_info("System", "SS58Prefix"))
@@ -138,27 +152,41 @@ impl Metadata {
         with_runtime!(&self.runtime, md => &md.types)
     }
 
-    /// Names a key of the main trie (`child_trie` is `None`) or of a child trie.
+    /// Names a key of the main trie (`child_trie` is `None`) or of a child trie, decoding map
+    /// keys where the hasher keeps them.
     pub fn key_name(&self, child_trie: Option<&[u8]>, key: &[u8]) -> KeyName {
+        self.name(child_trie, key, true)
+    }
+
+    /// Names a key from its first bytes only, without map keys: for keys the node printed
+    /// truncated. The result is never `complete`.
+    pub fn item_name(&self, child_trie: Option<&[u8]>, key_head: &[u8]) -> KeyName {
+        self.name(child_trie, key_head, false)
+    }
+
+    fn name(&self, child_trie: Option<&[u8]>, key: &[u8], decode_keys: bool) -> KeyName {
         if let Some(trie) = child_trie {
             return KeyName::Child {
                 trie: trie.to_vec(),
             };
         }
-        if let Some(name) = well_known(key) {
+        if decode_keys && let Some(name) = well_known(key) {
             return name;
         }
-        let Some(prefix) = key.get(..32).and_then(|p| <[u8; 32]>::try_from(p).ok()) else {
+        let Some(item) = key
+            .get(..32)
+            .and_then(|p| <[u8; 32]>::try_from(p).ok())
+            .and_then(|prefix| self.items.get(&prefix))
+        else {
             return KeyName::Unknown {
                 pallet: self.pallet_of(key),
             };
         };
-        let Some(item) = self.items.get(&prefix) else {
-            return KeyName::Unknown {
-                pallet: self.pallet_of(key),
-            };
+        let (keys, complete) = if decode_keys {
+            self.map_keys(item, key)
+        } else {
+            (Vec::new(), false)
         };
-        let (keys, complete) = self.map_keys(item, key);
         KeyName::Storage {
             pallet: item.pallet.clone(),
             item: item.name.clone(),
@@ -174,25 +202,39 @@ impl Metadata {
 
     /// Renders the map keys after the 32-byte prefix. Transparent hashers (`Identity`,
     /// `Twox64Concat`, `Blake2_128Concat`) give decoded values; opaque ones give a short hash.
-    /// `complete` is false when the key is a strict prefix of a full map key, has trailing bytes,
-    /// or does not decode.
+    /// A prefix of a full key (as `clear_prefix` uses) gives the leading keys it holds.
+    /// `complete` is true only when every map key was decoded and no bytes are left over.
     fn map_keys(&self, item: &Item, key: &[u8]) -> (Vec<String>, bool) {
-        if key.len() == 32 {
-            return (Vec::new(), item.info.keys.is_empty());
+        let all = item.info.keys.len();
+        for n in (1..=all).rev() {
+            let partial;
+            let info = if n == all {
+                &item.info
+            } else {
+                partial = StorageInfo {
+                    keys: Cow::Owned(item.info.keys[..n].to_vec()),
+                    default_value: None,
+                    ..item.info.clone()
+                };
+                &partial
+            };
+            let mut cursor = key;
+            let Ok(decoded) = decode_storage_key_with_info(&mut cursor, info, self.types()) else {
+                continue;
+            };
+            if !cursor.is_empty() {
+                continue;
+            }
+            let keys = decoded
+                .parts()
+                .map(|part| match part.value() {
+                    Some(value) => self.render_value(&key[value.range()], *value.ty()),
+                    None => format!("#{}", short_hex(&key[part.hash_range()])),
+                })
+                .collect();
+            return (keys, n == all);
         }
-        let mut cursor = key;
-        let Ok(decoded) = decode_storage_key_with_info(&mut cursor, &item.info, self.types())
-        else {
-            return (Vec::new(), false);
-        };
-        let keys = decoded
-            .parts()
-            .map(|part| match part.value() {
-                Some(value) => self.render_value(&key[value.range()], *value.ty()),
-                None => format!("#{}", short_hex(&key[part.hash_range()])),
-            })
-            .collect();
-        (keys, cursor.is_empty())
+        (Vec::new(), all == 0 && key.len() == 32)
     }
 
     fn render_value(&self, bytes: &[u8], ty: u32) -> String {

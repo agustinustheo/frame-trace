@@ -2,8 +2,10 @@
 
 #![allow(clippy::unwrap_used)] // Tests may panic on bad fixtures.
 
+use frame_metadata::{RuntimeMetadata, RuntimeMetadataPrefixed};
 use frame_trace_decode::{KeyName, Metadata, annotate};
 use frame_trace_model::{TracedBlock, rpc::parse_trace_block};
+use parity_scale_codec::{Decode, Encode};
 use sp_crypto_hashing::{blake2_128, twox_64, twox_128};
 
 const ALICE: &str = "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d";
@@ -79,7 +81,7 @@ fn falls_back_gracefully() {
 
     // A map prefix (as in `clear_prefix` or iteration): named, no keys, not complete.
     let name = md.key_name(None, &prefix("System", "Account"));
-    assert_eq!(name.to_string(), "System::Account");
+    assert_eq!(name.to_string(), "System::Account(…)");
     assert!(matches!(
         name,
         KeyName::Storage {
@@ -178,13 +180,14 @@ fn annotates_a_traced_block() {
         [
             "initialization",
             "extrinsic 0: Timestamp.set",
-            "extrinsic 1",
+            "post inherents (on_poll)",
+            "extrinsic 1: Balances.transfer_keep_alive",
             "finalization"
         ]
     );
 
-    let ext1 = &annotated.phases[2];
-    let read = &ext1.ops[1];
+    let ext1 = &annotated.phases[3];
+    let read = &ext1.ops[2];
     assert_eq!(
         read.label,
         "get System::Account(5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY)"
@@ -193,10 +196,15 @@ fn annotates_a_traced_block() {
         (read.pallet.as_deref(), read.item.as_str()),
         (Some("System"), "System::Account")
     );
-    assert!(ext1.ops[2].duplicate_read);
+    assert!(read.key_complete);
+    assert!(ext1.ops[3].duplicate_read);
     assert_eq!(annotated.phases[0].ops[0].label, "get System::Number");
+    assert_eq!(annotated.phases[0].ops[8].label, "get System::BlockHash(0)");
+    let clear_prefix = &annotated.phases[4].ops[6];
+    assert_eq!(clear_prefix.label, "clear_prefix System::BlockHash(…)");
+    assert!(!clear_prefix.key_complete);
     assert_eq!(
-        annotated.phases[3].ops.last().unwrap().label,
+        annotated.phases[4].ops.last().unwrap().label,
         "storage_root"
     );
 
@@ -204,4 +212,135 @@ fn annotates_a_traced_block() {
     let bare = annotate(&block, None);
     assert_eq!(bare.phases[1].ops[0].label, "get :extrinsic_index");
     assert_eq!(bare.phases[1].label, "extrinsic 0");
+}
+
+/// Keys start with `twox128(storage prefix)`, which may differ from the pallet name.
+#[test]
+fn hashes_the_storage_prefix_not_the_pallet_name() {
+    let RuntimeMetadataPrefixed(magic, RuntimeMetadata::V14(mut md)) =
+        RuntimeMetadataPrefixed::decode(&mut &*fixture("metadata/westend-v14.scale")).unwrap()
+    else {
+        panic!("expected V14");
+    };
+    let system = md.pallets.iter_mut().find(|p| p.name == "System").unwrap();
+    system.name = "Sys".into();
+    assert_eq!(system.storage.as_ref().unwrap().prefix, "System");
+    let bytes = RuntimeMetadataPrefixed(magic, RuntimeMetadata::V14(md)).encode();
+
+    let md = Metadata::from_bytes(&bytes).unwrap();
+    assert_eq!(
+        md.key_name(None, &prefix("System", "Number")).to_string(),
+        "Sys::Number"
+    );
+    assert_eq!(
+        md.key_name(None, &prefix("System", "NoSuchItem")),
+        KeyName::Unknown {
+            pallet: Some("Sys".into())
+        }
+    );
+}
+
+#[test]
+fn decodes_leading_keys_of_a_prefix() {
+    let md = westend(16);
+    // ParasDisputes::Disputes is Twox64Concat<SessionIndex>, Blake2_128Concat<CandidateHash>.
+    let era = 100u32.to_le_bytes();
+    let key = [
+        prefix("ParasDisputes", "Disputes"),
+        twox_64(&era).to_vec(),
+        era.to_vec(),
+    ]
+    .concat();
+    let name = md.key_name(None, &key);
+    assert_eq!(name.to_string(), "ParasDisputes::Disputes(100, …)");
+    assert!(matches!(
+        name,
+        KeyName::Storage {
+            complete: false,
+            ..
+        }
+    ));
+}
+
+#[test]
+fn names_truncated_keys_from_their_prefix_only() {
+    let md = westend(16);
+    let alice = hex::decode(ALICE).unwrap();
+    let head = [
+        prefix("System", "Account"),
+        blake2_128(&alice).to_vec(),
+        alice,
+    ]
+    .concat();
+    let name = md.item_name(None, &head);
+    assert_eq!(name.to_string(), "System::Account(…)");
+
+    // A trace with a truncated System::Account key: named, not decoded, not complete.
+    let event = |key: &str| {
+        format!(
+            r#"{{"target":"state","data":{{"stringValues":{{"method":"Get","key":"{key}","result":"None"}}}},"parentId":null}}"#
+        )
+    };
+    let key = format!("{}...{}", hex::encode(&head), "ff".repeat(4));
+    let json = format!(
+        r#"{{"blockHash":"0x01","parentHash":"0x00","events":[{},{}]}}"#,
+        event(&key),
+        event(&key)
+    );
+    let block = TracedBlock::from_trace(&parse_trace_block(&json).unwrap()).unwrap();
+    let annotated = annotate(&block, Some(&md));
+    let ops = &annotated.phases[0].ops;
+    assert_eq!(ops[0].label, "get System::Account(…)");
+    assert!(ops[0].key_truncated && !ops[0].key_complete && ops[0].map_keys.is_empty());
+    assert!(ops[0].key.ends_with("...ffffffff"));
+    assert!(
+        !ops[1].duplicate_read,
+        "truncated keys are never duplicates"
+    );
+    assert_eq!(annotated.totals.truncated_keys, 2);
+}
+
+#[test]
+fn loads_hex_metadata_of_a_real_chain() {
+    let hex = String::from_utf8(fixture("model/real/people-paseo-block-1-metadata.hex")).unwrap();
+    let md = Metadata::from_hex(&hex).unwrap();
+    assert_eq!(md.version(), 14);
+    assert_eq!(
+        md.key_name(None, &prefix("System", "Number")).to_string(),
+        "System::Number"
+    );
+    assert!(Metadata::from_hex("0xzz").is_err());
+    assert!(Metadata::from_hex("0x00").is_err());
+}
+
+#[test]
+fn real_block_extrinsics_get_named_only_with_matching_metadata() {
+    let json =
+        String::from_utf8(fixture("model/real/people-paseo-block-1-trace-state.json")).unwrap();
+    let block = TracedBlock::from_trace(&parse_trace_block(&json).unwrap()).unwrap();
+
+    let hex = String::from_utf8(fixture("model/real/people-paseo-block-1-metadata.hex")).unwrap();
+    let own = Metadata::from_hex(&hex).unwrap();
+    let labels: Vec<String> = annotate(&block, Some(&own))
+        .phases
+        .into_iter()
+        .map(|p| p.label)
+        .collect();
+    assert_eq!(
+        labels,
+        [
+            "initialization",
+            "extrinsic 0: ParachainSystem.set_validation_data",
+            "extrinsic 1: Timestamp.set",
+            "post inherents (on_poll)",
+            "finalization"
+        ]
+    );
+
+    // Westend metadata does not match this runtime: the label falls back to the index and the
+    // error is kept. (Extrinsic 1 still decodes, because Timestamp has the same index and call
+    // layout in both runtimes; metadata from another runtime can give plausible wrong names.)
+    let other = annotate(&block, Some(&westend(16)));
+    assert_eq!(other.phases[1].label, "extrinsic 0");
+    assert!(other.phases[1].call.is_none() && other.phases[1].call_error.is_some());
 }

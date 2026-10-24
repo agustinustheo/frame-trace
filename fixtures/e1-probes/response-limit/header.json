@@ -1,0 +1,12 @@
+{
+  "parentHash": "0x2497762c9b9dd5a55fe6fcd0413153d5a2407428502298da4060e2fb7fde662f",
+  "number": "0x1",
+  "stateRoot": "0x3c0108f8e1d026bfc387bf5f1fa280ef2660718b1a72bc99b0351e2a77540ac3",
+  "extrinsicsRoot": "0x683979ebd56b60c30edad22ab3006f6193f3a57af7c5a4a1747f147adca436a0",
+  "digest": {
+    "logs": [
+      "0x0661757261202abee70800000000",
+      "0x045250535290c1adc6c9211b73f22bb8619167542958ab7a37b5ff543adf988f3ba94c70877f56f13d47"
+    ]
+  }
+}

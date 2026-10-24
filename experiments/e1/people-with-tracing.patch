@@ -1,0 +1,12 @@
+diff --git a/runtimes/next-people-paseo/Cargo.toml b/runtimes/next-people-paseo/Cargo.toml
+index 3e90c61..b695a08 100644
+--- a/runtimes/next-people-paseo/Cargo.toml
++++ b/runtimes/next-people-paseo/Cargo.toml
+@@ -123,6 +123,7 @@ parking_lot = { workspace = true }
+ sp-trie = { workspace = true }
+ 
+ [features]
++with-tracing = ["sp-io/with-tracing", "frame-executive/with-tracing"]
+ default = ["std"]
+ std = [
+ 	"assets-common/std",

@@ -17,6 +17,9 @@
 
 use std::time::{Duration, SystemTime};
 
+mod delivery;
+
+pub use delivery::{Delivery, DeliveryHandle, Tracked};
 use frame_trace_decode::{AnnotatedBlock, AnnotatedOp, AnnotatedPhase};
 use frame_trace_model::Stats;
 use opentelemetry::{
@@ -47,6 +50,19 @@ pub enum Error {
     /// Export or shutdown failed.
     #[error("export failed: {0}")]
     Export(#[from] opentelemetry_sdk::error::OTelSdkError),
+    /// Some spans never reached the backend: rejected by the exporter or dropped by the SDK.
+    #[error(
+        "{lost} of {total} spans were not exported{}",
+        first_error.as_ref().map(|e| format!(" (first error: {e})")).unwrap_or_default()
+    )]
+    Incomplete {
+        /// Spans not exported.
+        lost: usize,
+        /// Spans created.
+        total: usize,
+        /// The first export error, if the exporter reported one.
+        first_error: Option<String>,
+    },
 }
 
 /// How spans are laid out in time.
@@ -107,13 +123,37 @@ pub fn otlp_http_exporter(endpoint: &str) -> Result<opentelemetry_otlp::SpanExpo
         .build()?)
 }
 
-/// Exports `block` to an OTLP/HTTP endpoint and waits until every span is sent.
+/// Exports `block` to an OTLP/HTTP endpoint. See [`export_block`].
 pub fn export_otlp(block: &AnnotatedBlock, endpoint: &str, timing: Timing) -> Result<usize, Error> {
-    let provider = provider(otlp_http_exporter(endpoint)?, span_count(block));
-    let spans = record_block(&provider.tracer(SCOPE), block, timing);
-    provider.force_flush()?;
-    provider.shutdown()?;
-    Ok(spans)
+    export_block(otlp_http_exporter(endpoint)?, block, timing)
+}
+
+/// Exports `block` through `exporter` and waits until every span was handed over. Returns the
+/// number of spans, or [`Error::Incomplete`] if any span was rejected or dropped.
+pub fn export_block<E: SpanExporter + 'static>(
+    exporter: E,
+    block: &AnnotatedBlock,
+    timing: Timing,
+) -> Result<usize, Error> {
+    let (exporter, delivery) = Tracked::new(exporter);
+    let provider = provider(exporter, span_count(block));
+    let total = record_block(&provider.tracer(SCOPE), block, timing);
+    let flushed = provider.force_flush();
+    let shutdown = provider.shutdown();
+
+    let delivery = delivery.get();
+    if delivery.exported < total {
+        return Err(Error::Incomplete {
+            lost: total - delivery.exported,
+            total,
+            first_error: delivery
+                .first_error
+                .or_else(|| flushed.err().map(|e| e.to_string())),
+        });
+    }
+    flushed?;
+    shutdown?;
+    Ok(total)
 }
 
 /// Records `block` as one trace on `tracer`. Returns the number of spans created.
@@ -209,6 +249,7 @@ fn op_attributes(op: &AnnotatedOp, extrinsic_index: Option<u32>) -> Vec<KeyValue
         KeyValue::new("frame.storage.key", op.key.clone()),
         KeyValue::new("frame.storage.seq", count(op.seq)),
         KeyValue::new("frame.storage.duplicate_read", op.duplicate_read),
+        KeyValue::new("frame.storage.key_complete", op.key_complete),
     ];
     if let Some(pallet) = &op.pallet {
         attrs.push(KeyValue::new("db.collection.name", pallet.clone()));
@@ -226,6 +267,9 @@ fn op_attributes(op: &AnnotatedOp, extrinsic_index: Option<u32>) -> Vec<KeyValue
     if let Some(trie) = &op.child_trie {
         attrs.push(KeyValue::new("frame.storage.child_trie", trie.clone()));
     }
+    if op.child_trie_truncated {
+        attrs.push(KeyValue::new("frame.storage.child_trie_truncated", true));
+    }
     if op.key_truncated {
         attrs.push(KeyValue::new("frame.storage.key_truncated", true));
     }
@@ -238,7 +282,7 @@ fn op_attributes(op: &AnnotatedOp, extrinsic_index: Option<u32>) -> Vec<KeyValue
     attrs
 }
 
-fn stats_attributes(stats: &Stats) -> [KeyValue; 7] {
+fn stats_attributes(stats: &Stats) -> [KeyValue; 8] {
     [
         KeyValue::new("frame.storage.ops", count(stats.ops)),
         KeyValue::new("frame.storage.reads", count(stats.reads)),
@@ -250,6 +294,7 @@ fn stats_attributes(stats: &Stats) -> [KeyValue; 7] {
             "frame.storage.duplicate_reads",
             count(stats.duplicate_reads),
         ),
+        KeyValue::new("frame.storage.truncated_keys", count(stats.truncated_keys)),
     ]
 }
 

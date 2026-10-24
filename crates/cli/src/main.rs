@@ -91,6 +91,17 @@ fn load(args: &source::SourceArgs) -> Result<AnnotatedBlock> {
         eprintln!("warning: no --metadata given, storage keys and extrinsics will not be named");
     }
     let mut block = annotate(&traced, loaded.metadata.as_ref());
+    let undecoded = block
+        .phases
+        .iter()
+        .filter(|p| p.call_error.is_some())
+        .count();
+    if undecoded > 0 {
+        eprintln!(
+            "warning: {undecoded} extrinsic(s) did not decode with this metadata; \
+             is it the metadata of the block's runtime?"
+        );
+    }
     block.block_number = loaded.block_number;
     Ok(block)
 }

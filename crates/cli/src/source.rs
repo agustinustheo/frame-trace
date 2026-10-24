@@ -70,28 +70,24 @@ mod file {
     fn load_metadata(path: &Path) -> Result<Metadata> {
         let context = || format!("reading metadata from {}", path.display());
         let raw = std::fs::read(path).with_context(context)?;
-        let bytes = if raw.starts_with(b"meta") {
-            raw
-        } else {
-            let text = String::from_utf8(raw)
-                .context("metadata is neither SCALE bytes nor text")
-                .with_context(context)?;
-            let text = text.trim();
-            let hex_str = if text.starts_with('{') {
-                let value: serde_json::Value = serde_json::from_str(text).with_context(context)?;
-                value["result"]
-                    .as_str()
-                    .context("no string `result` in the JSON")
-                    .with_context(context)?
-                    .to_owned()
-            } else {
-                text.trim_matches('"').to_owned()
-            };
-            hex::decode(hex_str.trim_start_matches("0x"))
-                .context("metadata is not valid hex")
+        if raw.starts_with(b"meta") {
+            return Metadata::from_bytes(&raw).with_context(context);
+        }
+        let text = String::from_utf8(raw)
+            .context("metadata is neither SCALE bytes nor text")
+            .with_context(context)?;
+        let text = text.trim();
+        let hex = if text.starts_with('{') {
+            let value: serde_json::Value = serde_json::from_str(text).with_context(context)?;
+            value["result"]
+                .as_str()
+                .context("no string `result` in the JSON")
                 .with_context(context)?
+                .to_owned()
+        } else {
+            text.to_owned()
         };
-        Metadata::from_bytes(&bytes).with_context(context)
+        Metadata::from_hex(&hex).with_context(context)
     }
 }
 

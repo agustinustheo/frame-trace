@@ -18,7 +18,6 @@ comfy-table.workspace = true
 frame-trace-decode.workspace = true
 frame-trace-model.workspace = true
 frame-trace-otel.workspace = true
-hex.workspace = true
 serde_json.workspace = true
 
 [lints]

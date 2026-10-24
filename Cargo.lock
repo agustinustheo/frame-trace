@@ -408,7 +408,6 @@ dependencies = [
  "frame-trace-decode",
  "frame-trace-model",
  "frame-trace-otel",
- "hex",
  "serde_json",
 ]
 

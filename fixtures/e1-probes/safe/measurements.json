@@ -1,0 +1,86 @@
+[
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "chain_getBlockHash",
+      "params": [
+        1
+      ]
+    },
+    "elapsedMs": 8.077541,
+    "responseBytes": 102,
+    "file": null
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 2,
+      "method": "state_traceBlock",
+      "params": [
+        "0x2d8fceb5ecad763ece34d1116c9346a05640fe1f12d3899a63b945fc166f1ae8",
+        "state",
+        "",
+        ""
+      ]
+    },
+    "elapsedMs": 1.3415830000000073,
+    "responseBytes": 101,
+    "file": "trace-before.json"
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 3,
+      "method": "chain_getBlock",
+      "params": [
+        "0x2d8fceb5ecad763ece34d1116c9346a05640fe1f12d3899a63b945fc166f1ae8"
+      ]
+    },
+    "elapsedMs": 1.180125000000004,
+    "responseBytes": 3623,
+    "file": "block.json"
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 4,
+      "method": "rpc_methods",
+      "params": []
+    },
+    "elapsedMs": 0.8433340000000011,
+    "responseBytes": 2833,
+    "file": "rpc-methods.json"
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 5,
+      "method": "state_traceBlock",
+      "params": [
+        "0x2d8fceb5ecad763ece34d1116c9346a05640fe1f12d3899a63b945fc166f1ae8",
+        "state",
+        "",
+        ""
+      ]
+    },
+    "elapsedMs": 0.791,
+    "responseBytes": 101,
+    "file": "trace-safe.json"
+  },
+  {
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 6,
+      "method": "author_insertKey",
+      "params": [
+        "aura",
+        "//Alice",
+        "0x0000000000000000000000000000000000000000000000000000000000000000"
+      ]
+    },
+    "elapsedMs": 0.6040000000000073,
+    "responseBytes": 103,
+    "file": "unsafe-control.json"
+  }
+]

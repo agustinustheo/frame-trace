@@ -1,0 +1,77 @@
+[
+  {
+    "method": "chain_getBlock",
+    "params": [
+      "0x07cfefae800c6ea172c90d25b5241cad3d9ab3724490406899af59249125016f"
+    ],
+    "file": "block.json",
+    "elapsedMs": 15.012958000000026,
+    "responseBytes": 990258,
+    "httpStatus": 200,
+    "error": null
+  },
+  {
+    "method": "chain_getHeader",
+    "params": [
+      "0x07cfefae800c6ea172c90d25b5241cad3d9ab3724490406899af59249125016f"
+    ],
+    "file": "header.json",
+    "elapsedMs": 1.419540999999981,
+    "responseBytes": 441,
+    "httpStatus": 200,
+    "error": null
+  },
+  {
+    "method": "state_getMetadata",
+    "params": [
+      "0x07cfefae800c6ea172c90d25b5241cad3d9ab3724490406899af59249125016f"
+    ],
+    "elapsedMs": 5.530458999999951,
+    "responseBytes": 979588,
+    "httpStatus": 200,
+    "error": null
+  },
+  {
+    "method": "state_getRuntimeVersion",
+    "params": [
+      "0x07cfefae800c6ea172c90d25b5241cad3d9ab3724490406899af59249125016f"
+    ],
+    "file": "runtime-version.json",
+    "elapsedMs": 0.9440000000000737,
+    "responseBytes": 848,
+    "httpStatus": 200,
+    "error": null
+  },
+  {
+    "method": "state_traceBlock",
+    "params": [
+      "0x07cfefae800c6ea172c90d25b5241cad3d9ab3724490406899af59249125016f",
+      "state",
+      "",
+      ""
+    ],
+    "file": "trace-full.json",
+    "elapsedMs": 22.196583000000032,
+    "responseBytes": 119,
+    "httpStatus": 200,
+    "error": {
+      "code": -32008,
+      "message": "Response is too big",
+      "data": "Exceeded max limit of 1048576"
+    }
+  },
+  {
+    "method": "state_traceBlock",
+    "params": [
+      "0x07cfefae800c6ea172c90d25b5241cad3d9ab3724490406899af59249125016f",
+      "state",
+      "3a65312d73697a653a0000",
+      ""
+    ],
+    "file": "trace-filtered.json",
+    "elapsedMs": 21.074709000000098,
+    "responseBytes": 10710,
+    "httpStatus": 200,
+    "error": null
+  }
+]

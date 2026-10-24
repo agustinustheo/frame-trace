@@ -19,6 +19,9 @@ pub enum Error {
     /// The bytes are not SCALE-encoded runtime metadata.
     #[error("invalid metadata: {0}")]
     Codec(#[from] parity_scale_codec::Error),
+    /// The metadata text is not valid hex.
+    #[error("metadata is not valid hex: {0}")]
+    Hex(#[from] hex::FromHexError),
     /// The metadata version is not V14, V15 or V16.
     #[error("unsupported metadata version V{0} (need V14, V15 or V16)")]
     UnsupportedVersion(u32),

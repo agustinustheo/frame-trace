@@ -1,0 +1,9 @@
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "error": {
+    "code": -32008,
+    "message": "Response is too big",
+    "data": "Exceeded max limit of 1048576"
+  }
+}

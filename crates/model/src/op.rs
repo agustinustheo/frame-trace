@@ -116,11 +116,9 @@ pub struct StorageOp {
     /// What the op did.
     pub kind: OpKind,
     /// Child trie storage key, `None` for the main trie.
-    pub child_trie: Option<Vec<u8>>,
+    pub child_trie: Option<PrintedBytes>,
     /// The key, or the prefix for [`OpKind::ClearPrefix`]. Empty when the op has no key.
-    pub key: Vec<u8>,
-    /// The key was too long for the node to print in full; `key` holds its first 512 bytes.
-    pub key_truncated: bool,
+    pub key: PrintedBytes,
     /// Value read, written or appended, when the event carries it in full.
     pub value: Option<Vec<u8>>,
     /// Length of the value read, written or appended. `None` when absent or unknown.
@@ -132,6 +130,16 @@ pub struct StorageOp {
 }
 
 impl StorageOp {
+    /// The `(child trie, key)` pair when both were printed in full. `None` when the node
+    /// truncated either, since two different long keys can then look the same.
+    pub fn key_id(&self) -> Option<(Option<&[u8]>, &[u8])> {
+        let child = match &self.child_trie {
+            Some(trie) => Some(trie.complete()?),
+            None => None,
+        };
+        Some((child, self.key.complete()?))
+    }
+
     fn new(kind: OpKind) -> Self {
         Self {
             seq: 0,
@@ -139,8 +147,7 @@ impl StorageOp {
             ext_id: None,
             kind,
             child_trie: None,
-            key: Vec::new(),
-            key_truncated: false,
+            key: PrintedBytes::default(),
             value: None,
             value_len: None,
             value_truncated: false,
@@ -202,12 +209,12 @@ fn parse_event(event: &Event) -> Result<Option<StorageOp>, String> {
     let mut op = StorageOp::new(kind);
     op.ext_id = event.field("ext_id").map(str::to_owned);
     if child {
-        op.child_trie = Some(display_hex(required(event, "child_info")?)?.0);
+        op.child_trie = Some(display_hex(required(event, "child_info")?)?);
     }
 
     match kind {
         OpKind::Get | OpKind::Exists | OpKind::Hash => {
-            (op.key, op.key_truncated) = display_hex(required(event, "key")?)?;
+            op.key = display_hex(required(event, "key")?)?;
             if kind == OpKind::Get {
                 // `result` is missing only if the node changed format; treat as unknown.
                 if let Some(result) = event.field("result") {
@@ -217,7 +224,7 @@ fn parse_event(event: &Event) -> Result<Option<StorageOp>, String> {
             }
         }
         OpKind::Put => {
-            (op.key, op.key_truncated) = display_hex(required(event, "key")?)?;
+            op.key = display_hex(required(event, "key")?)?;
             op.value = option_hex(required(event, "value")?)?;
             match &op.value {
                 Some(value) => op.value_len = Some(value.len()),
@@ -225,16 +232,16 @@ fn parse_event(event: &Event) -> Result<Option<StorageOp>, String> {
             }
         }
         OpKind::Append => {
-            (op.key, op.key_truncated) = display_hex(required(event, "key")?)?;
-            let (value, truncated) = display_hex(required(event, "value")?)?;
-            op.value_truncated = truncated;
-            if !truncated {
+            op.key = display_hex(required(event, "key")?)?;
+            let value = display_hex(required(event, "value")?)?;
+            op.value_truncated = value.is_truncated();
+            if let Some(value) = value.complete() {
                 op.value_len = Some(value.len());
-                op.value = Some(value);
+                op.value = Some(value.to_vec());
             }
         }
         OpKind::ClearPrefix => {
-            (op.key, op.key_truncated) = display_hex(required(event, "prefix")?)?;
+            op.key = display_hex(required(event, "prefix")?)?;
         }
         OpKind::Clear
         | OpKind::KillChild
@@ -251,12 +258,57 @@ fn required<'a>(event: &'a Event, field: &str) -> Result<&'a str, String> {
         .ok_or_else(|| format!("missing field `{field}`"))
 }
 
-/// Parses `%HexDisplay` output. Values of 1027 bytes or more are printed as
-/// `<first 512 bytes>...<last 512 bytes>`; then only the first part is kept and the flag is set.
-fn display_hex(s: &str) -> Result<(Vec<u8>, bool), String> {
+/// Bytes as the node printed them with `%HexDisplay`: in full, or, for inputs of 1027 bytes
+/// or more, only the first and last 512 bytes (`<head>...<tail>`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash)]
+pub struct PrintedBytes {
+    /// All bytes, or the first 512 when truncated.
+    pub head: Vec<u8>,
+    /// The last 512 bytes when the node truncated the value; the middle is lost.
+    pub tail: Option<Vec<u8>>,
+}
+
+impl PrintedBytes {
+    /// Bytes printed in full.
+    pub fn full(bytes: impl Into<Vec<u8>>) -> Self {
+        Self {
+            head: bytes.into(),
+            tail: None,
+        }
+    }
+
+    /// Whether the middle of the bytes is missing.
+    pub fn is_truncated(&self) -> bool {
+        self.tail.is_some()
+    }
+
+    /// The bytes, if printed in full.
+    pub fn complete(&self) -> Option<&[u8]> {
+        self.tail.is_none().then_some(self.head.as_slice())
+    }
+
+    /// Whether nothing was printed.
+    pub fn is_empty(&self) -> bool {
+        self.head.is_empty() && self.tail.is_none()
+    }
+
+    /// `0x`-prefixed hex, with `...` where the node cut the middle out.
+    pub fn to_hex(&self) -> String {
+        match &self.tail {
+            Some(tail) => format!("0x{}...{}", hex::encode(&self.head), hex::encode(tail)),
+            None => format!("0x{}", hex::encode(&self.head)),
+        }
+    }
+}
+
+/// Parses `%HexDisplay` output (see [`PrintedBytes`]).
+fn display_hex(s: &str) -> Result<PrintedBytes, String> {
     match s.split_once("...") {
-        Some((head, _tail)) => Ok((decode_hex(head)?, true)),
-        None => Ok((decode_hex(s)?, false)),
+        Some((head, tail)) => Ok(PrintedBytes {
+            head: decode_hex(head)?,
+            tail: Some(decode_hex(tail)?),
+        }),
+        None => Ok(PrintedBytes::full(decode_hex(s)?)),
     }
 }
 
@@ -310,8 +362,8 @@ mod tests {
         .unwrap()
         .unwrap();
         assert_eq!(
-            (get.kind, get.key.as_slice(), get.value_len),
-            (OpKind::Get, &[0xaa, 0xbb][..], Some(2))
+            (get.kind, get.key.complete(), get.value_len),
+            (OpKind::Get, Some(&[0xaa, 0xbb][..]), Some(2))
         );
         assert_eq!(get.ext_id.as_deref(), Some("0100"));
 
@@ -353,14 +405,14 @@ mod tests {
         ]))
         .unwrap()
         .unwrap();
-        assert_eq!(op.child_trie.as_deref(), Some(&[0xbe, 0xef][..]));
+        assert_eq!(op.child_trie, Some(PrintedBytes::full([0xbe, 0xef])));
 
         let op = parse_event(&event(&[("method", "ClearPrefix"), ("prefix", "abcd")]))
             .unwrap()
             .unwrap();
         assert_eq!(
-            (op.kind, op.key.as_slice()),
-            (OpKind::ClearPrefix, &[0xab, 0xcd][..])
+            (op.kind, op.key.complete()),
+            (OpKind::ClearPrefix, Some(&[0xab, 0xcd][..]))
         );
 
         let op = parse_event(&event(&[("method", "ChildKill"), ("child_info", "01")]))
@@ -380,6 +432,24 @@ mod tests {
         .unwrap();
         assert!(op.value_truncated);
         assert_eq!(op.value_len, None);
+
+        let op = parse_event(&event(&[
+            ("method", "ChildGet"),
+            ("child_info", "0a...0b"),
+            ("key", "aabb...ccdd"),
+            ("result", "None"),
+        ]))
+        .unwrap()
+        .unwrap();
+        assert_eq!(op.key.head, [0xaa, 0xbb]);
+        assert_eq!(op.key.tail.as_deref(), Some(&[0xcc, 0xdd][..]));
+        assert_eq!(op.key.to_hex(), "0xaabb...ccdd");
+        assert!(
+            op.child_trie
+                .as_ref()
+                .is_some_and(PrintedBytes::is_truncated)
+        );
+        assert_eq!(op.key_id(), None);
     }
 
     #[test]

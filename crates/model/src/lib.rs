@@ -12,7 +12,7 @@ pub mod rpc;
 mod stats;
 
 pub use block::{Phase, TracedBlock};
-pub use op::{OpKind, StorageOp, ops_from_events};
+pub use op::{OpKind, PrintedBytes, StorageOp, ops_from_events};
 pub use phase::{PhaseKind, phase_marker, segment};
 pub use stats::{Stats, mark_duplicate_reads};
 

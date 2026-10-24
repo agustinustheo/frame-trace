@@ -13,8 +13,8 @@ pub enum KeyName {
         item: String,
         /// Rendered map keys: decoded values for transparent hashers, `#<hash>` otherwise.
         keys: Vec<String>,
-        /// False when the key is only a prefix of a full key (for example `clear_prefix` on a map)
-        /// or could not be decoded.
+        /// False when the key is only a prefix of a full key (for example `clear_prefix` on a map),
+        /// was printed truncated, or could not be decoded. Shown as `…`.
         complete: bool,
     },
     /// A well-known key outside of any pallet, such as `:code`.
@@ -60,12 +60,16 @@ impl KeyName {
 impl fmt::Display for KeyName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.item())?;
-        if let KeyName::Storage { keys, .. } = self
-            && !keys.is_empty()
-        {
-            write!(f, "({})", keys.join(", "))?;
+        let KeyName::Storage { keys, complete, .. } = self else {
+            return Ok(());
+        };
+        match (keys.is_empty(), complete) {
+            (true, true) => Ok(()),
+            (false, true) => write!(f, "({})", keys.join(", ")),
+            // A prefix of a map key, or a key that did not decode in full.
+            (true, false) => f.write_str("(…)"),
+            (false, false) => write!(f, "({}, …)", keys.join(", ")),
         }
-        Ok(())
     }
 }
 

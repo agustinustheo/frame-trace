@@ -1,0 +1,16 @@
+{
+  "jsonrpc": "2.0",
+  "id": 167,
+  "result": {
+    "parentHash": "0x7f6137d31d5d430e69fdc65261d0ee38f26fde981f5d93481d3b1eb73f45069f",
+    "number": "0x12e",
+    "stateRoot": "0xac16c81ae8d66caafa1f3a19b9016a5e22637c9132f3dfd12b3a48ea3cc45380",
+    "extrinsicsRoot": "0xd870c55bee11c0f9416ee66d01d4fa3d51bd7af7b0d76fd7eeeb03c24bb9a8dd",
+    "digest": {
+      "logs": [
+        "0x06617572612049bfe70800000000",
+        "0x045250535290206241201db734c4589bc494934359bd753d682c4cb7c17d99b26dd01a4eb62e4efa3d47"
+      ]
+    }
+  }
+}

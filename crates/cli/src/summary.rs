@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use comfy_table::{CellAlignment, Table};
-use frame_trace_decode::AnnotatedBlock;
+use frame_trace_decode::{AnnotatedBlock, AnnotatedOp};
 use frame_trace_model::Stats;
 
 /// Renders the phase table, the top storage items, and the duplicate reads of each phase.
@@ -126,18 +126,33 @@ fn items(block: &AnnotatedBlock, top: usize) -> Table {
 fn duplicates(block: &AnnotatedBlock, top: usize) -> Table {
     let mut table = table(2, &["phase", "key", "dup reads"]);
     for phase in &block.phases {
-        // Labels include the map keys, so this counts re-reads of the same key.
-        let mut counts: BTreeMap<&str, usize> = BTreeMap::new();
+        // Group by key identity (child trie, raw key), whatever read method was used: names
+        // can be shared by different keys (`<unknown>`, undecoded map keys).
+        let mut counts: BTreeMap<(Option<&str>, &str), (&AnnotatedOp, usize)> = BTreeMap::new();
         for op in phase.ops.iter().filter(|op| op.duplicate_read) {
-            *counts.entry(op.label.as_str()).or_default() += 1;
+            counts
+                .entry((op.child_trie.as_deref(), op.key.as_str()))
+                .or_insert((op, 0))
+                .1 += 1;
         }
-        let mut rows: Vec<_> = counts.into_iter().collect();
-        rows.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.cmp(b.0)));
-        for (label, n) in rows.into_iter().take(top) {
-            table.add_row(vec![phase.label.clone(), label.to_owned(), n.to_string()]);
+        let mut rows: Vec<_> = counts.into_values().collect();
+        rows.sort_by(|a, b| b.1.cmp(&a.1).then(a.0.seq.cmp(&b.0.seq)));
+        for (op, n) in rows.into_iter().take(top) {
+            table.add_row(vec![phase.label.clone(), key_name(op), n.to_string()]);
         }
     }
     table
+}
+
+/// The op's key name, with the start of the raw key when the name alone does not identify it.
+fn key_name(op: &AnnotatedOp) -> String {
+    if op.key_complete {
+        return op.name.clone();
+    }
+    match op.key.get(..34) {
+        Some(head) if op.key.len() > 34 => format!("{} [{head}…]", op.name),
+        _ => format!("{} [{}]", op.name, op.key),
+    }
 }
 
 /// A table with the given header; columns after the first `text_columns` hold numbers and are

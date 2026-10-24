@@ -1,9 +1,9 @@
 //! A traced block with names: the form the exporters and the CLI consume.
 
-use frame_trace_model::{Stats, StorageOp, TracedBlock};
+use frame_trace_model::{PrintedBytes, Stats, StorageOp, TracedBlock};
 use serde::Serialize;
 
-use crate::{KeyName, Metadata};
+use crate::{KeyName, Metadata, key::well_known};
 
 /// A [`TracedBlock`] with every key and extrinsic named. Serialises to the `--json` output.
 #[derive(Debug, Clone, Serialize)]
@@ -32,6 +32,8 @@ pub struct AnnotatedPhase {
     pub extrinsic_index: Option<u32>,
     /// `Pallet.call` of the extrinsic, when its bytes were in the trace and decoded.
     pub call: Option<String>,
+    /// Why the extrinsic bytes did not decode. Usually the metadata is not the block's runtime.
+    pub call_error: Option<String>,
     /// Display name, for example `extrinsic 1: Balances.transfer_keep_alive`.
     pub label: String,
     /// Storage totals.
@@ -47,19 +49,27 @@ pub struct AnnotatedOp {
     pub seq: usize,
     /// Operation name (`get`, `put`, ...).
     pub op: &'static str,
-    /// Child trie storage key (hex), if the op is on a child trie.
+    /// Child trie storage key (hex, `0x`-prefixed), if the op is on a child trie.
     pub child_trie: Option<String>,
-    /// Raw key or prefix (hex, `0x`-prefixed).
+    /// The node printed the child trie key truncated (`<head>...<tail>` in `child_trie`).
+    pub child_trie_truncated: bool,
+    /// Raw key or prefix (hex, `0x`-prefixed); `<head>...<tail>` when truncated.
     pub key: String,
-    /// The node printed only the start of the key.
+    /// The node printed only the first and last 512 bytes of the key. Such keys are named from
+    /// their prefix only and never counted as duplicates.
     pub key_truncated: bool,
+    /// The key was named in full: all map keys decoded, nothing left over. False for prefixes
+    /// (`clear_prefix`), truncated keys, unknown keys and keys that do not decode.
+    pub key_complete: bool,
     /// Pallet, when known.
     pub pallet: Option<String>,
     /// `Pallet::Item`, a well-known key, `child:<id>` or `<unknown>`.
     pub item: String,
     /// Decoded map keys.
     pub map_keys: Vec<String>,
-    /// Display name, for example `get System::Account(5Grw...)`.
+    /// The key's name, for example `System::Account(5Grw...)`; `…` marks missing map keys.
+    pub name: String,
+    /// Display name of the op, for example `get System::Account(5Grw...)`.
     pub label: String,
     /// Length of the value read or written, when known.
     pub value_len: Option<usize>,
@@ -76,10 +86,14 @@ pub fn annotate(block: &TracedBlock, metadata: Option<&Metadata>) -> AnnotatedBl
         .phases
         .iter()
         .map(|phase| {
-            let call = metadata
+            let decoded = metadata
                 .zip(phase.extrinsic.as_deref())
-                .and_then(|(md, bytes)| md.call_name(bytes).ok())
-                .map(|c| c.to_string());
+                .map(|(md, bytes)| md.call_name(bytes));
+            let (call, call_error) = match decoded {
+                Some(Ok(call)) => (Some(call.to_string()), None),
+                Some(Err(err)) => (None, Some(err.to_string())),
+                None => (None, None),
+            };
             let label = match &call {
                 Some(call) => format!("{}: {call}", phase.kind),
                 None => phase.kind.to_string(),
@@ -88,6 +102,7 @@ pub fn annotate(block: &TracedBlock, metadata: Option<&Metadata>) -> AnnotatedBl
                 kind: phase.kind.name(),
                 extrinsic_index: phase.kind.extrinsic_index(),
                 call,
+                call_error,
                 label,
                 stats: phase.stats,
                 ops: block
@@ -109,16 +124,23 @@ pub fn annotate(block: &TracedBlock, metadata: Option<&Metadata>) -> AnnotatedBl
 }
 
 fn annotate_op(op: &StorageOp, metadata: Option<&Metadata>) -> AnnotatedOp {
-    let name = match metadata {
-        Some(md) => md.key_name(op.child_trie.as_deref(), &op.key),
-        None => crate::key::well_known(&op.key).unwrap_or(match &op.child_trie {
-            Some(trie) => KeyName::Child { trie: trie.clone() },
-            None => KeyName::Unknown { pallet: None },
-        }),
+    let child = op.child_trie.as_ref().map(|trie| trie.head.as_slice());
+    let name = match (metadata, op.key.complete()) {
+        (Some(md), Some(key)) => md.key_name(child, key),
+        // Never decode map keys from a truncated key: the middle is missing.
+        (Some(md), None) => md.item_name(child, &op.key.head),
+        (None, key) => match (child, key.and_then(well_known)) {
+            (Some(trie), _) => KeyName::Child {
+                trie: trie.to_vec(),
+            },
+            (None, Some(name)) => name,
+            (None, None) => KeyName::Unknown { pallet: None },
+        },
     };
-    let map_keys = match &name {
-        KeyName::Storage { keys, .. } => keys.clone(),
-        _ => Vec::new(),
+    let (map_keys, named_in_full) = match &name {
+        KeyName::Storage { keys, complete, .. } => (keys.clone(), *complete),
+        KeyName::WellKnown(_) | KeyName::Child { .. } => (Vec::new(), true),
+        KeyName::Unknown { .. } => (Vec::new(), false),
     };
     let label = if op.kind.has_key() {
         format!("{} {name}", op.kind)
@@ -128,12 +150,18 @@ fn annotate_op(op: &StorageOp, metadata: Option<&Metadata>) -> AnnotatedOp {
     AnnotatedOp {
         seq: op.seq,
         op: op.kind.as_str(),
-        child_trie: op.child_trie.as_deref().map(hex::encode),
-        key: format!("0x{}", hex::encode(&op.key)),
-        key_truncated: op.key_truncated,
+        child_trie: op.child_trie.as_ref().map(PrintedBytes::to_hex),
+        child_trie_truncated: op
+            .child_trie
+            .as_ref()
+            .is_some_and(PrintedBytes::is_truncated),
+        key: op.key.to_hex(),
+        key_truncated: op.key.is_truncated(),
+        key_complete: named_in_full && op.key_id().is_some(),
         pallet: name.pallet().map(str::to_owned),
         item: name.item(),
         map_keys,
+        name: name.to_string(),
         label,
         value_len: op.value_len,
         value_truncated: op.value_truncated,

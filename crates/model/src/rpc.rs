@@ -108,7 +108,7 @@ pub fn parse_trace_block(json: &str) -> Result<BlockTrace, Error> {
     let mut value: serde_json::Value = serde_json::from_str(json)?;
 
     if let Some(obj) = value.as_object_mut() {
-        if let Some(err) = obj.get("error") {
+        if let Some(err) = obj.get("error").filter(|e| !e.is_null()) {
             return Err(Error::Rpc(err.to_string()));
         }
         if let Some(result) = obj.remove("result") {
@@ -154,5 +154,9 @@ mod tests {
 
         let rpc_err = r#"{"jsonrpc":"2.0","id":1,"error":{"code":-32601,"message":"unsafe"}}"#;
         assert!(matches!(parse_trace_block(rpc_err), Err(Error::Rpc(_))));
+
+        // Some clients write `"error": null` next to a successful result.
+        let ok = r#"{"jsonrpc":"2.0","id":1,"error":null,"result":{"blockTrace":{"blockHash":"0x01","parentHash":"0x00"}}}"#;
+        assert_eq!(parse_trace_block(ok).unwrap().block_hash, "0x01");
     }
 }

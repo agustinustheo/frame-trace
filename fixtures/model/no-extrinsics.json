@@ -17,7 +17,6 @@
        "method": "Get",
        "key": "26aa394eea5630e07c48ae0c9558cef702a5c1b19ab7a04f536c519aca4983ac",
        "result": "Some(10000000)",
-       "result_encoded": "011010000000",
        "ext_id": "0100000000000000"
       }
      },
@@ -30,7 +29,6 @@
        "method": "Put",
        "key": "26aa394eea5630e07c48ae0c9558cef7ff553b5a9862a516939d82b3d3d8661a",
        "value": "Some(02)",
-       "value_encoded": "010402",
        "ext_id": "0100000000000000"
       }
      },
@@ -43,7 +41,42 @@
        "method": "Put",
        "key": "26aa394eea5630e07c48ae0c9558cef7ff553b5a9862a516939d82b3d3d8661a",
        "value": "Some(0000000000)",
-       "value_encoded": "01140000000000",
+       "ext_id": "0100000000000000"
+      }
+     },
+     "parentId": null
+    },
+    {
+     "target": "state",
+     "data": {
+      "stringValues": {
+       "method": "Get",
+       "key": "26aa394eea5630e07c48ae0c9558cef7156afe25323c70e43eb722ed7c886297",
+       "result": "None",
+       "ext_id": "0100000000000000"
+      }
+     },
+     "parentId": null
+    },
+    {
+     "target": "state",
+     "data": {
+      "stringValues": {
+       "method": "Put",
+       "key": "26aa394eea5630e07c48ae0c9558cef7156afe25323c70e43eb722ed7c886297",
+       "value": "Some(01)",
+       "ext_id": "0100000000000000"
+      }
+     },
+     "parentId": null
+    },
+    {
+     "target": "state",
+     "data": {
+      "stringValues": {
+       "method": "Get",
+       "key": "26aa394eea5630e07c48ae0c9558cef702a5c1b19ab7a04f536c519aca4983ac",
+       "result": "Some(10000000)",
        "ext_id": "0100000000000000"
       }
      },
@@ -56,7 +89,18 @@
        "method": "Get",
        "key": "3a65787472696e7369635f696e646578",
        "result": "Some(00000000)",
-       "result_encoded": "011000000000",
+       "ext_id": "0100000000000000"
+      }
+     },
+     "parentId": null
+    },
+    {
+     "target": "state",
+     "data": {
+      "stringValues": {
+       "method": "Put",
+       "key": "3a65787472696e7369635f696e646578",
+       "value": "None",
        "ext_id": "0100000000000000"
       }
      },
@@ -69,7 +113,6 @@
        "method": "Put",
        "key": "26aa394eea5630e07c48ae0c9558cef7ff553b5a9862a516939d82b3d3d8661a",
        "value": "Some(01)",
-       "value_encoded": "010401",
        "ext_id": "0100000000000000"
       }
      },
@@ -81,8 +124,7 @@
       "stringValues": {
        "method": "Get",
        "key": "26aa394eea5630e07c48ae0c9558cef702a5c1b19ab7a04f536c519aca4983ac",
-       "result": "Some(11000000)",
-       "result_encoded": "011011000000",
+       "result": "Some(10000000)",
        "ext_id": "0100000000000000"
       }
      },

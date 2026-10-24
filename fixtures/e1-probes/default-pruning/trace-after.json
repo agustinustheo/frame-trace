@@ -1,0 +1,8 @@
+{
+  "jsonrpc": "2.0",
+  "id": 168,
+  "error": {
+    "code": 4001,
+    "message": "Cannot resolve a block range ['\"0x8c07003f3bcfe033bfd9b722abc97a9c6f1334107446a958e42fa5ad7cdf8ebc\"' ... '\"None\"]. Dispatch error: Failed to collect traces and execute block: RuntimeApiError(UnknownBlock(\"State already discarded for 0x2497762c9b9dd5a55fe6fcd0413153d5a2407428502298da4060e2fb7fde662f\"))"
+  }
+}

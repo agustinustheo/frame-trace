@@ -16,6 +16,7 @@ pub struct Stats {
     /// `put`, `clear`, `append`, `clear_prefix` and `kill_child` ops.
     pub writes: usize,
     /// Distinct `(child trie, key)` pairs touched by reads or writes. Prefixes count as keys.
+    /// Keys the node printed truncated are not counted here (see `truncated_keys`).
     pub distinct_keys: usize,
     /// Sum of value lengths returned by reads (known lengths only).
     pub bytes_read: usize,
@@ -23,6 +24,9 @@ pub struct Stats {
     pub bytes_written: usize,
     /// Ops flagged `duplicate_read` (see [`mark_duplicate_reads`]).
     pub duplicate_reads: usize,
+    /// Reads and writes whose key or child trie the node printed truncated. Their identity is
+    /// uncertain, so they are left out of `distinct_keys` and duplicate detection.
+    pub truncated_keys: usize,
 }
 
 impl Stats {
@@ -43,7 +47,12 @@ impl Stats {
                 stats.writes += 1;
                 stats.bytes_written += len;
             }
-            touched.insert((op.child_trie.as_deref(), op.key.as_slice()));
+            match op.key_id() {
+                Some(id) => {
+                    touched.insert(id);
+                }
+                None => stats.truncated_keys += 1,
+            }
         }
         stats.distinct_keys = touched.len();
         stats
@@ -54,10 +63,116 @@ impl Stats {
 ///
 /// Called once per phase. A repeated read counts whatever happened to the key in between. Such
 /// reads are usually served by the overlay, so they are cheap on the node, but benchmarks may
-/// still charge them as database reads.
+/// still charge them as database reads. Reads of truncated keys are never flagged.
 pub fn mark_duplicate_reads(ops: &mut [StorageOp]) {
     let mut seen: HashSet<(Option<Vec<u8>>, Vec<u8>)> = HashSet::new();
     for op in ops.iter_mut().filter(|op| op.kind.is_read()) {
-        op.duplicate_read = !seen.insert((op.child_trie.clone(), op.key.clone()));
+        op.duplicate_read = match op.key_id() {
+            Some((child, key)) => !seen.insert((child.map(<[u8]>::to_vec), key.to_vec())),
+            None => false,
+        };
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        OpKind,
+        op::{PrintedBytes, ops_from_events},
+        rpc::{Data, Event},
+    };
+
+    fn ops(events: &[&[(&str, &str)]]) -> Vec<StorageOp> {
+        let events: Vec<Event> = events
+            .iter()
+            .map(|fields| Event {
+                target: "state".into(),
+                data: Data {
+                    string_values: fields
+                        .iter()
+                        .map(|(k, v)| (k.to_string(), v.to_string()))
+                        .collect(),
+                },
+                parent_id: None,
+            })
+            .collect();
+        ops_from_events(&events).unwrap().0
+    }
+
+    #[test]
+    fn child_trie_reads_are_keyed_by_trie_and_key() {
+        let mut ops = ops(&[
+            &[
+                ("method", "ChildGet"),
+                ("child_info", "01"),
+                ("key", "aa"),
+                ("result", "Some(00)"),
+            ],
+            &[
+                ("method", "ChildGet"),
+                ("child_info", "02"),
+                ("key", "aa"),
+                ("result", "Some(00)"),
+            ],
+            &[("method", "Get"), ("key", "aa"), ("result", "None")],
+            &[
+                ("method", "ChildGet"),
+                ("child_info", "01"),
+                ("key", "aa"),
+                ("result", "Some(00)"),
+            ],
+            &[
+                ("method", "ChildPut"),
+                ("child_info", "02"),
+                ("key", "bb"),
+                ("value", "Some(0102)"),
+            ],
+            &[("method", "ChildKill"), ("child_info", "03")],
+        ]);
+        mark_duplicate_reads(&mut ops);
+        let dups: Vec<bool> = ops.iter().map(|op| op.duplicate_read).collect();
+        assert_eq!(dups, [false, false, false, true, false, false]);
+        assert_eq!(ops[5].kind, OpKind::KillChild);
+
+        let stats = Stats::of(&ops);
+        // (01,aa) (02,aa) (main,aa) (02,bb) (03,"")
+        assert_eq!((stats.reads, stats.writes, stats.distinct_keys), (4, 2, 5));
+        assert_eq!(
+            (stats.bytes_read, stats.bytes_written, stats.duplicate_reads),
+            (3, 2, 1)
+        );
+    }
+
+    #[test]
+    fn truncated_keys_are_not_duplicates_or_distinct_keys() {
+        let mut ops = ops(&[
+            &[("method", "Get"), ("key", "aa...bb"), ("result", "None")],
+            &[("method", "Get"), ("key", "aa...bb"), ("result", "None")],
+            &[("method", "Get"), ("key", "aa...cc"), ("result", "None")],
+            &[
+                ("method", "ChildGet"),
+                ("child_info", "01...02"),
+                ("key", "aa"),
+                ("result", "None"),
+            ],
+            &[("method", "Get"), ("key", "aa"), ("result", "None")],
+            &[("method", "Get"), ("key", "aa"), ("result", "None")],
+        ]);
+        assert_eq!(ops[0].key.tail, Some(vec![0xbb]));
+        assert_eq!(ops[4].key, PrintedBytes::full([0xaa]));
+        mark_duplicate_reads(&mut ops);
+        let dups: Vec<bool> = ops.iter().map(|op| op.duplicate_read).collect();
+        assert_eq!(dups, [false, false, false, false, false, true]);
+
+        let stats = Stats::of(&ops);
+        assert_eq!(
+            (
+                stats.distinct_keys,
+                stats.truncated_keys,
+                stats.duplicate_reads
+            ),
+            (1, 4, 1)
+        );
     }
 }

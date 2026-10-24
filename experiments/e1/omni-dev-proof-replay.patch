@@ -1,0 +1,23 @@
+diff --git a/cumulus/polkadot-omni-node/lib/src/nodes/aura.rs b/cumulus/polkadot-omni-node/lib/src/nodes/aura.rs
+index 617a358..8f1df31 100644
+--- a/cumulus/polkadot-omni-node/lib/src/nodes/aura.rs
++++ b/cumulus/polkadot-omni-node/lib/src/nodes/aura.rs
+@@ -459,6 +459,7 @@ where
+ 		};
+ 
+ 		let database_path = config.database.path().map(|p| p.to_path_buf());
++		let tracing_client = client.clone();
+ 
+ 		let _rpc_handlers = sc_service::spawn_tasks(sc_service::SpawnTasksParams {
+ 			network,
+@@ -473,7 +474,9 @@ where
+ 			sync_service,
+ 			config,
+ 			telemetry: telemetry.as_mut(),
+-			tracing_execute_block: None,
++			tracing_execute_block: Some(Arc::new(
++				cumulus_client_service::ParachainTracingExecuteBlock::new(tracing_client),
++			)),
+ 		})?;
+ 
+ 		// Spawn the storage monitor.

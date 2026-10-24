@@ -1,6 +1,8 @@
-//! Segmentation, stats and duplicate detection on the handcrafted fixtures in `fixtures/model/`.
+//! Segmentation, stats and duplicate detection on the fixtures in `fixtures/model/`.
 
 #![allow(clippy::unwrap_used)] // Tests may panic on bad fixtures.
+
+use std::ops::Range;
 
 use frame_trace_model::{OpKind, PhaseKind, Stats, TracedBlock, rpc::parse_trace_block};
 
@@ -10,6 +12,14 @@ fn load(name: &str) -> TracedBlock {
     TracedBlock::from_trace(&parse_trace_block(&json).expect("valid trace")).expect("valid events")
 }
 
+fn phases(block: &TracedBlock) -> Vec<(PhaseKind, Range<usize>)> {
+    block
+        .phases
+        .iter()
+        .map(|p| (p.kind, p.ops.clone()))
+        .collect()
+}
+
 #[test]
 fn segments_a_block_with_two_extrinsics() {
     let block = load("two-extrinsics.json");
@@ -17,21 +27,17 @@ fn segments_a_block_with_two_extrinsics() {
         block.skipped_events, 1,
         "the Call event is not a storage op"
     );
-    assert_eq!(block.ops.len(), 30);
-
-    let phases: Vec<_> = block
-        .phases
-        .iter()
-        .map(|p| (p.kind, p.ops.clone()))
-        .collect();
+    assert_eq!(block.ops.len(), 38);
     assert_eq!(
-        phases,
+        phases(&block),
         vec![
-            (PhaseKind::Initialization, 0..7),
-            (PhaseKind::ApplyExtrinsic(0), 7..13),
-            (PhaseKind::ApplyExtrinsic(1), 13..21),
-            // 21..26 is the gap closed by the Finalization marker, folded into Finalization.
-            (PhaseKind::Finalization, 21..30),
+            // 7..9 runs after the ApplyExtrinsic(0) marker but is initialize_block's tail.
+            (PhaseKind::Initialization, 0..9),
+            // Ends with the marker and the ExtrinsicWeightReclaimed cleanup (15).
+            (PhaseKind::ApplyExtrinsic(0), 9..16),
+            (PhaseKind::PostInherents, 16..19),
+            (PhaseKind::ApplyExtrinsic(1), 19..29),
+            (PhaseKind::Finalization, 29..38),
         ]
     );
     assert_eq!(block.extrinsic_count(), 2);
@@ -41,43 +47,22 @@ fn segments_a_block_with_two_extrinsics() {
 fn computes_phase_stats() {
     let block = load("two-extrinsics.json");
     let stats: Vec<Stats> = block.phases.iter().map(|p| p.stats).collect();
+    let s = |ops, reads, writes, distinct_keys, bytes_read, bytes_written, duplicate_reads| Stats {
+        ops,
+        reads,
+        writes,
+        distinct_keys,
+        bytes_read,
+        bytes_written,
+        duplicate_reads,
+        truncated_keys: 0,
+    };
     let expected = [
-        Stats {
-            ops: 7,
-            reads: 3,
-            writes: 4,
-            distinct_keys: 3,
-            bytes_read: 12,
-            bytes_written: 14,
-            duplicate_reads: 2,
-        },
-        Stats {
-            ops: 6,
-            reads: 2,
-            writes: 4,
-            distinct_keys: 4,
-            bytes_read: 12,
-            bytes_written: 29,
-            duplicate_reads: 0,
-        },
-        Stats {
-            ops: 8,
-            reads: 4,
-            writes: 4,
-            distinct_keys: 6,
-            bytes_read: 32,
-            bytes_written: 11,
-            duplicate_reads: 2,
-        },
-        Stats {
-            ops: 9,
-            reads: 2,
-            writes: 6,
-            distinct_keys: 6,
-            bytes_read: 8,
-            bytes_written: 5,
-            duplicate_reads: 0,
-        },
+        s(9, 5, 4, 5, 44, 14, 2),
+        s(7, 2, 5, 5, 12, 29, 0),
+        s(3, 2, 1, 2, 8, 1, 0),
+        s(10, 5, 5, 7, 36, 159, 2),
+        s(9, 3, 5, 6, 9, 5, 0),
     ];
     assert_eq!(stats, expected);
 
@@ -89,7 +74,7 @@ fn computes_phase_stats() {
             totals.writes,
             totals.duplicate_reads
         ),
-        (30, 11, 18, 4)
+        (38, 17, 20, 4)
     );
 }
 
@@ -103,10 +88,10 @@ fn flags_duplicate_reads_per_phase() {
         .map(|op| op.seq)
         .collect();
     // System::Number twice in initialization; System::Account read again, then `Exists` on it.
-    assert_eq!(dups, vec![3, 4, 15, 18]);
+    assert_eq!(dups, vec![3, 4, 22, 25]);
     // System::Number is read again in finalization, but that is a different phase.
-    assert!(!block.ops[26].duplicate_read);
-    assert_eq!(block.ops[18].kind, OpKind::Exists);
+    assert!(!block.ops[34].duplicate_read);
+    assert_eq!(block.ops[25].kind, OpKind::Exists);
 }
 
 #[test]
@@ -114,22 +99,20 @@ fn extracts_extrinsic_bytes_from_extrinsic_data() {
     let block = load("two-extrinsics.json");
     let ext0 = block.phases[1].extrinsic.as_deref().map(hex::encode);
     assert_eq!(ext0.as_deref(), Some("280502000b80974e6fa101"));
-    assert_eq!(block.phases[2].extrinsic, None);
+    let ext1 = block.phases[3].extrinsic.as_ref().unwrap();
+    assert_eq!(ext1.len(), 146);
 }
 
 #[test]
-fn block_without_extrinsics_has_no_apply_phase() {
+fn block_without_extrinsics_runs_inherents_applied_before_finalization() {
     let block = load("no-extrinsics.json");
-    let kinds: Vec<_> = block
-        .phases
-        .iter()
-        .map(|p| (p.kind, p.ops.clone()))
-        .collect();
     assert_eq!(
-        kinds,
+        phases(&block),
         vec![
             (PhaseKind::Initialization, 0..3),
-            (PhaseKind::Finalization, 3..6)
+            (PhaseKind::PostInherents, 3..6),
+            // From the `:extrinsic_index` take in note_finished_extrinsics.
+            (PhaseKind::Finalization, 6..10),
         ]
     );
 }
@@ -143,4 +126,32 @@ fn trace_without_markers_is_unsegmented() {
     assert_eq!(block.phases.len(), 1);
     assert_eq!(block.phases[0].kind, PhaseKind::Unsegmented);
     assert_eq!(block.phases[0].stats.duplicate_reads, 1);
+}
+
+/// Block 1 of a `next-people-paseo` parachain (two inherents, `on_poll` work after them),
+/// recorded from a real node. See `fixtures/model/real/README.md`.
+#[test]
+fn segments_a_real_parachain_block() {
+    let block = load("real/people-paseo-block-1-trace-state.json");
+    assert_eq!(block.ops.len(), 315);
+    assert_eq!(
+        phases(&block),
+        vec![
+            // 146 (MultiBlockMigrations::Cursor) and 147 (System::BlockHash) follow the
+            // ApplyExtrinsic(0) marker but are initialize_block's tail.
+            (PhaseKind::Initialization, 0..148),
+            // set_validation_data, ending with the ExtrinsicWeightReclaimed cleanup at 199.
+            (PhaseKind::ApplyExtrinsic(0), 148..200),
+            // Timestamp.set, cleanup at 225.
+            (PhaseKind::ApplyExtrinsic(1), 200..226),
+            // No signed extrinsic, so inherents_applied (on_poll) runs before finalization.
+            (PhaseKind::PostInherents, 226..249),
+            (PhaseKind::Finalization, 249..315),
+        ]
+    );
+    let is = |seq: usize, key: &[u8]| block.ops[seq].key.complete() == Some(key);
+    let ewr = frame_trace_model::keys::EXTRINSIC_WEIGHT_RECLAIMED;
+    assert!(is(199, &ewr) && is(225, &ewr));
+    assert!(is(249, frame_trace_model::keys::EXTRINSIC_INDEX));
+    assert!(block.phases[1].extrinsic.is_some() && block.phases[2].extrinsic.is_some());
 }
