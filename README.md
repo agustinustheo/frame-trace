@@ -4,6 +4,8 @@ Replay a Polkadot SDK block and view its storage accesses in Jaeger or Tempo.
 Self-replay uses safe RPC and authenticated parent-state proofs. The SDK executes
 `Core_execute_block`, including signatures and the real storage-root assertion.
 
+![A Utility.batch extrinsic in Jaeger: batch, three transfer_keep_alive calls and every storage read and write under them](docs/images/jaeger-batch.png)
+
 Build with the pinned Rust toolchain. The first build compiles the SDK executor.
 
 ```sh
