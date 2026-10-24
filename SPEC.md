@@ -6,31 +6,38 @@ Research notes behind every decision here are in [`research/`](research/).
 
 ## Goals
 
-1. **Works on existing nodes.** The first version needs no node or runtime changes, only RPC access to a node started with `--rpc-methods unsafe` that still has the block's parent state (an archive node, or a recent block).
+1. **Works on existing nodes, with safe RPC only.** frame-trace re-executes a block itself, outside the node, with the Polkadot SDK's own executor. It fetches the parent state on demand as authenticated trie proofs (`state_getReadProof`), so it works against any node, including public RPC endpoints, without `--rpc-methods unsafe`. The block's real `Core_execute_block` runs, including the storage-root check, so the replay is provably faithful. (Experiment E2.)
 2. **Readable.** Raw keys become `System::Account(5Grw…)`. Extrinsics are named `Balances.transfer_keep_alive`. A trace opens in Jaeger, Tempo or any OTLP viewer.
-3. **Reuse, don't rebuild.** Polkadot SDK already replays blocks and logs every storage access. subxt and frame-decode already decode metadata and keys. The OpenTelemetry SDK already exports OTLP. frame-trace is the glue.
-4. **Cheap when off, efficient when on**, so it can be pointed at a production node to debug a real block.
+3. **Complete and real.** Every storage access, including deletions by prefix, child tries and iteration, in order, with measured timings, and nested under runtime spans when the runtime was built with `with-tracing`.
+4. **Reuse, don't rebuild.** sc-executor, sp-state-machine, sp-trie and sp-io do the execution. subxt and frame-decode decode metadata and keys. The OpenTelemetry SDK exports OTLP. frame-trace is the glue.
+5. **Reproducible.** A replay can be saved as an artifact (block + proof nodes) and replayed offline later, with no network.
 
 ## Non-goals (for now)
 
 - Setting weights. Benchmarks stay the source of truth.
 - A custom UI. Use Jaeger/Tempo/Perfetto first.
-- Changing the Polkadot SDK. Upstream proposals come after we have numbers.
+- Changing the Polkadot SDK. Upstream proposals (drafts in `upstream/`) come after we have numbers.
+
+## Why not `state_traceBlock`
+
+E1 showed the node's block-trace RPC is not enough on its own: it needs unsafe RPC, drops every storage event without a key (prefix deletions, child-trie kills, storage roots), never traces iteration, returns no timing and no span nesting, and in omni-node dev mode cannot replay signed parachain blocks at all. frame-trace keeps it as a secondary source (`--source trace-block`) and as the test oracle.
 
 ## What we reuse
 
 | Need | Reuse | Notes |
 | --- | --- | --- |
-| Every storage op of a block, in order | `state_traceBlock` RPC (`sc-tracing`), target `state` | Host-side events: `Get`, `Put`, `ClearPrefix`, `Append`, child-trie variants. No runtime change needed. Gated as unsafe. |
-| Extrinsic boundaries | `:extrinsic_index` and `System::ExecutionPhase` writes in the same event stream | |
-| Runtime spans (dispatch, hooks) | `sp-tracing` `with-tracing` runtime feature | Optional. Only if the runtime was built with it. |
-| Key → `Pallet::Item` + map keys | `frame-decode` / subxt metadata (V14–V16) | `twox128(pallet) ++ twox128(item)` prefix, then hashers. |
-| Extrinsic names | block body + metadata via subxt | |
-| OTLP export | `opentelemetry` / `opentelemetry_sdk` / `opentelemetry-otlp` 0.33 | Used directly, not through `tracing-opentelemetry`, so we never touch the node's pinned `tracing-subscriber`. |
-| Span attribute names | OTel database semantic conventions | `db.system.name = "substrate"`, `db.operation.name`, `db.collection.name` = pallet, plus `frame.storage.*`. |
+| Execute a block | `sc-executor` `WasmExecutor`, `sp-state-machine`, `sp-io` + the same extra host functions as omni-node (storage proof size, statement store, elliptic curves) | Runtime code comes from the parent state, authenticated by proof |
+| Parent state | `state_getReadProof` at the parent hash, fetched per missing trie node, cached; `sp-trie` `TrieBackend` | Safe RPC only. The root check proves the state was right |
+| Proof size (parachains) | a fresh `sp_trie` recorder + `ProofSizeExt` per execution | Also gives proof size per extrinsic |
+| Every storage op, in order, timed | a `tracing` subscriber on target `state`, plus backend instrumentation for `next_key` | Captures what `state_traceBlock` drops |
+| Runtime spans | `sp-tracing` `with-tracing` | Optional; parents reconstructed from the entered-span stack |
+| Extrinsic boundaries | `System::ExecutionPhase`, `:extrinsic_index`, `System::ExtrinsicData` writes | Rules in `crates/model/src/phase.rs` |
+| Key → `Pallet::Item` + map keys | `frame-decode` / `frame-metadata` (V14–V16) | |
+| OTLP export | `opentelemetry` / `opentelemetry_sdk` / `opentelemetry-otlp` 0.33 | Used directly, not through `tracing-opentelemetry` |
+| Span attribute names | OTel database semantic conventions | `db.system.name = "substrate"`, `db.operation.name`, `db.collection.name` = pallet, plus `frame.storage.*` |
 | Viewer | Jaeger v2 all-in-one (4317/4318/16686) | |
 
-Inspiration only: substrate-api-sidecar's `Trace.ts` (GPL, do not copy), nearcore's `io_tracer`, geth's prestate/call tracers, pallet-revive's tracers.
+Inspiration only: try-runtime-cli (relaxes the root and signature checks; we don't), Chopsticks' lazy storage layer, smoldot's resumable executor, substrate-api-sidecar's `Trace.ts` (GPL, do not copy), nearcore's `io_tracer`, geth's prestate/call tracers, pallet-revive's tracers.
 
 ## Trace model
 
@@ -50,24 +57,25 @@ block #1234 (0xabc…)                       span
 
 Storage op spans carry: operation (`get`/`put`/`clear`/`clear_prefix`/`append`/`next_key`, child-trie flag), pallet, item, decoded map keys (when decodable), raw key, value length, a `duplicate_read` flag when the same key was already read in this extrinsic, and the extrinsic index. Each extrinsic span carries totals: reads, writes, distinct keys, bytes read and written, duplicate reads.
 
-**Timing.** `state_traceBlock` returns order but no timestamps. Replay mode lays ops out in order with synthetic, evenly spaced timestamps and marks the trace `frame.timing = "synthetic"`, so nobody mistakes the widths for real durations. Real timing comes from live mode (phase 3).
+**Timing.** Self-replay measures every storage op and span (`frame.timing = "measured"`). These are replay timings on the tracing machine, with tracing overhead, not the original node's database latency: good for "where does the time go", not for weights. The `trace-block` source has no timing, so it uses synthetic, evenly spaced timestamps (`frame.timing = "synthetic"`).
 
 Raw keys and values can identify accounts. Keys are on by default (needed for debugging); values are off by default, length only.
 
 ## Command line
 
 ```sh
-frame-trace block  --rpc ws://127.0.0.1:9944 --block <number|hash> [--otlp http://127.0.0.1:4318] [--json out.json]
-frame-trace follow --rpc ws://127.0.0.1:9944 [--otlp …]      # trace each new block
-frame-trace summary --rpc … --block …                          # terminal table: top items by reads/writes, duplicate reads
+frame-trace block   --rpc wss://… --block <number|hash> [--otlp http://127.0.0.1:4318] [--json out.json] [--save <artifact-dir>]
+frame-trace block   --offline <artifact-dir> [--otlp …]          # replay a saved artifact, no network
+frame-trace follow  --rpc wss://… [--otlp …]                    # trace each new block
+frame-trace summary --rpc … --block …                            # terminal tables: top items, duplicate reads, per extrinsic
 ```
 
 ## Phases
 
-1. **Replay exporter (now).** `block`, `follow`, `summary` on top of `state_traceBlock`. Tested against recorded fixtures and a local individuality-community chain.
-2. **Runtime spans.** When the runtime has `with-tracing`, nest storage ops under the real dispatch and hook spans.
-3. **Live mode with real timing.** A `sc-tracing` `TraceHandler` / layer a node can add, exporting OTLP with real durations, plus cache-hit vs database information where the node exposes it. Also covers runtime API calls and RPC state queries, which block replay cannot see.
-4. **Constants.** Plain `#[pallet::constant]` values are compiled in and never touch storage. Tracing them needs an opt-in macro or a runtime build with instrumentation. Only `parameter_types! { storage … }` and dynamic parameters are visible as storage today.
+1. **Replay exporter (now).** Self-replay source, `block`, `follow`, `summary`, offline artifacts. Tested offline against saved artifacts from a local People chain and public Westend Asset Hub.
+2. **Runtime spans.** Nest storage ops under dispatch and hook spans when the runtime has `with-tracing`; build such runtimes on demand for debugging.
+3. **State queries.** Trace runtime API calls (`state_call`) and storage queries the same way, by executing them against proofs.
+4. **Constants.** Plain `#[pallet::constant]` values are compiled in and never touch storage. Tracing them needs an opt-in macro or instrumented runtime. Only `parameter_types! { storage … }` and dynamic parameters are visible as storage today.
 5. **PolkaMeter integration.** Attach a block trace to each load-test step, link spans by extrinsic hash.
 
 ## Repository layout
@@ -76,7 +84,8 @@ frame-trace summary --rpc … --block …                          # terminal ta
 crates/
   model/     trace model: blocks, extrinsic segments, storage ops, span tree (no I/O)
   decode/    metadata-based key and extrinsic decoding
-  source/    RPC client: state_traceBlock, block body, metadata
+  replay/    self-replay: safe-RPC proof fetching, executor, capture
+  source/    (optional) state_traceBlock client, used as the test oracle
   otel/      model → OpenTelemetry spans and OTLP export
   cli/       the frame-trace binary
 fixtures/    recorded state_traceBlock responses + metadata for tests
