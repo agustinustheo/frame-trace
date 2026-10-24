@@ -1,0 +1,25 @@
+[
+  {
+    "seq": 3,
+    "at_ns": 2511291,
+    "parent_id": 4,
+    "target": "state",
+    "fields": {
+      "ext_id": "f47a",
+      "method": "ClearPrefix",
+      "prefix": "26aa394eea5630e07c48ae0c9558cef7bb94e1c21adab714983cf06622e1de76"
+    }
+  },
+  {
+    "seq": 415,
+    "at_ns": 3661250,
+    "parent_id": 425,
+    "target": "state",
+    "fields": {
+      "cached": "false",
+      "ext_id": "f47a",
+      "method": "StorageRoot",
+      "storage_root": "43d6eb08860e818e07026e258bb6ccfddac6f6da5a68008e85d3a2b08fddd27f"
+    }
+  }
+]

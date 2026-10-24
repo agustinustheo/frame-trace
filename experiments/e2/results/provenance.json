@@ -1,0 +1,24 @@
+{
+  "proof_aware_node": {
+    "path": "/tmp/pm-audit/e1/target-node/release/polkadot-omni-node",
+    "sha256": "f8368897447837e575c48f4185e3da93b1c0fed5bbcff2bc6e7f1dc471bff738"
+  },
+  "traced_wasm": {
+    "path": "/tmp/pm-audit/e1/people-traced.wasm",
+    "sha256": "685f48ea8e82a27fdd95983cea5edc0e02b63ecd30b8c6b93290261dfc43720b"
+  },
+  "untraced_wasm": {
+    "path": "/tmp/pm-audit/e1/people-untraced.wasm",
+    "sha256": "ddb7cf17b26d8aebf4b3e2572ab557818e911d7bf1d474473d11b50253270500"
+  },
+  "replay_binary": {
+    "path": "/tmp/pm-audit/e2-target/release/frame-trace-e2",
+    "sha256": "5dbb425a2664e87b24f54e0f15fa1306503e387c9ebb37437d8fa5bc2b79ce59"
+  },
+  "toolchain": "cargo 1.93.0 (083ac5135 2025-12-15)",
+  "sdk_tag": "polkadot-stable2606-2",
+  "sdk_commit": "72284b37a234f8a1565f2043ddbf8280a69fcf29",
+  "machine": "Apple M4 Pro, 12 cores, macOS 15.8.1 (aarch64)",
+  "experiment_date": "2026-10-25 Asia/Ho_Chi_Minh",
+  "measurement_replay_binary_sha256": "74b67346357a80aa13cda2ff471974e0d284e71ebb31b0a5122799a96bd29c3d"
+}

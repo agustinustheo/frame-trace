@@ -1,0 +1,21 @@
+[
+  "/tmp/pm-audit/e1/target-node/release/polkadot-omni-node",
+  "--chain",
+  "/tmp/pm-audit/e1/people-traced.json",
+  "--dev",
+  "--dev-block-time",
+  "1000",
+  "--rpc-methods",
+  "unsafe",
+  "--rpc-port",
+  "19954",
+  "--port",
+  "29954",
+  "--rpc-max-response-size",
+  "64",
+  "--no-telemetry",
+  "--tmp",
+  "--no-prometheus",
+  "--state-pruning",
+  "archive"
+]

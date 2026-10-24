@@ -1,0 +1,36 @@
+[
+  {
+    "seq": 3,
+    "at_ns": 2617791,
+    "parent_id": 6,
+    "target": "state",
+    "fields": {
+      "ext_id": "eeb1",
+      "method": "ClearPrefix",
+      "prefix": "26aa394eea5630e07c48ae0c9558cef7bb94e1c21adab714983cf06622e1de76"
+    }
+  },
+  {
+    "seq": 292,
+    "at_ns": 3665583,
+    "parent_id": 357,
+    "target": "state",
+    "fields": {
+      "ext_id": "eeb1",
+      "method": "ClearPrefix",
+      "prefix": "3a6672616d652d74726163652d65323a"
+    }
+  },
+  {
+    "seq": 412,
+    "at_ns": 4159708,
+    "parent_id": 526,
+    "target": "state",
+    "fields": {
+      "cached": "false",
+      "ext_id": "eeb1",
+      "method": "StorageRoot",
+      "storage_root": "370ee2b4e7a5dbbb19033ef72f8dbb861d2cb88388a111a9100aef486e48705c"
+    }
+  }
+]

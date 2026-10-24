@@ -1,0 +1,7 @@
+{
+  "computed_root": "0x47116eac39ac59ba0534a0e4d624f78c4c8c56af5c3084e71c98ca1811e6e4f1",
+  "error": "Core_execute_block: Execution aborted due to trap: wasm trap: wasm `unreachable` instruction executed",
+  "rpc_calls": 0,
+  "tampered_expected_root": "0x4242424242424242424242424242424242424242424242424242424242424242",
+  "tampered_root_rejected": true
+}

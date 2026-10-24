@@ -1,0 +1,177 @@
+{
+  "acquisition_ms": 262.62166599999995,
+  "discovery_execute_ms": 219.076833,
+  "execution": "Core_execute_block",
+  "extrinsic_durations": [],
+  "fetched_node_bytes": 3750927,
+  "hash": "0xad410b1e4dbe191529a16e664f00c3cfcf2b802933005eef9460497c3eca2a84",
+  "number": 6,
+  "offline_verification": true,
+  "parent": "0xbd704a2d9ff4eb7fe8f6366d97cb9356bb0e19e2e1b7e5bfad0eeade5ccb214b",
+  "parented_wasm_spans": 0,
+  "proof_nodes": 86,
+  "recorded_execution_proof_bytes": 6828,
+  "root_check": true,
+  "rpc_calls": 53,
+  "rpc_counts": {
+    "chain_getBlock": 1,
+    "chain_getHeader": 1,
+    "state_getReadProof": 50,
+    "state_getRuntimeVersion": 1
+  },
+  "runtime": {
+    "apis": [
+      [
+        "0x12c8e3d4d7e06de0",
+        1
+      ],
+      [
+        "0x2609be83ac4468dc",
+        1
+      ],
+      [
+        "0xd0bac7be4a6b0920",
+        1
+      ],
+      [
+        "0x9287fb0e021bc854",
+        1
+      ],
+      [
+        "0x843b6f8cec8098c7",
+        1
+      ],
+      [
+        "0x5f4d07c7630fd6b9",
+        1
+      ],
+      [
+        "0xea93e3f16f3d6962",
+        3
+      ],
+      [
+        "0xfbc577b9d747efd6",
+        1
+      ],
+      [
+        "0xdd718d5cc53262d4",
+        1
+      ],
+      [
+        "0x04e70521a0d3d2f8",
+        2
+      ],
+      [
+        "0x162bf19137abacbd",
+        1
+      ],
+      [
+        "0xd7bdd8a272ca0d65",
+        2
+      ],
+      [
+        "0xdf6acb689907609b",
+        5
+      ],
+      [
+        "0x37e397fc7c91f5e4",
+        2
+      ],
+      [
+        "0xccd9de6396c899ca",
+        1
+      ],
+      [
+        "0x40fe3ad401f8959a",
+        6
+      ],
+      [
+        "0xd2bc9897eed08f15",
+        3
+      ],
+      [
+        "0xf78b278be53f454c",
+        2
+      ],
+      [
+        "0xab3c0572291feb8b",
+        2
+      ],
+      [
+        "0xbc9d89904f5b923f",
+        1
+      ],
+      [
+        "0x37c8bb1350a9a2a8",
+        4
+      ],
+      [
+        "0xf3ff14d5ab527059",
+        3
+      ],
+      [
+        "0x6ff52ee858e6c5bd",
+        2
+      ],
+      [
+        "0x91b1c8b16328eb92",
+        2
+      ],
+      [
+        "0x9ffb505aa738d69c",
+        1
+      ]
+    ],
+    "authoringVersion": 1,
+    "implName": "next-people-paseo",
+    "implVersion": 0,
+    "specName": "next-people-paseo",
+    "specVersion": 3004000,
+    "stateVersion": 1,
+    "systemVersion": 1,
+    "transactionVersion": 6
+  },
+  "spans": 424,
+  "state_methods": {
+    "Append": 10,
+    "ClearPrefix": 1,
+    "Core_execute_block": 1,
+    "Exists": 10,
+    "Get": 222,
+    "Put": 169,
+    "Return": 1,
+    "StorageRoot": 1
+  },
+  "storage_host_durations": 421,
+  "warm_extrinsic_ms": {},
+  "warm_replay_ms": [
+    1.510625,
+    1.3670419999999999,
+    1.350333,
+    1.3452080000000002,
+    1.345583
+  ],
+  "warm_rpc_calls": 0,
+  "wasm_blake2": "0xee817a9ecd07f4c0f861dd6f2b5105fd316638b827d4d425ae062add4b651c1c",
+  "wasm_bytes": 3744189,
+  "wasm_spans": 0,
+  "label": "individuality-clear",
+  "oracle_match": true,
+  "keyed_events": 411,
+  "extra_events": {
+    "Core_execute_block": 1,
+    "ClearPrefix": 1,
+    "StorageRoot": 1,
+    "Return": 1
+  },
+  "backend_iteration_events": {
+    "BackendIterNextKey": 1
+  },
+  "warm_median_ms": 1.350333,
+  "extrinsic_median_ms": {},
+  "oracle_fields_ignored": [
+    "ext_id"
+  ],
+  "span_intervals_and_parents_valid": true,
+  "storage_events_with_real_host_durations": 413
+}

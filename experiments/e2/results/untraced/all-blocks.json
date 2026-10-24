@@ -1,0 +1,1418 @@
+[
+  {
+    "acquisition_ms": 1057.883417,
+    "discovery_execute_ms": 1016.9447920000001,
+    "execution": "Core_execute_block",
+    "extrinsic_durations": [],
+    "fetched_node_bytes": 3748243,
+    "hash": "0xe1e914294d7bc267a2972fb4356de615fa5f741b0af4395d089a751510a0249e",
+    "number": 1,
+    "offline_verification": true,
+    "parent": "0x2497762c9b9dd5a55fe6fcd0413153d5a2407428502298da4060e2fb7fde662f",
+    "parented_wasm_spans": 0,
+    "proof_nodes": 51,
+    "recorded_execution_proof_bytes": 4091,
+    "root_check": true,
+    "rpc_calls": 31,
+    "rpc_counts": {
+      "chain_getBlock": 1,
+      "chain_getHeader": 1,
+      "state_getReadProof": 28,
+      "state_getRuntimeVersion": 1
+    },
+    "runtime": {
+      "apis": [
+        [
+          "0x12c8e3d4d7e06de0",
+          1
+        ],
+        [
+          "0x2609be83ac4468dc",
+          1
+        ],
+        [
+          "0xd0bac7be4a6b0920",
+          1
+        ],
+        [
+          "0x9287fb0e021bc854",
+          1
+        ],
+        [
+          "0x843b6f8cec8098c7",
+          1
+        ],
+        [
+          "0x5f4d07c7630fd6b9",
+          1
+        ],
+        [
+          "0xea93e3f16f3d6962",
+          3
+        ],
+        [
+          "0xfbc577b9d747efd6",
+          1
+        ],
+        [
+          "0xdd718d5cc53262d4",
+          1
+        ],
+        [
+          "0x04e70521a0d3d2f8",
+          2
+        ],
+        [
+          "0x162bf19137abacbd",
+          1
+        ],
+        [
+          "0xd7bdd8a272ca0d65",
+          2
+        ],
+        [
+          "0xdf6acb689907609b",
+          5
+        ],
+        [
+          "0x37e397fc7c91f5e4",
+          2
+        ],
+        [
+          "0xccd9de6396c899ca",
+          1
+        ],
+        [
+          "0x40fe3ad401f8959a",
+          6
+        ],
+        [
+          "0xd2bc9897eed08f15",
+          3
+        ],
+        [
+          "0xf78b278be53f454c",
+          2
+        ],
+        [
+          "0xab3c0572291feb8b",
+          2
+        ],
+        [
+          "0xbc9d89904f5b923f",
+          1
+        ],
+        [
+          "0x37c8bb1350a9a2a8",
+          4
+        ],
+        [
+          "0xf3ff14d5ab527059",
+          3
+        ],
+        [
+          "0x6ff52ee858e6c5bd",
+          2
+        ],
+        [
+          "0x91b1c8b16328eb92",
+          2
+        ],
+        [
+          "0x9ffb505aa738d69c",
+          1
+        ]
+      ],
+      "authoringVersion": 1,
+      "implName": "next-people-paseo",
+      "implVersion": 0,
+      "specName": "next-people-paseo",
+      "specVersion": 3004000,
+      "stateVersion": 1,
+      "systemVersion": 1,
+      "transactionVersion": 6
+    },
+    "spans": 322,
+    "state_methods": {
+      "Append": 4,
+      "ClearPrefix": 1,
+      "Core_execute_block": 1,
+      "Exists": 10,
+      "Get": 155,
+      "Put": 146,
+      "Return": 1,
+      "StorageRoot": 1
+    },
+    "storage_host_durations": 321,
+    "warm_extrinsic_ms": {},
+    "warm_replay_ms": [
+      1.279583,
+      1.2811249999999998,
+      1.019625,
+      1.033458,
+      1.410459
+    ],
+    "warm_rpc_calls": 0,
+    "wasm_blake2": "0xee817a9ecd07f4c0f861dd6f2b5105fd316638b827d4d425ae062add4b651c1c",
+    "wasm_bytes": 3744189,
+    "wasm_spans": 0,
+    "label": "inherents",
+    "oracle_match": true,
+    "keyed_events": 315,
+    "extra_events": {
+      "Core_execute_block": 1,
+      "ClearPrefix": 1,
+      "StorageRoot": 1,
+      "Return": 1
+    },
+    "backend_iteration_events": {
+      "BackendIterNextKey": 1
+    },
+    "warm_median_ms": 1.279583,
+    "extrinsic_median_ms": {},
+    "oracle_fields_ignored": [
+      "ext_id"
+    ],
+    "span_intervals_and_parents_valid": true,
+    "storage_events_with_real_host_durations": 317
+  },
+  {
+    "acquisition_ms": 258.71133299999997,
+    "discovery_execute_ms": 217.54816599999998,
+    "execution": "Core_execute_block",
+    "extrinsic_durations": [],
+    "fetched_node_bytes": 3750585,
+    "hash": "0xea56e9d68d1664e7998f17d21883a1f4927e67a1cf5c175501bccfa9043f2462",
+    "number": 2,
+    "offline_verification": true,
+    "parent": "0xe1e914294d7bc267a2972fb4356de615fa5f741b0af4395d089a751510a0249e",
+    "parented_wasm_spans": 0,
+    "proof_nodes": 82,
+    "recorded_execution_proof_bytes": 6479,
+    "root_check": true,
+    "rpc_calls": 51,
+    "rpc_counts": {
+      "chain_getBlock": 1,
+      "chain_getHeader": 1,
+      "state_getReadProof": 48,
+      "state_getRuntimeVersion": 1
+    },
+    "runtime": {
+      "apis": [
+        [
+          "0x12c8e3d4d7e06de0",
+          1
+        ],
+        [
+          "0x2609be83ac4468dc",
+          1
+        ],
+        [
+          "0xd0bac7be4a6b0920",
+          1
+        ],
+        [
+          "0x9287fb0e021bc854",
+          1
+        ],
+        [
+          "0x843b6f8cec8098c7",
+          1
+        ],
+        [
+          "0x5f4d07c7630fd6b9",
+          1
+        ],
+        [
+          "0xea93e3f16f3d6962",
+          3
+        ],
+        [
+          "0xfbc577b9d747efd6",
+          1
+        ],
+        [
+          "0xdd718d5cc53262d4",
+          1
+        ],
+        [
+          "0x04e70521a0d3d2f8",
+          2
+        ],
+        [
+          "0x162bf19137abacbd",
+          1
+        ],
+        [
+          "0xd7bdd8a272ca0d65",
+          2
+        ],
+        [
+          "0xdf6acb689907609b",
+          5
+        ],
+        [
+          "0x37e397fc7c91f5e4",
+          2
+        ],
+        [
+          "0xccd9de6396c899ca",
+          1
+        ],
+        [
+          "0x40fe3ad401f8959a",
+          6
+        ],
+        [
+          "0xd2bc9897eed08f15",
+          3
+        ],
+        [
+          "0xf78b278be53f454c",
+          2
+        ],
+        [
+          "0xab3c0572291feb8b",
+          2
+        ],
+        [
+          "0xbc9d89904f5b923f",
+          1
+        ],
+        [
+          "0x37c8bb1350a9a2a8",
+          4
+        ],
+        [
+          "0xf3ff14d5ab527059",
+          3
+        ],
+        [
+          "0x6ff52ee858e6c5bd",
+          2
+        ],
+        [
+          "0x91b1c8b16328eb92",
+          2
+        ],
+        [
+          "0x9ffb505aa738d69c",
+          1
+        ]
+      ],
+      "authoringVersion": 1,
+      "implName": "next-people-paseo",
+      "implVersion": 0,
+      "specName": "next-people-paseo",
+      "specVersion": 3004000,
+      "stateVersion": 1,
+      "systemVersion": 1,
+      "transactionVersion": 6
+    },
+    "spans": 429,
+    "state_methods": {
+      "Append": 9,
+      "ClearPrefix": 1,
+      "Core_execute_block": 1,
+      "Exists": 10,
+      "Get": 232,
+      "Put": 167,
+      "Return": 1,
+      "StorageRoot": 1
+    },
+    "storage_host_durations": 426,
+    "warm_extrinsic_ms": {},
+    "warm_replay_ms": [
+      1.564708,
+      1.645583,
+      1.421125,
+      1.428583,
+      1.6073330000000001
+    ],
+    "warm_rpc_calls": 0,
+    "wasm_blake2": "0xee817a9ecd07f4c0f861dd6f2b5105fd316638b827d4d425ae062add4b651c1c",
+    "wasm_bytes": 3744189,
+    "wasm_spans": 0,
+    "label": "transfer",
+    "oracle_match": true,
+    "keyed_events": 418,
+    "extra_events": {
+      "Core_execute_block": 1,
+      "ClearPrefix": 1,
+      "StorageRoot": 1,
+      "Return": 1
+    },
+    "backend_iteration_events": {
+      "BackendIterNextKey": 1
+    },
+    "warm_median_ms": 1.564708,
+    "extrinsic_median_ms": {},
+    "oracle_fields_ignored": [
+      "ext_id"
+    ],
+    "span_intervals_and_parents_valid": true,
+    "storage_events_with_real_host_durations": 420
+  },
+  {
+    "acquisition_ms": 258.167417,
+    "discovery_execute_ms": 215.69575,
+    "execution": "Core_execute_block",
+    "extrinsic_durations": [],
+    "fetched_node_bytes": 3750495,
+    "hash": "0x9c4c9de0cfb2b3aeac48b3e1ca9c2f730ad14b4c34b09d66e4fb72c22919d62e",
+    "number": 3,
+    "offline_verification": true,
+    "parent": "0xea56e9d68d1664e7998f17d21883a1f4927e67a1cf5c175501bccfa9043f2462",
+    "parented_wasm_spans": 0,
+    "proof_nodes": 81,
+    "recorded_execution_proof_bytes": 6387,
+    "root_check": true,
+    "rpc_calls": 50,
+    "rpc_counts": {
+      "chain_getBlock": 1,
+      "chain_getHeader": 1,
+      "state_getReadProof": 47,
+      "state_getRuntimeVersion": 1
+    },
+    "runtime": {
+      "apis": [
+        [
+          "0x12c8e3d4d7e06de0",
+          1
+        ],
+        [
+          "0x2609be83ac4468dc",
+          1
+        ],
+        [
+          "0xd0bac7be4a6b0920",
+          1
+        ],
+        [
+          "0x9287fb0e021bc854",
+          1
+        ],
+        [
+          "0x843b6f8cec8098c7",
+          1
+        ],
+        [
+          "0x5f4d07c7630fd6b9",
+          1
+        ],
+        [
+          "0xea93e3f16f3d6962",
+          3
+        ],
+        [
+          "0xfbc577b9d747efd6",
+          1
+        ],
+        [
+          "0xdd718d5cc53262d4",
+          1
+        ],
+        [
+          "0x04e70521a0d3d2f8",
+          2
+        ],
+        [
+          "0x162bf19137abacbd",
+          1
+        ],
+        [
+          "0xd7bdd8a272ca0d65",
+          2
+        ],
+        [
+          "0xdf6acb689907609b",
+          5
+        ],
+        [
+          "0x37e397fc7c91f5e4",
+          2
+        ],
+        [
+          "0xccd9de6396c899ca",
+          1
+        ],
+        [
+          "0x40fe3ad401f8959a",
+          6
+        ],
+        [
+          "0xd2bc9897eed08f15",
+          3
+        ],
+        [
+          "0xf78b278be53f454c",
+          2
+        ],
+        [
+          "0xab3c0572291feb8b",
+          2
+        ],
+        [
+          "0xbc9d89904f5b923f",
+          1
+        ],
+        [
+          "0x37c8bb1350a9a2a8",
+          4
+        ],
+        [
+          "0xf3ff14d5ab527059",
+          3
+        ],
+        [
+          "0x6ff52ee858e6c5bd",
+          2
+        ],
+        [
+          "0x91b1c8b16328eb92",
+          2
+        ],
+        [
+          "0x9ffb505aa738d69c",
+          1
+        ]
+      ],
+      "authoringVersion": 1,
+      "implName": "next-people-paseo",
+      "implVersion": 0,
+      "specName": "next-people-paseo",
+      "specVersion": 3004000,
+      "stateVersion": 1,
+      "systemVersion": 1,
+      "transactionVersion": 6
+    },
+    "spans": 402,
+    "state_methods": {
+      "Append": 8,
+      "ClearPrefix": 1,
+      "Core_execute_block": 1,
+      "Exists": 10,
+      "Get": 209,
+      "Put": 164,
+      "Return": 1,
+      "StorageRoot": 1
+    },
+    "storage_host_durations": 399,
+    "warm_extrinsic_ms": {},
+    "warm_replay_ms": [
+      1.4509589999999999,
+      1.4481249999999999,
+      1.325,
+      1.43225,
+      1.308792
+    ],
+    "warm_rpc_calls": 0,
+    "wasm_blake2": "0xee817a9ecd07f4c0f861dd6f2b5105fd316638b827d4d425ae062add4b651c1c",
+    "wasm_bytes": 3744189,
+    "wasm_spans": 0,
+    "label": "remark",
+    "oracle_match": true,
+    "keyed_events": 391,
+    "extra_events": {
+      "Core_execute_block": 1,
+      "ClearPrefix": 1,
+      "StorageRoot": 1,
+      "Return": 1
+    },
+    "backend_iteration_events": {
+      "BackendIterNextKey": 1
+    },
+    "warm_median_ms": 1.43225,
+    "extrinsic_median_ms": {},
+    "oracle_fields_ignored": [
+      "ext_id"
+    ],
+    "span_intervals_and_parents_valid": true,
+    "storage_events_with_real_host_durations": 393
+  },
+  {
+    "acquisition_ms": 263.709125,
+    "discovery_execute_ms": 220.498542,
+    "execution": "Core_execute_block",
+    "extrinsic_durations": [],
+    "fetched_node_bytes": 3750690,
+    "hash": "0x83a73d41983c02621cc0da831c42279d160973075b666292eccdf0bf45a21f43",
+    "number": 4,
+    "offline_verification": true,
+    "parent": "0x9c4c9de0cfb2b3aeac48b3e1ca9c2f730ad14b4c34b09d66e4fb72c22919d62e",
+    "parented_wasm_spans": 0,
+    "proof_nodes": 83,
+    "recorded_execution_proof_bytes": 6586,
+    "root_check": true,
+    "rpc_calls": 51,
+    "rpc_counts": {
+      "chain_getBlock": 1,
+      "chain_getHeader": 1,
+      "state_getReadProof": 48,
+      "state_getRuntimeVersion": 1
+    },
+    "runtime": {
+      "apis": [
+        [
+          "0x12c8e3d4d7e06de0",
+          1
+        ],
+        [
+          "0x2609be83ac4468dc",
+          1
+        ],
+        [
+          "0xd0bac7be4a6b0920",
+          1
+        ],
+        [
+          "0x9287fb0e021bc854",
+          1
+        ],
+        [
+          "0x843b6f8cec8098c7",
+          1
+        ],
+        [
+          "0x5f4d07c7630fd6b9",
+          1
+        ],
+        [
+          "0xea93e3f16f3d6962",
+          3
+        ],
+        [
+          "0xfbc577b9d747efd6",
+          1
+        ],
+        [
+          "0xdd718d5cc53262d4",
+          1
+        ],
+        [
+          "0x04e70521a0d3d2f8",
+          2
+        ],
+        [
+          "0x162bf19137abacbd",
+          1
+        ],
+        [
+          "0xd7bdd8a272ca0d65",
+          2
+        ],
+        [
+          "0xdf6acb689907609b",
+          5
+        ],
+        [
+          "0x37e397fc7c91f5e4",
+          2
+        ],
+        [
+          "0xccd9de6396c899ca",
+          1
+        ],
+        [
+          "0x40fe3ad401f8959a",
+          6
+        ],
+        [
+          "0xd2bc9897eed08f15",
+          3
+        ],
+        [
+          "0xf78b278be53f454c",
+          2
+        ],
+        [
+          "0xab3c0572291feb8b",
+          2
+        ],
+        [
+          "0xbc9d89904f5b923f",
+          1
+        ],
+        [
+          "0x37c8bb1350a9a2a8",
+          4
+        ],
+        [
+          "0xf3ff14d5ab527059",
+          3
+        ],
+        [
+          "0x6ff52ee858e6c5bd",
+          2
+        ],
+        [
+          "0x91b1c8b16328eb92",
+          2
+        ],
+        [
+          "0x9ffb505aa738d69c",
+          1
+        ]
+      ],
+      "authoringVersion": 1,
+      "implName": "next-people-paseo",
+      "implVersion": 0,
+      "specName": "next-people-paseo",
+      "specVersion": 3004000,
+      "stateVersion": 1,
+      "systemVersion": 1,
+      "transactionVersion": 6
+    },
+    "spans": 532,
+    "state_methods": {
+      "Append": 17,
+      "ClearPrefix": 1,
+      "Core_execute_block": 1,
+      "Exists": 10,
+      "Get": 302,
+      "Put": 186,
+      "Return": 1,
+      "StorageRoot": 1
+    },
+    "storage_host_durations": 529,
+    "warm_extrinsic_ms": {},
+    "warm_replay_ms": [
+      1.9040839999999999,
+      1.777417,
+      1.7298339999999999,
+      1.726416,
+      1.7039170000000001
+    ],
+    "warm_rpc_calls": 0,
+    "wasm_blake2": "0xee817a9ecd07f4c0f861dd6f2b5105fd316638b827d4d425ae062add4b651c1c",
+    "wasm_bytes": 3744189,
+    "wasm_spans": 0,
+    "label": "batch",
+    "oracle_match": true,
+    "keyed_events": 515,
+    "extra_events": {
+      "Core_execute_block": 1,
+      "ClearPrefix": 1,
+      "StorageRoot": 1,
+      "Return": 1
+    },
+    "backend_iteration_events": {
+      "BackendIterNextKey": 1
+    },
+    "warm_median_ms": 1.7298339999999999,
+    "extrinsic_median_ms": {},
+    "oracle_fields_ignored": [
+      "ext_id"
+    ],
+    "span_intervals_and_parents_valid": true,
+    "storage_events_with_real_host_durations": 517
+  },
+  {
+    "acquisition_ms": 264.260542,
+    "discovery_execute_ms": 221.074667,
+    "execution": "Core_execute_block",
+    "extrinsic_durations": [],
+    "fetched_node_bytes": 3750786,
+    "hash": "0xbd704a2d9ff4eb7fe8f6366d97cb9356bb0e19e2e1b7e5bfad0eeade5ccb214b",
+    "number": 5,
+    "offline_verification": true,
+    "parent": "0x83a73d41983c02621cc0da831c42279d160973075b666292eccdf0bf45a21f43",
+    "parented_wasm_spans": 0,
+    "proof_nodes": 85,
+    "recorded_execution_proof_bytes": 6684,
+    "root_check": true,
+    "rpc_calls": 52,
+    "rpc_counts": {
+      "chain_getBlock": 1,
+      "chain_getHeader": 1,
+      "state_getReadProof": 49,
+      "state_getRuntimeVersion": 1
+    },
+    "runtime": {
+      "apis": [
+        [
+          "0x12c8e3d4d7e06de0",
+          1
+        ],
+        [
+          "0x2609be83ac4468dc",
+          1
+        ],
+        [
+          "0xd0bac7be4a6b0920",
+          1
+        ],
+        [
+          "0x9287fb0e021bc854",
+          1
+        ],
+        [
+          "0x843b6f8cec8098c7",
+          1
+        ],
+        [
+          "0x5f4d07c7630fd6b9",
+          1
+        ],
+        [
+          "0xea93e3f16f3d6962",
+          3
+        ],
+        [
+          "0xfbc577b9d747efd6",
+          1
+        ],
+        [
+          "0xdd718d5cc53262d4",
+          1
+        ],
+        [
+          "0x04e70521a0d3d2f8",
+          2
+        ],
+        [
+          "0x162bf19137abacbd",
+          1
+        ],
+        [
+          "0xd7bdd8a272ca0d65",
+          2
+        ],
+        [
+          "0xdf6acb689907609b",
+          5
+        ],
+        [
+          "0x37e397fc7c91f5e4",
+          2
+        ],
+        [
+          "0xccd9de6396c899ca",
+          1
+        ],
+        [
+          "0x40fe3ad401f8959a",
+          6
+        ],
+        [
+          "0xd2bc9897eed08f15",
+          3
+        ],
+        [
+          "0xf78b278be53f454c",
+          2
+        ],
+        [
+          "0xab3c0572291feb8b",
+          2
+        ],
+        [
+          "0xbc9d89904f5b923f",
+          1
+        ],
+        [
+          "0x37c8bb1350a9a2a8",
+          4
+        ],
+        [
+          "0xf3ff14d5ab527059",
+          3
+        ],
+        [
+          "0x6ff52ee858e6c5bd",
+          2
+        ],
+        [
+          "0x91b1c8b16328eb92",
+          2
+        ],
+        [
+          "0x9ffb505aa738d69c",
+          1
+        ]
+      ],
+      "authoringVersion": 1,
+      "implName": "next-people-paseo",
+      "implVersion": 0,
+      "specName": "next-people-paseo",
+      "specVersion": 3004000,
+      "stateVersion": 1,
+      "systemVersion": 1,
+      "transactionVersion": 6
+    },
+    "spans": 425,
+    "state_methods": {
+      "Append": 10,
+      "ClearPrefix": 1,
+      "Core_execute_block": 1,
+      "Exists": 10,
+      "Get": 223,
+      "Put": 169,
+      "Return": 1,
+      "StorageRoot": 1
+    },
+    "storage_host_durations": 422,
+    "warm_extrinsic_ms": {},
+    "warm_replay_ms": [
+      1.5795,
+      1.411708,
+      1.382708,
+      1.382917,
+      1.375958
+    ],
+    "warm_rpc_calls": 0,
+    "wasm_blake2": "0xee817a9ecd07f4c0f861dd6f2b5105fd316638b827d4d425ae062add4b651c1c",
+    "wasm_bytes": 3744189,
+    "wasm_spans": 0,
+    "label": "individuality-grant",
+    "oracle_match": true,
+    "keyed_events": 412,
+    "extra_events": {
+      "Core_execute_block": 1,
+      "ClearPrefix": 1,
+      "StorageRoot": 1,
+      "Return": 1
+    },
+    "backend_iteration_events": {
+      "BackendIterNextKey": 1
+    },
+    "warm_median_ms": 1.382917,
+    "extrinsic_median_ms": {},
+    "oracle_fields_ignored": [
+      "ext_id"
+    ],
+    "span_intervals_and_parents_valid": true,
+    "storage_events_with_real_host_durations": 414
+  },
+  {
+    "acquisition_ms": 262.62166599999995,
+    "discovery_execute_ms": 219.076833,
+    "execution": "Core_execute_block",
+    "extrinsic_durations": [],
+    "fetched_node_bytes": 3750927,
+    "hash": "0xad410b1e4dbe191529a16e664f00c3cfcf2b802933005eef9460497c3eca2a84",
+    "number": 6,
+    "offline_verification": true,
+    "parent": "0xbd704a2d9ff4eb7fe8f6366d97cb9356bb0e19e2e1b7e5bfad0eeade5ccb214b",
+    "parented_wasm_spans": 0,
+    "proof_nodes": 86,
+    "recorded_execution_proof_bytes": 6828,
+    "root_check": true,
+    "rpc_calls": 53,
+    "rpc_counts": {
+      "chain_getBlock": 1,
+      "chain_getHeader": 1,
+      "state_getReadProof": 50,
+      "state_getRuntimeVersion": 1
+    },
+    "runtime": {
+      "apis": [
+        [
+          "0x12c8e3d4d7e06de0",
+          1
+        ],
+        [
+          "0x2609be83ac4468dc",
+          1
+        ],
+        [
+          "0xd0bac7be4a6b0920",
+          1
+        ],
+        [
+          "0x9287fb0e021bc854",
+          1
+        ],
+        [
+          "0x843b6f8cec8098c7",
+          1
+        ],
+        [
+          "0x5f4d07c7630fd6b9",
+          1
+        ],
+        [
+          "0xea93e3f16f3d6962",
+          3
+        ],
+        [
+          "0xfbc577b9d747efd6",
+          1
+        ],
+        [
+          "0xdd718d5cc53262d4",
+          1
+        ],
+        [
+          "0x04e70521a0d3d2f8",
+          2
+        ],
+        [
+          "0x162bf19137abacbd",
+          1
+        ],
+        [
+          "0xd7bdd8a272ca0d65",
+          2
+        ],
+        [
+          "0xdf6acb689907609b",
+          5
+        ],
+        [
+          "0x37e397fc7c91f5e4",
+          2
+        ],
+        [
+          "0xccd9de6396c899ca",
+          1
+        ],
+        [
+          "0x40fe3ad401f8959a",
+          6
+        ],
+        [
+          "0xd2bc9897eed08f15",
+          3
+        ],
+        [
+          "0xf78b278be53f454c",
+          2
+        ],
+        [
+          "0xab3c0572291feb8b",
+          2
+        ],
+        [
+          "0xbc9d89904f5b923f",
+          1
+        ],
+        [
+          "0x37c8bb1350a9a2a8",
+          4
+        ],
+        [
+          "0xf3ff14d5ab527059",
+          3
+        ],
+        [
+          "0x6ff52ee858e6c5bd",
+          2
+        ],
+        [
+          "0x91b1c8b16328eb92",
+          2
+        ],
+        [
+          "0x9ffb505aa738d69c",
+          1
+        ]
+      ],
+      "authoringVersion": 1,
+      "implName": "next-people-paseo",
+      "implVersion": 0,
+      "specName": "next-people-paseo",
+      "specVersion": 3004000,
+      "stateVersion": 1,
+      "systemVersion": 1,
+      "transactionVersion": 6
+    },
+    "spans": 424,
+    "state_methods": {
+      "Append": 10,
+      "ClearPrefix": 1,
+      "Core_execute_block": 1,
+      "Exists": 10,
+      "Get": 222,
+      "Put": 169,
+      "Return": 1,
+      "StorageRoot": 1
+    },
+    "storage_host_durations": 421,
+    "warm_extrinsic_ms": {},
+    "warm_replay_ms": [
+      1.510625,
+      1.3670419999999999,
+      1.350333,
+      1.3452080000000002,
+      1.345583
+    ],
+    "warm_rpc_calls": 0,
+    "wasm_blake2": "0xee817a9ecd07f4c0f861dd6f2b5105fd316638b827d4d425ae062add4b651c1c",
+    "wasm_bytes": 3744189,
+    "wasm_spans": 0,
+    "label": "individuality-clear",
+    "oracle_match": true,
+    "keyed_events": 411,
+    "extra_events": {
+      "Core_execute_block": 1,
+      "ClearPrefix": 1,
+      "StorageRoot": 1,
+      "Return": 1
+    },
+    "backend_iteration_events": {
+      "BackendIterNextKey": 1
+    },
+    "warm_median_ms": 1.350333,
+    "extrinsic_median_ms": {},
+    "oracle_fields_ignored": [
+      "ext_id"
+    ],
+    "span_intervals_and_parents_valid": true,
+    "storage_events_with_real_host_durations": 413
+  },
+  {
+    "acquisition_ms": 260.809625,
+    "discovery_execute_ms": 218.16804100000002,
+    "execution": "Core_execute_block",
+    "extrinsic_durations": [],
+    "fetched_node_bytes": 3750817,
+    "hash": "0x82fa5200a8c46f651e8aed7bad1dd72e1615c2bf28d90c367f9838b014216a4c",
+    "number": 7,
+    "offline_verification": true,
+    "parent": "0xad410b1e4dbe191529a16e664f00c3cfcf2b802933005eef9460497c3eca2a84",
+    "parented_wasm_spans": 0,
+    "proof_nodes": 84,
+    "recorded_execution_proof_bytes": 6714,
+    "root_check": true,
+    "rpc_calls": 51,
+    "rpc_counts": {
+      "chain_getBlock": 1,
+      "chain_getHeader": 1,
+      "state_getReadProof": 48,
+      "state_getRuntimeVersion": 1
+    },
+    "runtime": {
+      "apis": [
+        [
+          "0x12c8e3d4d7e06de0",
+          1
+        ],
+        [
+          "0x2609be83ac4468dc",
+          1
+        ],
+        [
+          "0xd0bac7be4a6b0920",
+          1
+        ],
+        [
+          "0x9287fb0e021bc854",
+          1
+        ],
+        [
+          "0x843b6f8cec8098c7",
+          1
+        ],
+        [
+          "0x5f4d07c7630fd6b9",
+          1
+        ],
+        [
+          "0xea93e3f16f3d6962",
+          3
+        ],
+        [
+          "0xfbc577b9d747efd6",
+          1
+        ],
+        [
+          "0xdd718d5cc53262d4",
+          1
+        ],
+        [
+          "0x04e70521a0d3d2f8",
+          2
+        ],
+        [
+          "0x162bf19137abacbd",
+          1
+        ],
+        [
+          "0xd7bdd8a272ca0d65",
+          2
+        ],
+        [
+          "0xdf6acb689907609b",
+          5
+        ],
+        [
+          "0x37e397fc7c91f5e4",
+          2
+        ],
+        [
+          "0xccd9de6396c899ca",
+          1
+        ],
+        [
+          "0x40fe3ad401f8959a",
+          6
+        ],
+        [
+          "0xd2bc9897eed08f15",
+          3
+        ],
+        [
+          "0xf78b278be53f454c",
+          2
+        ],
+        [
+          "0xab3c0572291feb8b",
+          2
+        ],
+        [
+          "0xbc9d89904f5b923f",
+          1
+        ],
+        [
+          "0x37c8bb1350a9a2a8",
+          4
+        ],
+        [
+          "0xf3ff14d5ab527059",
+          3
+        ],
+        [
+          "0x6ff52ee858e6c5bd",
+          2
+        ],
+        [
+          "0x91b1c8b16328eb92",
+          2
+        ],
+        [
+          "0x9ffb505aa738d69c",
+          1
+        ]
+      ],
+      "authoringVersion": 1,
+      "implName": "next-people-paseo",
+      "implVersion": 0,
+      "specName": "next-people-paseo",
+      "specVersion": 3004000,
+      "stateVersion": 1,
+      "systemVersion": 1,
+      "transactionVersion": 6
+    },
+    "spans": 419,
+    "state_methods": {
+      "Append": 9,
+      "ClearPrefix": 1,
+      "Core_execute_block": 1,
+      "Exists": 10,
+      "Get": 219,
+      "Put": 168,
+      "Return": 1,
+      "StorageRoot": 1
+    },
+    "storage_host_durations": 416,
+    "warm_extrinsic_ms": {},
+    "warm_replay_ms": [
+      1.663917,
+      1.5777079999999999,
+      1.530083,
+      1.5865420000000001,
+      1.555833
+    ],
+    "warm_rpc_calls": 0,
+    "wasm_blake2": "0xee817a9ecd07f4c0f861dd6f2b5105fd316638b827d4d425ae062add4b651c1c",
+    "wasm_bytes": 3744189,
+    "wasm_spans": 0,
+    "label": "large-put",
+    "oracle_match": true,
+    "keyed_events": 406,
+    "extra_events": {
+      "Core_execute_block": 1,
+      "ClearPrefix": 1,
+      "StorageRoot": 1,
+      "Return": 1
+    },
+    "backend_iteration_events": {
+      "BackendIterNextKey": 1
+    },
+    "warm_median_ms": 1.5777079999999999,
+    "extrinsic_median_ms": {},
+    "oracle_fields_ignored": [
+      "ext_id"
+    ],
+    "span_intervals_and_parents_valid": true,
+    "storage_events_with_real_host_durations": 408
+  },
+  {
+    "acquisition_ms": 261.49154200000004,
+    "discovery_execute_ms": 218.678208,
+    "execution": "Core_execute_block",
+    "extrinsic_durations": [],
+    "fetched_node_bytes": 3750967,
+    "hash": "0x7d99aaa134e6ecea7fbeea635f4225e839ca31da4b1702a3f1eb6e697eec712b",
+    "number": 8,
+    "offline_verification": true,
+    "parent": "0x82fa5200a8c46f651e8aed7bad1dd72e1615c2bf28d90c367f9838b014216a4c",
+    "parented_wasm_spans": 0,
+    "proof_nodes": 86,
+    "recorded_execution_proof_bytes": 6867,
+    "root_check": true,
+    "rpc_calls": 52,
+    "rpc_counts": {
+      "chain_getBlock": 1,
+      "chain_getHeader": 1,
+      "state_getReadProof": 49,
+      "state_getRuntimeVersion": 1
+    },
+    "runtime": {
+      "apis": [
+        [
+          "0x12c8e3d4d7e06de0",
+          1
+        ],
+        [
+          "0x2609be83ac4468dc",
+          1
+        ],
+        [
+          "0xd0bac7be4a6b0920",
+          1
+        ],
+        [
+          "0x9287fb0e021bc854",
+          1
+        ],
+        [
+          "0x843b6f8cec8098c7",
+          1
+        ],
+        [
+          "0x5f4d07c7630fd6b9",
+          1
+        ],
+        [
+          "0xea93e3f16f3d6962",
+          3
+        ],
+        [
+          "0xfbc577b9d747efd6",
+          1
+        ],
+        [
+          "0xdd718d5cc53262d4",
+          1
+        ],
+        [
+          "0x04e70521a0d3d2f8",
+          2
+        ],
+        [
+          "0x162bf19137abacbd",
+          1
+        ],
+        [
+          "0xd7bdd8a272ca0d65",
+          2
+        ],
+        [
+          "0xdf6acb689907609b",
+          5
+        ],
+        [
+          "0x37e397fc7c91f5e4",
+          2
+        ],
+        [
+          "0xccd9de6396c899ca",
+          1
+        ],
+        [
+          "0x40fe3ad401f8959a",
+          6
+        ],
+        [
+          "0xd2bc9897eed08f15",
+          3
+        ],
+        [
+          "0xf78b278be53f454c",
+          2
+        ],
+        [
+          "0xab3c0572291feb8b",
+          2
+        ],
+        [
+          "0xbc9d89904f5b923f",
+          1
+        ],
+        [
+          "0x37c8bb1350a9a2a8",
+          4
+        ],
+        [
+          "0xf3ff14d5ab527059",
+          3
+        ],
+        [
+          "0x6ff52ee858e6c5bd",
+          2
+        ],
+        [
+          "0x91b1c8b16328eb92",
+          2
+        ],
+        [
+          "0x9ffb505aa738d69c",
+          1
+        ]
+      ],
+      "authoringVersion": 1,
+      "implName": "next-people-paseo",
+      "implVersion": 0,
+      "specName": "next-people-paseo",
+      "specVersion": 3004000,
+      "stateVersion": 1,
+      "systemVersion": 1,
+      "transactionVersion": 6
+    },
+    "spans": 419,
+    "state_methods": {
+      "Append": 9,
+      "ClearPrefix": 2,
+      "Core_execute_block": 1,
+      "Exists": 10,
+      "Get": 219,
+      "Put": 167,
+      "Return": 1,
+      "StorageRoot": 1
+    },
+    "storage_host_durations": 416,
+    "warm_extrinsic_ms": {},
+    "warm_replay_ms": [
+      1.579292,
+      1.397709,
+      1.355375,
+      1.348625,
+      1.345
+    ],
+    "warm_rpc_calls": 0,
+    "wasm_blake2": "0xee817a9ecd07f4c0f861dd6f2b5105fd316638b827d4d425ae062add4b651c1c",
+    "wasm_bytes": 3744189,
+    "wasm_spans": 0,
+    "label": "clear-prefix",
+    "oracle_match": true,
+    "keyed_events": 405,
+    "extra_events": {
+      "Core_execute_block": 1,
+      "ClearPrefix": 2,
+      "StorageRoot": 1,
+      "Return": 1
+    },
+    "backend_iteration_events": {
+      "BackendIterNextKey": 3
+    },
+    "warm_median_ms": 1.355375,
+    "extrinsic_median_ms": {},
+    "oracle_fields_ignored": [
+      "ext_id"
+    ],
+    "span_intervals_and_parents_valid": true,
+    "storage_events_with_real_host_durations": 408
+  }
+]

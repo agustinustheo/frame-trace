@@ -1,0 +1,212 @@
+{
+  "acquisition_ms": 300.682083,
+  "discovery_execute_ms": 246.62954200000001,
+  "execution": "Core_execute_block",
+  "extrinsic_durations": [
+    {
+      "duration_ns": 228167,
+      "index": 0,
+      "proof_delta_bytes": 229,
+      "proof_end_bytes": 2936,
+      "proof_start_bytes": 2707,
+      "span_id": 202
+    },
+    {
+      "duration_ns": 46792,
+      "index": 1,
+      "proof_delta_bytes": 107,
+      "proof_end_bytes": 3043,
+      "proof_start_bytes": 2936,
+      "span_id": 258
+    }
+  ],
+  "fetched_node_bytes": 3792608,
+  "hash": "0xdf2d7b01cfd684bb5b0bde8aa264804bd161dc7c60d7ef1bb411dc1b1c6462c8",
+  "number": 1,
+  "offline_verification": true,
+  "parent": "0x35c0fc72b57702d5d78cd925008093ce64bc973833434a07ad9084c81246a583",
+  "parented_wasm_spans": 104,
+  "proof_nodes": 51,
+  "recorded_execution_proof_bytes": 4091,
+  "root_check": true,
+  "rpc_calls": 31,
+  "rpc_counts": {
+    "chain_getBlock": 1,
+    "chain_getHeader": 1,
+    "state_getReadProof": 28,
+    "state_getRuntimeVersion": 1
+  },
+  "runtime": {
+    "apis": [
+      [
+        "0x12c8e3d4d7e06de0",
+        1
+      ],
+      [
+        "0x2609be83ac4468dc",
+        1
+      ],
+      [
+        "0xd0bac7be4a6b0920",
+        1
+      ],
+      [
+        "0x9287fb0e021bc854",
+        1
+      ],
+      [
+        "0x843b6f8cec8098c7",
+        1
+      ],
+      [
+        "0x5f4d07c7630fd6b9",
+        1
+      ],
+      [
+        "0xea93e3f16f3d6962",
+        3
+      ],
+      [
+        "0xfbc577b9d747efd6",
+        1
+      ],
+      [
+        "0xdd718d5cc53262d4",
+        1
+      ],
+      [
+        "0x04e70521a0d3d2f8",
+        2
+      ],
+      [
+        "0x162bf19137abacbd",
+        1
+      ],
+      [
+        "0xd7bdd8a272ca0d65",
+        2
+      ],
+      [
+        "0xdf6acb689907609b",
+        5
+      ],
+      [
+        "0x37e397fc7c91f5e4",
+        2
+      ],
+      [
+        "0xccd9de6396c899ca",
+        1
+      ],
+      [
+        "0x40fe3ad401f8959a",
+        6
+      ],
+      [
+        "0xd2bc9897eed08f15",
+        3
+      ],
+      [
+        "0xf78b278be53f454c",
+        2
+      ],
+      [
+        "0xab3c0572291feb8b",
+        2
+      ],
+      [
+        "0xbc9d89904f5b923f",
+        1
+      ],
+      [
+        "0x37c8bb1350a9a2a8",
+        4
+      ],
+      [
+        "0xf3ff14d5ab527059",
+        3
+      ],
+      [
+        "0x6ff52ee858e6c5bd",
+        2
+      ],
+      [
+        "0x91b1c8b16328eb92",
+        2
+      ],
+      [
+        "0x9ffb505aa738d69c",
+        1
+      ]
+    ],
+    "authoringVersion": 1,
+    "implName": "next-people-paseo",
+    "implVersion": 0,
+    "specName": "next-people-paseo",
+    "specVersion": 3004000,
+    "stateVersion": 1,
+    "systemVersion": 1,
+    "transactionVersion": 6
+  },
+  "spans": 426,
+  "state_methods": {
+    "Append": 4,
+    "ClearPrefix": 1,
+    "Core_execute_block": 1,
+    "Exists": 10,
+    "Get": 155,
+    "Put": 146,
+    "Return": 1,
+    "StorageRoot": 1
+  },
+  "storage_host_durations": 321,
+  "warm_extrinsic_ms": {
+    "0": [
+      0.4785,
+      0.226958,
+      0.243334,
+      0.227375,
+      0.228167
+    ],
+    "1": [
+      0.054959,
+      0.046333,
+      0.047666,
+      0.042291,
+      0.046792
+    ]
+  },
+  "warm_replay_ms": [
+    1.863958,
+    1.520667,
+    1.474,
+    1.476375,
+    1.472416
+  ],
+  "warm_rpc_calls": 0,
+  "wasm_blake2": "0xba01b1de0c55e48c84c70a59381594c8540eb2482ac8e785908de120ce617074",
+  "wasm_bytes": 3788554,
+  "wasm_spans": 104,
+  "label": "inherents",
+  "oracle_match": true,
+  "keyed_events": 315,
+  "extra_events": {
+    "Core_execute_block": 1,
+    "ClearPrefix": 1,
+    "StorageRoot": 1,
+    "Return": 1
+  },
+  "backend_iteration_events": {
+    "BackendIterNextKey": 1
+  },
+  "warm_median_ms": 1.476375,
+  "extrinsic_median_ms": {
+    "0": 0.228167,
+    "1": 0.046792
+  },
+  "oracle_fields_ignored": [
+    "ext_id"
+  ],
+  "span_intervals_and_parents_valid": true,
+  "storage_events_with_real_host_durations": 317
+}

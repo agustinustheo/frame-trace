@@ -1,0 +1,228 @@
+{
+  "acquisition_ms": 277.65141700000004,
+  "discovery_execute_ms": 234.14925,
+  "execution": "Core_execute_block",
+  "extrinsic_durations": [
+    {
+      "duration_ns": 241000,
+      "index": 0,
+      "proof_delta_bytes": 495,
+      "proof_end_bytes": 3985,
+      "proof_start_bytes": 3490,
+      "span_id": 204
+    },
+    {
+      "duration_ns": 46500,
+      "index": 1,
+      "proof_delta_bytes": 139,
+      "proof_end_bytes": 4124,
+      "proof_start_bytes": 3985,
+      "span_id": 262
+    },
+    {
+      "duration_ns": 663459,
+      "index": 2,
+      "proof_delta_bytes": 1513,
+      "proof_end_bytes": 5637,
+      "proof_start_bytes": 4124,
+      "span_id": 292
+    }
+  ],
+  "fetched_node_bytes": 3795055,
+  "hash": "0x0661899538bf75f600c05c9cc31a01d34e95be6ea6096230a2af6a0074d90637",
+  "number": 4,
+  "offline_verification": true,
+  "parent": "0xaa9b6d9f7f0d74a603f7d763724d812f468139427ba81f5f22dc82a7d4026de6",
+  "parented_wasm_spans": 109,
+  "proof_nodes": 83,
+  "recorded_execution_proof_bytes": 6586,
+  "root_check": true,
+  "rpc_calls": 51,
+  "rpc_counts": {
+    "chain_getBlock": 1,
+    "chain_getHeader": 1,
+    "state_getReadProof": 48,
+    "state_getRuntimeVersion": 1
+  },
+  "runtime": {
+    "apis": [
+      [
+        "0x12c8e3d4d7e06de0",
+        1
+      ],
+      [
+        "0x2609be83ac4468dc",
+        1
+      ],
+      [
+        "0xd0bac7be4a6b0920",
+        1
+      ],
+      [
+        "0x9287fb0e021bc854",
+        1
+      ],
+      [
+        "0x843b6f8cec8098c7",
+        1
+      ],
+      [
+        "0x5f4d07c7630fd6b9",
+        1
+      ],
+      [
+        "0xea93e3f16f3d6962",
+        3
+      ],
+      [
+        "0xfbc577b9d747efd6",
+        1
+      ],
+      [
+        "0xdd718d5cc53262d4",
+        1
+      ],
+      [
+        "0x04e70521a0d3d2f8",
+        2
+      ],
+      [
+        "0x162bf19137abacbd",
+        1
+      ],
+      [
+        "0xd7bdd8a272ca0d65",
+        2
+      ],
+      [
+        "0xdf6acb689907609b",
+        5
+      ],
+      [
+        "0x37e397fc7c91f5e4",
+        2
+      ],
+      [
+        "0xccd9de6396c899ca",
+        1
+      ],
+      [
+        "0x40fe3ad401f8959a",
+        6
+      ],
+      [
+        "0xd2bc9897eed08f15",
+        3
+      ],
+      [
+        "0xf78b278be53f454c",
+        2
+      ],
+      [
+        "0xab3c0572291feb8b",
+        2
+      ],
+      [
+        "0xbc9d89904f5b923f",
+        1
+      ],
+      [
+        "0x37c8bb1350a9a2a8",
+        4
+      ],
+      [
+        "0xf3ff14d5ab527059",
+        3
+      ],
+      [
+        "0x6ff52ee858e6c5bd",
+        2
+      ],
+      [
+        "0x91b1c8b16328eb92",
+        2
+      ],
+      [
+        "0x9ffb505aa738d69c",
+        1
+      ]
+    ],
+    "authoringVersion": 1,
+    "implName": "next-people-paseo",
+    "implVersion": 0,
+    "specName": "next-people-paseo",
+    "specVersion": 3004000,
+    "stateVersion": 1,
+    "systemVersion": 1,
+    "transactionVersion": 6
+  },
+  "spans": 641,
+  "state_methods": {
+    "Append": 17,
+    "ClearPrefix": 1,
+    "Core_execute_block": 1,
+    "Exists": 10,
+    "Get": 302,
+    "Put": 186,
+    "Return": 1,
+    "StorageRoot": 1
+  },
+  "storage_host_durations": 529,
+  "warm_extrinsic_ms": {
+    "0": [
+      0.260958,
+      0.246917,
+      0.2575,
+      0.222875,
+      0.241
+    ],
+    "1": [
+      0.047334,
+      0.042875,
+      0.048209,
+      0.041166,
+      0.0465
+    ],
+    "2": [
+      0.679375,
+      0.666708,
+      0.684709,
+      0.608917,
+      0.663459
+    ]
+  },
+  "warm_replay_ms": [
+    2.347,
+    2.217375,
+    2.213458,
+    2.00925,
+    2.179625
+  ],
+  "warm_rpc_calls": 0,
+  "wasm_blake2": "0xba01b1de0c55e48c84c70a59381594c8540eb2482ac8e785908de120ce617074",
+  "wasm_bytes": 3788554,
+  "wasm_spans": 109,
+  "label": "batch",
+  "oracle_match": true,
+  "keyed_events": 515,
+  "extra_events": {
+    "Core_execute_block": 1,
+    "ClearPrefix": 1,
+    "StorageRoot": 1,
+    "Return": 1
+  },
+  "backend_iteration_events": {
+    "BackendIterNextKey": 1
+  },
+  "warm_median_ms": 2.213458,
+  "extrinsic_median_ms": {
+    "0": 0.246917,
+    "1": 0.0465,
+    "2": 0.666708
+  },
+  "oracle_fields_ignored": [
+    "ext_id"
+  ],
+  "span_intervals_and_parents_valid": true,
+  "storage_events_with_real_host_durations": 517
+}

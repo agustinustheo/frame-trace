@@ -1,0 +1,14 @@
+Rust 1.93.0, CARGO_TARGET_DIR=/tmp/pm-audit/e2-target
+release build --locked: PASS
+fmt --check: PASS
+clippy --locked --all-targets -- -D warnings: PASS
+cargo test --locked: PASS (1 host conformance test)
+node --check local.cjs: PASS
+verify.py traced: PASS (8 exact ordered oracle matches, root checks, timing/parent validation)
+verify.py untraced: PASS (8 exact ordered oracle matches, root checks, timing/parent validation)
+public Westend Asset Hub #18558320: PASS (root check, five zero-RPC warm runs)
+separate-process offline local batch and public replay: PASS (zero RPCs)
+tampered expected root: REJECTED after computing authentic root
+cargo metadata: isolated experiments/e2 workspace, one member
+README local links: PASS
+cleanup: no polkadot-omni-node processes remain

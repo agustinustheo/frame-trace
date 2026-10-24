@@ -1,0 +1,117 @@
+[
+  {
+    "path": [
+      {
+        "id": 1,
+        "name": "replay",
+        "target": "e2"
+      },
+      {
+        "id": 2,
+        "name": "execute_block",
+        "target": "frame_executive"
+      },
+      {
+        "id": 292,
+        "name": "apply_extrinsic",
+        "target": "frame_executive"
+      },
+      {
+        "id": 348,
+        "name": "batch",
+        "target": "pallet_utility::pallet"
+      }
+    ],
+    "duration_ns": 412542
+  },
+  {
+    "path": [
+      {
+        "id": 1,
+        "name": "replay",
+        "target": "e2"
+      },
+      {
+        "id": 2,
+        "name": "execute_block",
+        "target": "frame_executive"
+      },
+      {
+        "id": 292,
+        "name": "apply_extrinsic",
+        "target": "frame_executive"
+      },
+      {
+        "id": 348,
+        "name": "batch",
+        "target": "pallet_utility::pallet"
+      },
+      {
+        "id": 352,
+        "name": "transfer_keep_alive",
+        "target": "pallet_balances::pallet"
+      }
+    ],
+    "duration_ns": 124750
+  },
+  {
+    "path": [
+      {
+        "id": 1,
+        "name": "replay",
+        "target": "e2"
+      },
+      {
+        "id": 2,
+        "name": "execute_block",
+        "target": "frame_executive"
+      },
+      {
+        "id": 292,
+        "name": "apply_extrinsic",
+        "target": "frame_executive"
+      },
+      {
+        "id": 348,
+        "name": "batch",
+        "target": "pallet_utility::pallet"
+      },
+      {
+        "id": 391,
+        "name": "transfer_keep_alive",
+        "target": "pallet_balances::pallet"
+      }
+    ],
+    "duration_ns": 129625
+  },
+  {
+    "path": [
+      {
+        "id": 1,
+        "name": "replay",
+        "target": "e2"
+      },
+      {
+        "id": 2,
+        "name": "execute_block",
+        "target": "frame_executive"
+      },
+      {
+        "id": 292,
+        "name": "apply_extrinsic",
+        "target": "frame_executive"
+      },
+      {
+        "id": 348,
+        "name": "batch",
+        "target": "pallet_utility::pallet"
+      },
+      {
+        "id": 441,
+        "name": "transfer_keep_alive",
+        "target": "pallet_balances::pallet"
+      }
+    ],
+    "duration_ns": 114542
+  }
+]

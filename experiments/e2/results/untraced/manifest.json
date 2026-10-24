@@ -1,0 +1,750 @@
+{
+  "captured_at": "2026-10-24T19:45:34.460Z",
+  "blocks": [
+    {
+      "label": "inherents",
+      "hash": "0xe1e914294d7bc267a2972fb4356de615fa5f741b0af4395d089a751510a0249e"
+    },
+    {
+      "label": "transfer",
+      "hash": "0xea56e9d68d1664e7998f17d21883a1f4927e67a1cf5c175501bccfa9043f2462",
+      "events": [
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "Withdraw",
+            "section": "balances",
+            "index": "0x0a08",
+            "data": {
+              "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+              "amount": "14,868,480"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "Transfer",
+            "section": "balances",
+            "index": "0x0a02",
+            "data": {
+              "from": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+              "to": "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty",
+              "amount": "10,000,000,000"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "BurnedDebt",
+            "section": "balances",
+            "index": "0x0a0d",
+            "data": {
+              "amount": "14,868,480"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "TransactionFeePaid",
+            "section": "transactionPayment",
+            "index": "0x0b00",
+            "data": {
+              "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+              "actualFee": "14,868,480",
+              "tip": "0"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "ExtrinsicSuccess",
+            "section": "system",
+            "index": "0x0000",
+            "data": {
+              "dispatchInfo": {
+                "weight": {
+                  "refTime": "684,826,000",
+                  "proofSize": "605"
+                },
+                "class": "Normal",
+                "paysFee": "Yes"
+              }
+            }
+          },
+          "topics": []
+        }
+      ],
+      "index": 2
+    },
+    {
+      "label": "remark",
+      "hash": "0x9c4c9de0cfb2b3aeac48b3e1ca9c2f730ad14b4c34b09d66e4fb72c22919d62e",
+      "events": [
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "Withdraw",
+            "section": "balances",
+            "index": "0x0a08",
+            "data": {
+              "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+              "amount": "12,453,237"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "BurnedDebt",
+            "section": "balances",
+            "index": "0x0a0d",
+            "data": {
+              "amount": "12,453,237"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "TransactionFeePaid",
+            "section": "transactionPayment",
+            "index": "0x0b00",
+            "data": {
+              "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+              "actualFee": "12,453,237",
+              "tip": "0"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "ExtrinsicSuccess",
+            "section": "system",
+            "index": "0x0000",
+            "data": {
+              "dispatchInfo": {
+                "weight": {
+                  "refTime": "532,395,096",
+                  "proofSize": "439"
+                },
+                "class": "Normal",
+                "paysFee": "Yes"
+              }
+            }
+          },
+          "topics": []
+        }
+      ],
+      "index": 2
+    },
+    {
+      "label": "batch",
+      "hash": "0x83a73d41983c02621cc0da831c42279d160973075b666292eccdf0bf45a21f43",
+      "events": [
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "Withdraw",
+            "section": "balances",
+            "index": "0x0a08",
+            "data": {
+              "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+              "amount": "23,403,185"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "Transfer",
+            "section": "balances",
+            "index": "0x0a02",
+            "data": {
+              "from": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+              "to": "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty",
+              "amount": "20,000,000,000"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "ItemCompleted",
+            "section": "utility",
+            "index": "0x2803",
+            "data": {}
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "NewAccount",
+            "section": "system",
+            "index": "0x0003",
+            "data": {
+              "account": "5FLSigC9HGRKVhB9FiEo4Y3koPsNmBmLJbpXg2mp1hXcS59Y"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "Endowed",
+            "section": "balances",
+            "index": "0x0a00",
+            "data": {
+              "account": "5FLSigC9HGRKVhB9FiEo4Y3koPsNmBmLJbpXg2mp1hXcS59Y",
+              "freeBalance": "30,000,000,000"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "Transfer",
+            "section": "balances",
+            "index": "0x0a02",
+            "data": {
+              "from": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+              "to": "5FLSigC9HGRKVhB9FiEo4Y3koPsNmBmLJbpXg2mp1hXcS59Y",
+              "amount": "30,000,000,000"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "ItemCompleted",
+            "section": "utility",
+            "index": "0x2803",
+            "data": {}
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "Transfer",
+            "section": "balances",
+            "index": "0x0a02",
+            "data": {
+              "from": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+              "to": "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty",
+              "amount": "40,000,000,000"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "ItemCompleted",
+            "section": "utility",
+            "index": "0x2803",
+            "data": {}
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "BatchCompleted",
+            "section": "utility",
+            "index": "0x2801",
+            "data": {}
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "BurnedDebt",
+            "section": "balances",
+            "index": "0x0a0d",
+            "data": {
+              "amount": "23,403,185"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "TransactionFeePaid",
+            "section": "transactionPayment",
+            "index": "0x0b00",
+            "data": {
+              "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+              "actualFee": "23,403,185",
+              "tip": "0"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "ExtrinsicSuccess",
+            "section": "system",
+            "index": "0x0000",
+            "data": {
+              "dispatchInfo": {
+                "weight": {
+                  "refTime": "1,031,916,419",
+                  "proofSize": "605"
+                },
+                "class": "Normal",
+                "paysFee": "Yes"
+              }
+            }
+          },
+          "topics": []
+        }
+      ],
+      "index": 2
+    },
+    {
+      "label": "individuality-grant",
+      "hash": "0xbd704a2d9ff4eb7fe8f6366d97cb9356bb0e19e2e1b7e5bfad0eeade5ccb214b",
+      "events": [
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "Withdraw",
+            "section": "balances",
+            "index": "0x0a08",
+            "data": {
+              "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+              "amount": "14,768,677"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "AttestationAllowanceIncreased",
+            "section": "peopleLite",
+            "index": "0x3e01",
+            "data": {
+              "account": "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty",
+              "count": "7"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "Sudid",
+            "section": "sudo",
+            "index": "0x2a00",
+            "data": {
+              "sudoResult": "Ok"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "Deposit",
+            "section": "balances",
+            "index": "0x0a07",
+            "data": {
+              "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+              "amount": "14,768,677"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "TransactionFeePaid",
+            "section": "transactionPayment",
+            "index": "0x0b00",
+            "data": {
+              "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+              "actualFee": "0",
+              "tip": "0"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "ExtrinsicSuccess",
+            "section": "system",
+            "index": "0x0000",
+            "data": {
+              "dispatchInfo": {
+                "weight": {
+                  "refTime": "686,822,000",
+                  "proofSize": "600"
+                },
+                "class": "Normal",
+                "paysFee": "No"
+              }
+            }
+          },
+          "topics": []
+        }
+      ],
+      "index": 2
+    },
+    {
+      "label": "individuality-clear",
+      "hash": "0xad410b1e4dbe191529a16e664f00c3cfcf2b802933005eef9460497c3eca2a84",
+      "events": [
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "Withdraw",
+            "section": "balances",
+            "index": "0x0a08",
+            "data": {
+              "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+              "amount": "14,365,870"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "AllAttestationAllowanceCleared",
+            "section": "peopleLite",
+            "index": "0x3e00",
+            "data": {
+              "verifier": "5FHneW46xGXgs5mUiveU4sbTyGBzmstUspZC92UhjJM694ty"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "Sudid",
+            "section": "sudo",
+            "index": "0x2a00",
+            "data": {
+              "sudoResult": "Ok"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "Deposit",
+            "section": "balances",
+            "index": "0x0a07",
+            "data": {
+              "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+              "amount": "14,365,870"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "TransactionFeePaid",
+            "section": "transactionPayment",
+            "index": "0x0b00",
+            "data": {
+              "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+              "actualFee": "0",
+              "tip": "0"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "ExtrinsicSuccess",
+            "section": "system",
+            "index": "0x0000",
+            "data": {
+              "dispatchInfo": {
+                "weight": {
+                  "refTime": "658,750,000",
+                  "proofSize": "564"
+                },
+                "class": "Normal",
+                "paysFee": "No"
+              }
+            }
+          },
+          "topics": []
+        }
+      ],
+      "index": 2
+    },
+    {
+      "label": "large-put",
+      "hash": "0x82fa5200a8c46f651e8aed7bad1dd72e1615c2bf28d90c367f9838b014216a4c",
+      "events": [
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "Withdraw",
+            "section": "balances",
+            "index": "0x0a08",
+            "data": {
+              "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+              "amount": "422,865,400"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "Sudid",
+            "section": "sudo",
+            "index": "0x2a00",
+            "data": {
+              "sudoResult": "Ok"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "Deposit",
+            "section": "balances",
+            "index": "0x0a07",
+            "data": {
+              "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+              "amount": "422,865,400"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "TransactionFeePaid",
+            "section": "transactionPayment",
+            "index": "0x0b00",
+            "data": {
+              "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+              "actualFee": "0",
+              "tip": "0"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "ExtrinsicSuccess",
+            "section": "system",
+            "index": "0x0000",
+            "data": {
+              "dispatchInfo": {
+                "weight": {
+                  "refTime": "654,066,716",
+                  "proofSize": "564"
+                },
+                "class": "Operational",
+                "paysFee": "No"
+              }
+            }
+          },
+          "topics": []
+        }
+      ],
+      "index": 2
+    },
+    {
+      "label": "clear-prefix",
+      "hash": "0x7d99aaa134e6ecea7fbeea635f4225e839ca31da4b1702a3f1eb6e697eec712b",
+      "events": [
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "Withdraw",
+            "section": "balances",
+            "index": "0x0a08",
+            "data": {
+              "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+              "amount": "13,280,750"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "Sudid",
+            "section": "sudo",
+            "index": "0x2a00",
+            "data": {
+              "sudoResult": "Ok"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "Deposit",
+            "section": "balances",
+            "index": "0x0a07",
+            "data": {
+              "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+              "amount": "13,280,750"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "TransactionFeePaid",
+            "section": "transactionPayment",
+            "index": "0x0b00",
+            "data": {
+              "who": "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY",
+              "actualFee": "0",
+              "tip": "0"
+            }
+          },
+          "topics": []
+        },
+        {
+          "phase": {
+            "ApplyExtrinsic": "2"
+          },
+          "event": {
+            "method": "ExtrinsicSuccess",
+            "section": "system",
+            "index": "0x0000",
+            "data": {
+              "dispatchInfo": {
+                "weight": {
+                  "refTime": "807,591,648",
+                  "proofSize": "613"
+                },
+                "class": "Operational",
+                "paysFee": "No"
+              }
+            }
+          },
+          "topics": []
+        }
+      ],
+      "index": 2
+    }
+  ]
+}
