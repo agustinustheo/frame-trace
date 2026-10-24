@@ -126,3 +126,126 @@ paths, child pending namespaces, corrupt cache healing, combined disk eviction
 phases, pallet-labelled hooks, collections on well-known/root/iteration operations,
 RPC EOF, timeouts, and event-based cancellation. Existing ordered oracle/phase
 comparisons and authenticated public fixture replay remain enabled.
+
+## State queries and follow prefetch (11d84cc working tree)
+
+Measured on 2026-10-25, macOS arm64, Rust **1.93.0**, development builds
+(`debug = 0`, default optimization). Endpoint:
+`wss://westend-asset-hub-rpc.polkadot.io`. The before executable is 11d84cc plus
+proof-round counters and a per-block counter log; its acquisition behavior is
+unchanged. After is this uncommitted implementation. Each follows **finalized**
+heads with two workers, eight proof slots, 32-key batches and a separate initially
+empty persistent cache. Compilation and tests were stopped during both reported
+windows. No collector or local node was started.
+
+Exact commands (each interrupted with SIGINT at 120 seconds):
+
+```sh
+/tmp/frame-trace-state-bench/before follow \
+  --rpc wss://westend-asset-hub-rpc.polkadot.io \
+  --cache-dir /tmp/frame-trace-state-bench/before-cache
+
+target/debug/frame-trace follow \
+  --rpc wss://westend-asset-hub-rpc.polkadot.io \
+  --cache-dir /tmp/frame-trace-state-bench/after2-cache
+```
+
+Warm statistics exclude the first two completed startup jobs in each window:
+**12 before / 16 after** warm completions. Counts include context RPC; measured
+execution itself uses zero RPC.
+
+| Metric | Before | After |
+| --- | ---: | ---: |
+| Warm RPC calls/block, median | 41 | 33.5 |
+| Warm RPC range | 38–45 | 30–49 |
+| Sequential proof rounds/block, median | 28 | 15.5 |
+| Proof-round range | 26–30 | 13–17 |
+| Warm seconds/block, median | 12.0255 | 10.034 |
+| Warm seconds range | 10.588–14.808 | 8.117–13.677 |
+| Completed in 120 seconds, including startup | 14 | 18 |
+| Throughput, blocks/minute | 7.0 | 9.0 |
+
+A proof round is one strict demand request or one bounded parallel group of
+prefetch requests that actually makes RPC. Cache-only groups do not count.
+This counts acquisition dependencies, **not each parallel request**; retries are
+inside their original round. Four sequential context RPC calls precede acquisition
+for these hash-selected follow jobs, giving median **32 → 19.5** logical
+sequential stages including context. RPC counts include individual retry attempts.
+
+The first warm before block is **#18561570**,
+`0xe7c0d5c3e2405c42310460bfd74f46032b0f16d579969103e3696de2f8e67670`:
+44 RPC, 27 proof rounds, 14.808 seconds. The first warm after block is
+**#18562313**,
+`0x3589f24a84a4489a1911deed6d61399473bb0beb0cb910a7cf54579c8b248b50`:
+49 RPC, 15 proof rounds, 10.692 seconds. Thus speculative overfetch can increase
+request count on an individual block; it is not an unconditional RPC reduction.
+
+The measured windows contain different public blocks and election-snapshot work:
+before warm traces have roughly 567–587 operations; after has 550–552. Endpoint
+conditions also vary. These figures are an observed comparison, not an isolated
+same-block speedup. All **32** completed follow replays passed the real computed /
+header root check and reported **zero measured RPC calls**. Follow still samples
+near the tip when its queue fills; 9 blocks/minute does not keep up with this chain.
+Both clients exited successfully after SIGINT, with no forced kill.
+
+### Acquisition changes and remaining dependencies
+
+Before loading runtime code, one bounded acquisition stage predicts full storage
+keys and trie miss paths from the last three successful replays. Every lookup
+walks from the new parent root and skips paths already covered by authenticated
+cache nodes, including proven absence. Missing iteration/root-calculation paths
+are remembered along with ordinary reads. Up to eight existing discarded dry runs
+can collect another set of pending keys; their output is never exported.
+
+A preliminary experiment retaining only previous paths did not materially shorten
+the miss chain. Diagnostic key decoding identified sequential
+`VoterList::ListNodes` traversal followed by new `Staking::Bonded`, `Ledger` and
+`Nominators` lookups: the next block visits different accounts. Consequently, a
+new 32-byte identifier in a checked concat-hashed key now also predicts related
+map layouts observed in recent blocks. At most **31** extra keys join its proof
+request, including pending requests from dry runs. Incorrect guesses cost
+bandwidth; only traversal from the current authenticated root can supply values.
+This is generic layout inference, with no hard-coded staking pallet keys.
+
+Previously unseen identifiers, other key layouts, linked-list dependencies,
+child-trie requests and context RPC still cause sequential work. The final run
+cuts those waits substantially but does not eliminate discovery. Raw benchmark
+logs, per-block rows, exact commands/window/exit records and summaries are in
+`/tmp/frame-trace-state-bench/`: `before.log`, `after2.log`, `results.json`,
+`before-run.json`, `after2-run.json`. Preliminary/debug logs are separate and are
+not used for the table. All benchmark/debug clients and test servers have stopped.
+
+### Call observation and verification
+
+A live finalized-state call at Westend Asset Hub **#18,561,759**,
+`0x60c39d38f0135762de46c998a9628e606483e52d4b838ea6d4c5da383b940502`,
+executed `AccountNonceApi_account_nonce` for Alice. JSON arguments were encoded
+using the block's V16 runtime API types. Local result **520** (`0x08020000`)
+matched the node's pinned safe `state_call` oracle. One timed `System::Account`
+read used a **3,713-byte execution proof**, with **8 RPC calls**, **2 proof rounds**,
+and **0 measured RPC calls**. Runtime code loading is excluded from that proof
+size. A call authenticates reads against its state header; **no block root check
+applies**. The small public fixture retains the independent oracle bytes and is
+re-executed offline. Three People calls cover nonce, transaction-payment info and
+metadata versions; their V14 metadata intentionally exercises hex fallback.
+
+Final commands passed:
+
+```sh
+cargo +1.93.0 fmt --all --check
+cargo +1.93.0 clippy --workspace --all-targets --locked -- -D warnings
+cargo +1.93.0 test --workspace --locked --no-fail-fast
+cargo +1.93.0 build --locked
+```
+
+Exact results: **110 passed, 0 failed, 1 ignored; 0 doctests**. Breakdown:
+CLI **21** (5 unit + 16 integration), decode **13** (1 unit + 12 integration),
+model **19** (11 unit + 8 integration), OTel **10**, replay **47**
+(31 unit + 5 call integration + 11 block integration), plus the ignored public
+network test. Subprocess re-executions are part of their parent cases and are not
+counted again. Tests cover call input validation, selected-state pinning, local /
+oracle match and mismatch, recorded oracle labeling, output/state/proof tampering,
+metadata argument/result types, empty call traces, exports, offline save/load,
+recent-path expiry, bounded related-key inference, and the existing block oracles.
+The sixteen compressed replay fixture files total **11,144,851 bytes**, sharing
+People and Westend Wasm nodes and metadata. No commit or push was made.

@@ -204,6 +204,7 @@ fn synthetic_block(ops: usize) -> AnnotatedBlock {
         duplicate_read: seq > 0,
     };
     AnnotatedBlock {
+        call: None,
         runtime_spans: Vec::new(),
         timing: None,
         block_number: Some(7),
@@ -706,4 +707,40 @@ fn every_storage_op_has_a_collection_including_well_known_roots_and_iteration() 
             "state"
         ]
     );
+}
+
+#[test]
+fn runtime_call_root_and_empty_calls_export_one_trace_with_explicit_semantics() {
+    for ops in [0, 2] {
+        let mut trace = synthetic_block(ops);
+        trace.timing = Some(frame_trace_model::MeasuredTiming {
+            start_ns: 0,
+            duration_ns: 1_000_000,
+        });
+        trace.call = Some(frame_trace_decode::AnnotatedCall {
+            method: "AccountNonceApi_account_nonce".into(),
+            data: "0x00".into(),
+            result: "0x00000000".into(),
+            decoded: Some("0".into()),
+            oracle_match: Some(true),
+            proof_bytes: 1234,
+            state_root: "0xab".into(),
+        });
+        let spans = export(&trace, Timing::default());
+        let root = by_name(&spans, "call AccountNonceApi_account_nonce at #7");
+        assert_eq!(root.parent_span_id, SpanId::INVALID);
+        assert_eq!(attr(root, "frame.trace.kind"), Some("call".into()));
+        assert_eq!(
+            attr(root, "frame.root_check"),
+            Some("not_applicable".into())
+        );
+        assert_eq!(attr(root, "frame.call.oracle_match"), Some(true.into()));
+        assert_eq!(attr(root, "frame.proof.bytes"), Some(1234i64.into()));
+        assert!(
+            spans
+                .iter()
+                .all(|s| s.span_context.trace_id() == root.span_context.trace_id())
+        );
+        assert_eq!(spans.len(), span_count(&trace));
+    }
 }

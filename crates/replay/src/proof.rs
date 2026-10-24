@@ -10,10 +10,10 @@ use serde_json::json;
 use sp_core::{Blake2Hasher, H256, storage::ChildInfo};
 use sp_state_machine::TrieBackendStorage;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet},
     sync::{
         Arc,
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicUsize, Ordering},
     },
 };
 
@@ -56,9 +56,11 @@ pub struct ProofDb {
     pub online: Arc<AtomicBool>,
     pub speculative: Arc<AtomicBool>,
     pending: Arc<Mutex<BTreeMap<PendingKey, Option<ChildInfo>>>>,
+    observed: Arc<Mutex<BTreeSet<Vec<u8>>>>,
     root: Arc<Mutex<Option<H256>>>,
     rpc_failure: Arc<Mutex<Option<Error>>>,
     pub failure: Arc<Mutex<Option<String>>>,
+    pub round_trips: Arc<AtomicUsize>,
 }
 impl ProofDb {
     #[cfg(test)]
@@ -80,9 +82,11 @@ impl ProofDb {
             online: Arc::new(AtomicBool::new(online)),
             speculative: Default::default(),
             pending: Default::default(),
+            observed: Default::default(),
             root: Default::default(),
             rpc_failure: Default::default(),
             failure: Default::default(),
+            round_trips: Default::default(),
         }
     }
     pub fn set_root(&self, root: H256) {
@@ -115,6 +119,14 @@ impl ProofDb {
         }
     }
     pub fn fetch(&self, child: Option<&ChildInfo>, paths: &[Vec<u8>]) -> Result<()> {
+        self.fetch_inner(child, paths, true)
+    }
+    fn fetch_inner(
+        &self,
+        child: Option<&ChildInfo>,
+        paths: &[Vec<u8>],
+        count_round: bool,
+    ) -> Result<()> {
         if !self.online.load(Ordering::SeqCst) {
             return Err(Error::Invalid("offline proof cache miss".into()));
         }
@@ -129,6 +141,9 @@ impl ProofDb {
             .collect();
         if keys.is_empty() {
             return Ok(());
+        }
+        if count_round {
+            self.round_trips.fetch_add(1, Ordering::Relaxed);
         }
         let proof = match child {
             Some(child) => rpc.call(
@@ -213,8 +228,8 @@ impl ProofDb {
         Ok(None)
     }
     pub fn remember_key(&self, key: &[u8]) {
-        if self.rpc.is_some() && CHILD.with(|c| c.borrow().is_none()) {
-            let mut hints = self.session.hints.lock();
+        if self.rpc.is_some() && key != b":code" && CHILD.with(|c| c.borrow().is_none()) {
+            let mut hints = self.observed.lock();
             if hints.len() < 4096 {
                 hints.insert(key.to_vec());
             }
@@ -225,10 +240,11 @@ impl ProofDb {
         let concurrency = self.rpc.as_ref().map_or(1, Rpc::parallelism);
         let batches: Vec<_> = keys.chunks(32).collect();
         for group in batches.chunks(concurrency) {
+            let before = self.rpc.as_ref().map_or(0, Rpc::count);
             std::thread::scope(|scope| {
                 let handles: Vec<_> = group
                     .iter()
-                    .map(|keys| scope.spawn(|| self.fetch(None, keys)))
+                    .map(|keys| scope.spawn(|| self.fetch_inner(None, keys, false)))
                     .collect();
                 for handle in handles {
                     handle.join().map_err(|_| {
@@ -237,6 +253,9 @@ impl ProofDb {
                 }
                 Ok::<_, Error>(())
             })?;
+            if self.rpc.as_ref().map_or(0, Rpc::count) > before {
+                self.round_trips.fetch_add(1, Ordering::Relaxed);
+            }
         }
         Ok(())
     }
@@ -250,6 +269,7 @@ impl ProofDb {
             if let Some(child) = child {
                 self.fetch(Some(&child), &[path])?;
             } else {
+                self.remember_key(&path);
                 top.push(path);
             }
         }
@@ -267,6 +287,9 @@ impl ProofDb {
         }
     }
     pub fn persist(&self) -> Result<()> {
+        if self.rpc.is_some() {
+            self.session.remember_paths(self.observed.lock().clone());
+        }
         if let Some(dir) = &self.session.node_dir {
             for (hash, node) in self.nodes.lock().iter() {
                 let path = dir.join(format!("{hash:x}"));
@@ -339,11 +362,14 @@ impl TrieBackendStorage<Blake2Hasher> for ProofDb {
             // Root calculation and iteration ask for branch prefixes, rather than full keys.
             // Query each immediate child in the same proof: root collapse commonly needs a
             // neighboring node next. These are hints only; every get still checks its hash.
-            let paths = if !full_key_hint && self.session.speculative_discovery {
+            let mut paths = if !full_key_hint && self.session.speculative_discovery {
                 sibling_paths(&path, prefix.1.is_some())
             } else {
                 vec![path.clone()]
             };
+            if child.is_none() && full_key_hint {
+                paths.extend(related_keys(&paths, &self.session.predicted_keys()));
+            }
             if self.speculative.load(Ordering::SeqCst) {
                 // Missing values are placeholders in throw-away executions only. Their output
                 // and root are never accepted; the final two runs use strict authentication.
@@ -364,6 +390,11 @@ impl TrieBackendStorage<Blake2Hasher> for ProofDb {
                     "proof node {hash:?} missing/invalid at path {}",
                     hex0(&path)
                 ));
+            }
+            if child.is_none() {
+                for path in &paths {
+                    self.remember_key(path);
+                }
             }
             self.fetch(child.as_ref(), &paths).map_err(|e| {
                 let message = format!("proof fetch for {hash:?} at {}: {e}", hex0(&path));
@@ -403,4 +434,86 @@ pub(crate) fn sibling_paths(path: &[u8], odd: bool) -> Vec<Vec<u8>> {
         }
     }
     paths
+}
+
+/// Learned single-map concat layouts let a newly encountered 32-byte identifier predict
+/// related reads (e.g. a linked-list node followed by account/ledger lookups). These are
+/// bandwidth-only guesses: every used value still traverses the current authenticated root.
+fn related_keys(keys: &[Vec<u8>], known: &BTreeSet<Vec<u8>>) -> Vec<Vec<u8>> {
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+    enum Concat {
+        Blake,
+        Twox,
+    }
+    fn split(key: &[u8]) -> Option<(Concat, &[u8])> {
+        if key.len() == 80 && key[32..48] == sp_crypto_hashing::blake2_128(&key[48..]) {
+            Some((Concat::Blake, &key[48..]))
+        } else if key.len() == 72 && key[32..40] == sp_crypto_hashing::twox_64(&key[40..]) {
+            Some((Concat::Twox, &key[40..]))
+        } else {
+            None
+        }
+    }
+    let families: BTreeSet<_> = known
+        .iter()
+        .filter_map(|key| split(key).map(|(hasher, _)| (key[..32].to_vec(), hasher)))
+        .collect();
+    let mut hints = BTreeSet::new();
+    for key in keys {
+        let Some((_, value)) = split(key) else {
+            continue;
+        };
+        for (prefix, hasher) in &families {
+            let mut predicted = prefix.clone();
+            match hasher {
+                Concat::Blake => predicted.extend(sp_crypto_hashing::blake2_128(value)),
+                Concat::Twox => predicted.extend(sp_crypto_hashing::twox_64(value)),
+            }
+            predicted.extend(value);
+            if !keys.contains(&predicted) {
+                hints.insert(predicted);
+            }
+            if hints.len() >= 31 {
+                return hints.into_iter().collect();
+            }
+        }
+    }
+    hints.into_iter().collect()
+}
+
+#[cfg(test)]
+mod prediction_tests {
+    use super::*;
+    fn key(prefix: u8, id: u8, twox: bool) -> Vec<u8> {
+        let mut key = vec![prefix; 32];
+        let id = [id; 32];
+        if twox {
+            key.extend(sp_crypto_hashing::twox_64(&id));
+        } else {
+            key.extend(sp_crypto_hashing::blake2_128(&id));
+        }
+        key.extend(id);
+        key
+    }
+    #[test]
+    fn related_predictions_rehash_new_ids_across_observed_maps_and_bound_bandwidth() {
+        let known = [key(1, 7, false), key(2, 8, true)].into_iter().collect();
+        let source = key(1, 9, false);
+        assert_eq!(
+            related_keys(std::slice::from_ref(&source), &known),
+            vec![key(2, 9, true)]
+        );
+        let mut corrupt = key(3, 7, false);
+        corrupt[32] ^= 1;
+        assert!(
+            related_keys(
+                std::slice::from_ref(&source),
+                &[corrupt].into_iter().collect()
+            )
+            .is_empty()
+        );
+        assert!(related_keys(&[vec![0; 32]], &known).is_empty());
+        let many = (0..64).map(|p| key(p, 7, false)).collect();
+        assert_eq!(related_keys(&[source], &many).len(), 31);
+    }
 }

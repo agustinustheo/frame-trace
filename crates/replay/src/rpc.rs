@@ -22,6 +22,7 @@ const ALLOWED: &[&str] = &[
     "state_getReadProof",
     "state_getChildReadProof",
     "state_getMetadata",
+    "state_call",
 ];
 type Socket = WebSocketStream<MaybeTlsStream<tokio::net::TcpStream>>;
 
@@ -132,6 +133,18 @@ impl Rpc {
         {
             return Err(Error::Rpc(
                 "metadata must be fetched at an explicit parent/block hash".into(),
+            ));
+        }
+        if method == "state_call"
+            && (params.as_array().is_none_or(|a| a.len() != 3)
+                || params[0].as_str().is_none_or(str::is_empty)
+                || params[1].as_str().is_none_or(|s| unhex(s).is_err())
+                || params[2]
+                    .as_str()
+                    .is_none_or(|s| s.parse::<sp_core::H256>().is_err()))
+        {
+            return Err(Error::Rpc(
+                "state_call requires method, SCALE hex and explicit state hash".into(),
             ));
         }
         runtime()?.block_on(async {

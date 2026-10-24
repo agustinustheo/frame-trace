@@ -205,6 +205,16 @@ pub fn record_block(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) 
     if let Some(number) = block.block_number {
         attrs.push(KeyValue::new("frame.block.number", count(number)));
     }
+    if let Some(call) = &block.call {
+        attrs.push(KeyValue::new("frame.trace.kind", "call"));
+        attrs.push(KeyValue::new("frame.call.method", call.method.clone()));
+        attrs.push(KeyValue::new("frame.root_check", "not_applicable"));
+        attrs.push(KeyValue::new("frame.state.root", call.state_root.clone()));
+        attrs.push(KeyValue::new("frame.proof.bytes", count(call.proof_bytes)));
+        if let Some(matched) = call.oracle_match {
+            attrs.push(KeyValue::new("frame.call.oracle_match", matched));
+        }
+    }
     attrs.extend(stats_attributes(&block.totals));
     let root = tracer
         .span_builder(block_name(block))
@@ -244,6 +254,16 @@ fn record_measured(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) -
     ];
     if let Some(number) = block.block_number {
         attrs.push(KeyValue::new("frame.block.number", count(number)));
+    }
+    if let Some(call) = &block.call {
+        attrs.push(KeyValue::new("frame.trace.kind", "call"));
+        attrs.push(KeyValue::new("frame.call.method", call.method.clone()));
+        attrs.push(KeyValue::new("frame.root_check", "not_applicable"));
+        attrs.push(KeyValue::new("frame.state.root", call.state_root.clone()));
+        attrs.push(KeyValue::new("frame.proof.bytes", count(call.proof_bytes)));
+        if let Some(matched) = call.oracle_match {
+            attrs.push(KeyValue::new("frame.call.oracle_match", matched));
+        }
     }
     attrs.extend(stats_attributes(&block.totals));
     let root = tracer
@@ -579,6 +599,13 @@ fn stats_attributes(stats: &Stats) -> [KeyValue; 8] {
 }
 
 fn block_name(block: &AnnotatedBlock) -> String {
+    if let Some(call) = &block.call {
+        return format!(
+            "call {} at #{}",
+            call.method,
+            block.block_number.unwrap_or(0)
+        );
+    }
     let hash = &block.block_hash;
     let short = match (hash.get(..10), hash.get(hash.len().saturating_sub(4)..)) {
         (Some(head), Some(tail)) if hash.len() > 16 => format!("{head}…{tail}"),

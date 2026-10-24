@@ -8,6 +8,7 @@ use frame_trace_decode::{AnnotatedBlock, annotate};
 
 use frame_trace_otel::Timing;
 
+mod call;
 mod follow;
 mod source;
 mod summary;
@@ -21,6 +22,8 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Trace a runtime API call against authenticated state proofs.
+    Call(call::CallArgs),
     /// Trace one block: export it over OTLP and/or write it as JSON.
     Block(BlockArgs),
     /// Print tables of storage use per phase and the busiest storage items.
@@ -53,6 +56,7 @@ struct SummaryArgs {
 fn main() -> Result<()> {
     match Cli::parse().command {
         Command::Block(args) => block(args),
+        Command::Call(args) => call::run(args),
         Command::Follow(args) => follow(args),
         Command::Summary(args) => {
             let block = load(&args.source)?;

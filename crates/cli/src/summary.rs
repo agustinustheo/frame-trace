@@ -8,10 +8,19 @@ use frame_trace_model::Stats;
 
 /// Renders the phase table, the top storage items, and the duplicate reads of each phase.
 pub fn render(block: &AnnotatedBlock, top: usize) -> String {
-    let mut out = format!(
-        "block {} (parent {})\n\n",
-        block.block_hash, block.parent_hash
-    );
+    let mut out = if let Some(call) = &block.call {
+        format!(
+            "call {} at #{} ({})\n\n",
+            call.method,
+            block.block_number.unwrap_or(0),
+            block.block_hash
+        )
+    } else {
+        format!(
+            "block {} (parent {})\n\n",
+            block.block_hash, block.parent_hash
+        )
+    };
     out += &format!("Storage per phase\n{}\n\n", phases(block));
     out += &format!(
         "Top {top} storage items by reads + writes\n{}\n\n",

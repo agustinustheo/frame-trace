@@ -170,6 +170,89 @@ impl Metadata {
         with_runtime!(&self.runtime, md => &md.types)
     }
 
+    /// Runtime API input/output IDs (V15+). Match the whole export name, allowing underscores in methods.
+    fn runtime_api(&self, method: &str) -> Option<(Vec<(&str, u32)>, u32)> {
+        macro_rules! find {
+            ($md:expr) => {
+                $md.apis.iter().find_map(|api| {
+                    api.methods.iter().find_map(|m| {
+                        (format!("{}_{}", api.name, m.name) == method).then(|| {
+                            (
+                                m.inputs
+                                    .iter()
+                                    .map(|p| (p.name.as_str(), p.ty.id))
+                                    .collect(),
+                                m.output.id,
+                            )
+                        })
+                    })
+                })
+            };
+        }
+        match &self.runtime {
+            Runtime::V14(_) => None,
+            Runtime::V15(md) => find!(md),
+            Runtime::V16(md) => find!(md),
+        }
+    }
+
+    /// Encode a positional JSON array or an object keyed by runtime API parameter names.
+    /// Accounts and byte sequences use JSON byte arrays. Enum variants use
+    /// {"$variant":"Some","$values":[16]}; --data accepts any SCALE encoding.
+    pub fn encode_runtime_args(
+        &self,
+        method: &str,
+        args: &serde_json::Value,
+    ) -> Result<Vec<u8>, Error> {
+        let (inputs, _) = self.runtime_api(method).ok_or_else(|| {
+            Error::Metadata(format!(
+                "runtime API types unavailable for {method}; use --data SCALE hex"
+            ))
+        })?;
+        let values: Vec<_> = match args {
+            serde_json::Value::Array(values) if values.len() == inputs.len() => {
+                values.iter().collect()
+            }
+            serde_json::Value::Object(values) if values.len() == inputs.len() => inputs
+                .iter()
+                .map(|(name, _)| {
+                    values
+                        .get(*name)
+                        .ok_or_else(|| Error::Metadata(format!("missing argument {name}")))
+                })
+                .collect::<Result<_, _>>()?,
+            _ => {
+                return Err(Error::Metadata(format!(
+                    "expected {} positional or named arguments",
+                    inputs.len()
+                )));
+            }
+        };
+        let mut output = Vec::new();
+        for ((name, ty), value) in inputs.into_iter().zip(values) {
+            let value = json_value(value)?;
+            scale_value::scale::encode_as_type(&value, ty, self.types(), &mut output)
+                .map_err(|e| Error::Metadata(format!("argument {name}: {e}")))?;
+        }
+        Ok(output)
+    }
+
+    /// Decode the complete runtime API output, without truncating it. Unknown APIs use hex upstream.
+    pub fn decode_runtime_result(&self, method: &str, bytes: &[u8]) -> Result<String, Error> {
+        let (_, ty) = self.runtime_api(method).ok_or_else(|| {
+            Error::Metadata(format!("runtime API types unavailable for {method}"))
+        })?;
+        let mut cursor = bytes;
+        let value = scale_value::scale::decode_as_type(&mut cursor, ty, self.types())
+            .map_err(|e| Error::Metadata(format!("runtime API output: {e}")))?;
+        if !cursor.is_empty() {
+            return Err(Error::Metadata(
+                "trailing bytes in runtime API output".into(),
+            ));
+        }
+        Ok(value.to_string())
+    }
+
     /// Names a key of the main trie (`child_trie` is `None`) or of a child trie, decoding map
     /// keys where the hasher keeps them.
     pub fn key_name(&self, child_trie: Option<&[u8]>, key: &[u8]) -> KeyName {
@@ -292,4 +375,62 @@ fn truncate(mut s: String) -> String {
         s.push('…');
     }
     s
+}
+
+fn json_value(value: &serde_json::Value) -> Result<scale_value::Value, Error> {
+    use scale_value::Value;
+    Ok(match value {
+        serde_json::Value::Null => Value::unnamed_composite(Vec::<Value>::new()),
+        serde_json::Value::Bool(v) => Value::bool(*v),
+        serde_json::Value::Number(n) => {
+            if let Some(n) = n.as_u64() {
+                Value::u128(n.into())
+            } else if let Some(n) = n.as_i64() {
+                Value::i128(n.into())
+            } else {
+                return Err(Error::Metadata(
+                    "SCALE arguments require integers, not floating point".into(),
+                ));
+            }
+        }
+        serde_json::Value::String(v) => Value::string(v),
+        serde_json::Value::Array(values) => Value::unnamed_composite(
+            values
+                .iter()
+                .map(json_value)
+                .collect::<Result<Vec<_>, _>>()?,
+        ),
+        serde_json::Value::Object(values) if values.contains_key("$variant") => {
+            let name = values
+                .get("$variant")
+                .and_then(serde_json::Value::as_str)
+                .ok_or_else(|| Error::Metadata("$variant must be a string".into()))?;
+            if values.len() != 2 {
+                return Err(Error::Metadata("enum requires $variant and $values".into()));
+            }
+            match values.get("$values") {
+                Some(serde_json::Value::Array(fields)) => Value::unnamed_variant(
+                    name,
+                    fields
+                        .iter()
+                        .map(json_value)
+                        .collect::<Result<Vec<_>, _>>()?,
+                ),
+                Some(serde_json::Value::Object(fields)) => Value::named_variant(
+                    name,
+                    fields
+                        .iter()
+                        .map(|(k, v)| Ok((k.clone(), json_value(v)?)))
+                        .collect::<Result<Vec<_>, Error>>()?,
+                ),
+                _ => return Err(Error::Metadata("$values must be an array or object".into())),
+            }
+        }
+        serde_json::Value::Object(values) => Value::named_composite(
+            values
+                .iter()
+                .map(|(name, value)| Ok((name.clone(), json_value(value)?)))
+                .collect::<Result<Vec<_>, Error>>()?,
+        ),
+    })
 }

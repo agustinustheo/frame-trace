@@ -40,9 +40,12 @@ target/release/frame-trace follow \
 Each replay prints the computed and header state roots, their comparison and RPC count.
 Discovery batches up to 32 predicted storage keys per proof and uses eight concurrent
 requests by default (`--proof-concurrency 1..64`). Metadata storage prefixes,
-previous blocks' full-key hints and up to eight discarded speculative executions
+the last three successful replays' full keys and trie miss paths, and up to eight discarded speculative executions
 provide the predictions. Branch misses also batch immediate sibling paths needed
-by trie-root calculation and iteration. A strict authenticated discovery run follows; speculative
+by trie-root calculation and iteration. When a new 32-byte identifier appears in a
+learned concat-hashed map, the same proof request also predicts related maps observed
+in recent blocks (at most 31 extra keys). This shortens linked-list/account lookup
+chains without assuming the guesses are correct. A strict authenticated discovery run follows; speculative
 outputs are never exported or accepted. Progress is printed during proof acquisition
 and runtime compilation/loading.
 The measured run uses a warm cache and zero RPC. A missing proof is an error.
@@ -51,7 +54,8 @@ Offline replay never creates an RPC client. HTTP(S) endpoints also work.
 `follow` polls finalized headers every two seconds. Use `--best` to follow reversible
 best heads; reorgs and reverted traced blocks are logged. Two workers share authenticated
 content-addressed nodes (bounded to 256 MiB), full-key hints and compiled runtimes
-keyed by code hash. Before fetching predictions, each block walks the cache from
+keyed by code hash. Before runtime loading, one bounded acquisition stage fetches predicted full paths
+(including root-calculation/iteration branches). Each block walks the cache from
 its own parent state root and skips fully covered paths (including proven absence).
 Fresh overlays and recorders preserve proof sizes. `--cache-dir DIR` also persists
 proof nodes and Wasmtime's compiled-module cache. Without it, compiled modules
@@ -141,3 +145,49 @@ change the profile locally when native debugger symbols are needed.
 
 [Replay fix-round measurements](crates/replay/PERFORMANCE.md) record cold/warm
 replay, two-minute follow throughput, offline summary timings and exact test counts.
+
+## Runtime API calls
+
+`call` executes a runtime API against the selected block's **own state** (default
+`best`; also `finalized`, a decimal number or a full hash). It authenticates runtime
+code and every fetched storage value using the same proof backend as block replay.
+**No block state-root check applies to a call.** Writes stay in a disposable overlay.
+The optional safe `state_call` oracle compares bytes at that exact hash.
+
+```sh
+target/release/frame-trace call \
+  --rpc wss://westend-asset-hub-rpc.polkadot.io --at finalized \
+  --method AccountNonceApi_account_nonce \
+  --data 0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d \
+  --oracle --summary --json call.json --save saved-call
+
+target/release/frame-trace call --offline saved-call --otlp http://127.0.0.1:4318
+
+target/release/frame-trace call \
+  --rpc wss://westend-asset-hub-rpc.polkadot.io --at finalized \
+  --method TransactionPaymentApi_query_weight_to_fee \
+  --args '{"weight":{"ref_time":1000000,"proof_size":0}}'
+```
+
+Use exactly one of `--data` (hex SCALE arguments; `0x` for none) or `--args`
+(a positional JSON array or named object). V15/V16 runtime API metadata supplies
+argument and return types; the CLI negotiates it using a pinned safe metadata call.
+JSON supports integers, booleans, strings, byte arrays, records and enum values
+such as `{"$variant":"Some","$values":[16]}` (an object in `$values` supplies named
+fields). Accounts use 32-byte arrays; use `--data` for SS58 inputs or unsupported
+JSON shapes. Missing API types produce a hex result and require `--data` for inputs.
+This also works for runtime-exposed view APIs with their usual SCALE arguments.
+
+Each call exports one trace rooted at `call <method> at #N`, with ordered storage
+operations, runtime spans when available, and measured local timings. `--summary`
+prints the storage tables; JSON adds method/input/result, decoded output, proof
+bytes, state root and optional oracle comparison to the existing trace model.
+The proof-byte count is the execution recorder's proof, excluding code loading.
+Call artifacts have `kind = "call"`, record the output and optional oracle bytes,
+and check the recorded output again during offline execution. Offline oracle
+comparisons are explicitly labelled recorded; they make no network requests.
+
+A separate `storage` command is deferred: these calls already expose authenticated
+storage reads and their execution proof sizes. A direct storage query's extra value
+would be per-key trie depth/node accounting, which is not yet exposed by the shared
+recorder. Raw storage values and a standalone trie-depth view remain future work.

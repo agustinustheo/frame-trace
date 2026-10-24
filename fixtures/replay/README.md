@@ -3,20 +3,20 @@
 These are E2's successful full `Core_execute_block` inputs, converted to the
 [version 1 artifact format](../../crates/replay/ARTIFACT.md). No live node is needed.
 All rehydrate authenticated runtime code, parent header, runtime version, metadata
-and complete discovery proof nodes. The shared People Wasm and metadata are stored
+and complete discovery proof nodes. The shared People/Westend Wasm nodes and metadata are stored
 once under `blobs/<blake2-256>.zst`; fixture metadata/node strings use `blob:<hash>`.
 The loader bounds decompression and verifies each blob's content hash before
 rehydrating hex. No arbitrary reference paths are accepted. `Artifact::save`
-always writes self-contained artifacts. The ten compressed files, including blobs,
-oracles and the public reference, total 11,195,050 bytes (10.68 MiB), down from
-15,882,348 bytes.
+always writes self-contained artifacts. The sixteen compressed files, including call artifacts, blobs,
+oracles and the public reference, total 11,144,851 bytes (10.63 MiB). Sharing the
+Westend Wasm as raw blob bytes also reduces the original public block artifact.
 
 | Directory | Block | Source | Artifact bytes |
 | --- | --- | --- | ---: |
 | `people-transfer` | 2 / `ea56e9d6…` | E2 untraced People, signed transfer | 7,882 |
 | `people-kill-prefix` | 8 / `7d99aaa1…` | E2 untraced People, sudo kill_prefix | 8,368 |
 | `people-traced` | 4 / `06618995…` | E2 traced People, three-transfer batch | 4,115,093 |
-| `westend-asset-hub` | 18,558,320 / `4c0d1d57…` | Public Westend Asset Hub, two inherents | 3,154,143 |
+| `westend-asset-hub` | 18,558,320 / `4c0d1d57…` | Public Westend Asset Hub, two inherents | 275,788 |
 
 The local `oracle.json.zst` files are E2's independent `state_traceBlock` RPC
 recordings of the exact same blocks. Tests compare the entire ordered keyed
@@ -39,3 +39,34 @@ is tested after recomputing the header hash, so rejection reaches the runtime's
 actual final root assertion. Missing nodes and changed parent headers also fail.
 Remote child-proof loading is tested separately against SDK-generated child
 proofs served over loopback HTTP; these four chain blocks do not touch child state.
+
+## State call fixtures
+
+| Directory | State | Method | Artifact bytes |
+| --- | --- | --- | ---: |
+| `call-people-nonce` | People #1 / `e1e91429…` | `AccountNonceApi_account_nonce` (Alice) | 2,425 |
+| `call-people-fee` | People #1 / `e1e91429…` | `TransactionPaymentApi_query_info` (the saved signed transfer, plus u32 byte length) | 2,009 |
+| `call-people-metadata` | People #1 / `e1e91429…` | `Metadata_metadata_versions` | 1,662 |
+| `call-westend-nonce` | Westend Asset Hub #18,561,759 / `60c39d38…` | `AccountNonceApi_account_nonce` (Alice) | 5,301 |
+
+The People calls execute against the existing transfer fixture's **parent state**,
+not block #2's resulting state. They use its original V14 metadata, so results
+remain hex; their recorded outputs are local executions, **not node oracle data**.
+`cargo +1.93.0 run -p frame-trace-replay --example record_calls` regenerates those
+three artifacts offline. The recorder extracts proofs only for observed keys plus
+`:code`/`:heappages`, executes again with the reduced proof, and reuses shared blobs.
+Nonce is 0; query_info returns the saved runtime's dispatch info; metadata versions
+are `[14, 15, 16]`. The metadata-version query has no storage operations and a
+zero-byte execution proof, but still needs authenticated runtime-loading nodes.
+
+The public call was recorded on 2026-10-25 from
+`wss://westend-asset-hub-rpc.polkadot.io`, using `--at finalized --oracle` and Alice's
+32-byte account (`d43593c7…a56da27d`). Exact state hash:
+`0x60c39d38f0135762de46c998a9628e606483e52d4b838ea6d4c5da383b940502`.
+V16 metadata came from `Metadata_metadata_at_version(16)` at that same hash.
+Local result and independent node `state_call` both returned `0x08020000` (nonce
+520). The call reads one `System::Account`, with a 3,713-byte execution proof.
+Its artifact shares the identical runtime node with the existing public block
+fixture and stores V16 metadata in a shared content-addressed blob. Offline tests
+re-execute and compare with the recorded oracle; they do not contact the endpoint.
+No call claims a block root check. All reads authenticate against its state header.

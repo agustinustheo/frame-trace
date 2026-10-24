@@ -3,7 +3,7 @@ use crate::{Error, Executor, Result};
 use parking_lot::Mutex;
 use sp_core::H256;
 use std::{
-    collections::{BTreeMap, BTreeSet},
+    collections::{BTreeMap, BTreeSet, VecDeque},
     path::{Path, PathBuf},
     sync::{Arc, OnceLock},
 };
@@ -31,7 +31,7 @@ impl Nodes {
 #[derive(Clone)]
 pub struct ReplaySession {
     pub(crate) nodes: Arc<Mutex<Nodes>>,
-    pub(crate) hints: Arc<Mutex<BTreeSet<Vec<u8>>>>,
+    pub(crate) hints: Arc<Mutex<VecDeque<BTreeSet<Vec<u8>>>>>,
     pub(crate) executor: Arc<Executor>,
     pub(crate) node_dir: Option<PathBuf>,
     pub(crate) speculative_discovery: bool,
@@ -81,6 +81,17 @@ impl ReplaySession {
         };
         session.prune_disk_cache()?;
         Ok(session)
+    }
+    /// Full storage keys and trie paths from the last three successful replays.
+    pub(crate) fn predicted_keys(&self) -> BTreeSet<Vec<u8>> {
+        self.hints.lock().iter().flatten().cloned().collect()
+    }
+    pub(crate) fn remember_paths(&self, paths: BTreeSet<Vec<u8>>) {
+        let mut history = self.hints.lock();
+        history.push_back(paths);
+        while history.len() > 3 {
+            history.pop_front();
+        }
     }
     /// Disable throw-away speculative passes when debugging strict execution-driven paging.
     pub fn with_speculative_discovery(mut self, enabled: bool) -> Self {

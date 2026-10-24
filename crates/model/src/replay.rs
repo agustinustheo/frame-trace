@@ -63,6 +63,23 @@ pub struct ReplayCapture {
 }
 
 impl TracedBlock {
+    /// A runtime API call has one phase, including calls which write FRAME phase markers.
+    pub fn from_call(capture: &ReplayCapture) -> Result<Self, Error> {
+        let mut trace = Self::from_replay(capture)?;
+        for op in &mut trace.ops {
+            op.duplicate_read = false;
+        }
+        crate::stats::mark_duplicate_reads(trace.ops.iter_mut());
+        trace.phases = vec![crate::Phase {
+            kind: crate::PhaseKind::Unsegmented,
+            ops: 0..trace.ops.len(),
+            stats: trace.totals(),
+            extrinsic: None,
+            post_inherents: None,
+        }];
+        Ok(trace)
+    }
+
     /// Uses the same parser and phase rules for both sources. Keyless events remain in the
     /// capture; recognized keyless storage operations also participate in phases and stats.
     pub fn from_replay(capture: &ReplayCapture) -> Result<Self, Error> {

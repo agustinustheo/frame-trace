@@ -8,6 +8,9 @@ use crate::{KeyName, Metadata, key::well_known};
 /// A [`TracedBlock`] with every key and extrinsic named. Serialises to the `--json` output.
 #[derive(Debug, Clone, Serialize)]
 pub struct AnnotatedBlock {
+    /// Runtime API context, absent for block traces.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub call: Option<AnnotatedCall>,
     /// Observed span tree, empty for legacy JSON.
     pub runtime_spans: Vec<frame_trace_model::RuntimeSpan>,
     /// Replay duration, absent for synthetic input.
@@ -25,6 +28,18 @@ pub struct AnnotatedBlock {
     pub totals: Stats,
     /// Phases in execution order.
     pub phases: Vec<AnnotatedPhase>,
+}
+
+/// One authenticated runtime API execution. Block root checks do not apply to calls.
+#[derive(Debug, Clone, Serialize)]
+pub struct AnnotatedCall {
+    pub method: String,
+    pub data: String,
+    pub result: String,
+    pub decoded: Option<String>,
+    pub oracle_match: Option<bool>,
+    pub proof_bytes: usize,
+    pub state_root: String,
 }
 
 /// One phase with its ops.
@@ -117,6 +132,7 @@ pub struct AnnotatedOp {
 /// are `<unknown>` and extrinsics are unnamed.
 pub fn annotate(block: &TracedBlock, metadata: Option<&Metadata>) -> AnnotatedBlock {
     AnnotatedBlock {
+        call: None,
         runtime_spans: block
             .runtime_spans
             .iter()

@@ -1,5 +1,6 @@
 //! Faithful block replay using safe RPC and SDK authenticated trie execution.
 mod artifact;
+pub mod call;
 mod session;
 pub use session::ReplaySession;
 mod backend;
@@ -51,7 +52,7 @@ pub enum Error {
     #[error("invalid replay input: {0}")]
     Invalid(String),
     #[error(
-        "Core_execute_block failed (root mismatch, unsupported host function, or invalid block): {0}"
+        "runtime execution failed (root mismatch, unsupported host function, or invalid block/call): {0}"
     )]
     Execution(String),
     #[error("artifact I/O: {0}")]
@@ -94,12 +95,23 @@ type Executor = WasmExecutor<HostFunctions>;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Artifact {
     pub format_version: u32,
+    #[serde(default)]
+    pub kind: ArtifactKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub call: Option<call::Call>,
     pub block_hash: H256,
     pub block: Value,
     pub parent_header: Value,
     pub runtime_version: Value,
     pub metadata: String,
     pub proof_nodes: Vec<String>,
+}
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ArtifactKind {
+    #[default]
+    Block,
+    Call,
 }
 impl Artifact {
     fn validate(&self) -> Result<(Block, Header)> {
@@ -114,6 +126,19 @@ impl Artifact {
         let parent: Header = serde_json::from_value(self.parent_header.clone())?;
         if block.header.hash() != self.block_hash {
             return Err(Error::Invalid("block header hash mismatch".into()));
+        }
+        match (self.kind, &self.call) {
+            (ArtifactKind::Block, None) => {}
+            (ArtifactKind::Call, Some(call)) => {
+                call.validate()?;
+                if parent.hash() != self.block_hash || !block.extrinsics.is_empty() {
+                    return Err(Error::Invalid(
+                        "call state header mismatch or nonempty block body".into(),
+                    ));
+                }
+                return Ok((block, parent));
+            }
+            _ => return Err(Error::Invalid("artifact kind/call mismatch".into())),
         }
         if parent.hash() != *block.header.parent_hash() {
             return Err(Error::Invalid("parent header hash mismatch".into()));
@@ -132,6 +157,8 @@ pub struct Replay {
     pub expected_state_root: H256,
     pub rpc_count: usize,
     pub measured_rpc_count: usize,
+    /// Sequential proof acquisition waves, excluding context RPC and retries.
+    pub proof_round_trips: usize,
     pub proof_bytes: usize,
     pub artifact: Artifact,
 }
@@ -181,6 +208,8 @@ pub fn online_with_session(rpc: &Rpc, selector: &str, session: &ReplaySession) -
     let parent_hash = *block.header.parent_hash();
     let artifact = Artifact {
         format_version: 1,
+        kind: ArtifactKind::Block,
+        call: None,
         block_hash: block.header.hash(),
         block: response["block"].clone(),
         parent_header: rpc.call("chain_getHeader", json!([parent_hash]))?,
@@ -228,6 +257,9 @@ fn replay_inner(
     session: &ReplaySession,
 ) -> Result<Replay> {
     let (mut block, parent) = artifact.validate()?;
+    if artifact.kind != ArtifactKind::Block {
+        return Err(Error::Invalid("call artifact: use call --offline".into()));
+    }
     let number = u64::from(*block.header.number());
     let root = *parent.state_root();
     block
@@ -244,29 +276,21 @@ fn replay_inner(
             .map(|s| unhex(s))
             .collect::<Result<Vec<_>>>()?,
     );
-    if rpc.is_some() && artifact.proof_nodes.is_empty() && session.nodes.lock().nodes.is_empty() {
-        db.fetch(None, &[b":code".to_vec(), b":heappages".to_vec()])?;
-    }
-    let initial =
-        sp_state_machine::TrieBackendBuilder::<_, Blake2Hasher>::new(db.clone(), root).build();
-    // Complete-key hints acquire :code and :heappages in at most one call each.
-    let wasm = proof::with_key_hint(b":code", || initial.storage(b":code"))
-        .map_err(|e| db.take_error(db.failure.lock().take().unwrap_or(e)))?
-        .ok_or_else(|| Error::Invalid("no authenticated parent :code".into()))?;
-    let heap_pages = proof::with_key_hint(b":heappages", || initial.storage(b":heappages"))
-        .map_err(|e| db.take_error(db.failure.lock().take().unwrap_or(e)))?
-        .map(|b| u64::decode(&mut &b[..]).map_err(|e| Error::Invalid(format!(":heappages: {e}"))))
-        .transpose()?;
-    let executor = &session.executor;
     if rpc.is_some() {
         eprintln!(
-            "replay #{number}: acquiring proofs ({} in flight, batched keys)",
+            "replay #{number}: prefetching prior access paths ({} in flight, batched keys)",
             rpc.as_ref().map_or(1, Rpc::parallelism)
         );
-        let mut hints = session.hints.lock().clone();
+        let mut hints = session.predicted_keys();
         hints.extend(storage_hints(&artifact.metadata));
+        // Fetch missing full paths before even loading :code: its ancestor nodes change each block.
+        if session.nodes.lock().nodes.is_empty() {
+            hints.extend([b":code".to_vec(), b":heappages".to_vec()]);
+        }
         db.prefetch(&hints.into_iter().collect::<Vec<_>>())?;
     }
+    let (wasm, heap_pages) = runtime_code(&db, root)?;
+    let executor = &session.executor;
     eprintln!("replay #{number}: compiling/loading runtime and discovering state");
     if rpc.is_some() && session.speculative_discovery {
         db.speculative.store(true, Ordering::SeqCst);
@@ -302,15 +326,7 @@ fn replay_inner(
         execute(&db, root, &wasm, heap_pages, executor, &block, &capture)
     })?;
     let rpc_count = rpc.as_ref().map_or(0, Rpc::count);
-    let d = capture.0.lock();
-    let capture = ReplayCapture {
-        block_hash: format!("{:?}", artifact.block_hash),
-        parent_hash: format!("{:?}", parent.hash()),
-        events: d.events.clone(),
-        spans: d.spans.iter().map(capture::Span::to_model).collect(),
-        transitions: d.transitions.clone(),
-        duration_ns: d.spans.iter().filter_map(|s| s.end_ns).max().unwrap_or(0),
-    };
+    let capture = captured(&capture, artifact.block_hash, parent.hash());
     db.persist()?;
     artifact.proof_nodes = db.export();
     Ok(Replay {
@@ -321,6 +337,7 @@ fn replay_inner(
         expected_state_root: *block.header.state_root(),
         rpc_count,
         measured_rpc_count: 0,
+        proof_round_trips: db.round_trips.load(Ordering::Relaxed),
         proof_bytes,
         artifact,
     })
@@ -336,6 +353,54 @@ fn execute(
     block: &Block,
     capture: &Capture,
 ) -> Result<(usize, H256)> {
+    let (proof_bytes, _) = execute_method(
+        db,
+        root,
+        wasm,
+        heap_pages,
+        executor,
+        "Core_execute_block",
+        &block.encode(),
+        *block.header.parent_hash(),
+        CallContext::Onchain { import: true },
+        capture,
+    )?;
+    let computed = capture
+        .0
+        .lock()
+        .events
+        .iter()
+        .rev()
+        .find(|e| e.target == "state" && e.fields.get("method").is_some_and(|s| s == "StorageRoot"))
+        .and_then(|e| e.fields.get("storage_root"))
+        .and_then(|s| {
+            format!("0x{}", s.trim_start_matches("0x"))
+                .parse::<H256>()
+                .ok()
+        })
+        .ok_or_else(|| Error::Execution("runtime did not report a computed state root".into()))?;
+    if computed != *block.header.state_root() {
+        return Err(Error::Execution(format!(
+            "state root mismatch: computed {computed:?}, header {:?}",
+            block.header.state_root()
+        )));
+    }
+    Ok((proof_bytes, computed))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn execute_method(
+    db: &ProofDb,
+    root: H256,
+    wasm: &[u8],
+    heap_pages: Option<u64>,
+    executor: &Executor,
+    method: &str,
+    data: &[u8],
+    parent_hash: H256,
+    context: CallContext,
+    capture: &Capture,
+) -> Result<(usize, Vec<u8>)> {
     let _abort_guard = sp_panic_handler::AbortGuard::never_abort();
     let recorder = Recorder::<Blake2Hasher>::default();
     capture.0.lock().recorder = Some(recorder.clone());
@@ -358,20 +423,20 @@ fn execute(
                 &backend,
                 &mut overlay,
                 executor,
-                "Core_execute_block",
-                &block.encode(),
+                method,
+                data,
                 &mut extensions,
                 &code,
-                CallContext::Onchain { import: true },
+                context,
             )
-            .set_parent_hash(*block.header.parent_hash())
+            .set_parent_hash(parent_hash)
             .execute()
         })
     });
     if let Some(failure) = db.failure.lock().take() {
         return Err(db.take_error(failure));
     }
-    result
+    let output = result
         .map_err(|e| {
             Error::Execution(
                 e.downcast_ref::<String>()
@@ -381,27 +446,7 @@ fn execute(
             )
         })?
         .map_err(|e| Error::Execution(e.to_string()))?;
-    let computed = capture
-        .0
-        .lock()
-        .events
-        .iter()
-        .rev()
-        .find(|e| e.target == "state" && e.fields.get("method").is_some_and(|s| s == "StorageRoot"))
-        .and_then(|e| e.fields.get("storage_root"))
-        .and_then(|s| {
-            format!("0x{}", s.trim_start_matches("0x"))
-                .parse::<H256>()
-                .ok()
-        })
-        .ok_or_else(|| Error::Execution("runtime did not report a computed state root".into()))?;
-    if computed != *block.header.state_root() {
-        return Err(Error::Execution(format!(
-            "state root mismatch: computed {computed:?}, header {:?}",
-            block.header.state_root()
-        )));
-    }
-    Ok((recorder.estimate_encoded_size(), computed))
+    Ok((recorder.estimate_encoded_size(), output))
 }
 
 /// Hash a fetched SDK header directly, so best-head polling cannot race a separate number lookup.
@@ -451,4 +496,35 @@ fn storage_hints(metadata: &str) -> Vec<Vec<u8>> {
         _ => {}
     }
     keys
+}
+
+fn runtime_code(db: &ProofDb, root: H256) -> Result<(Vec<u8>, Option<u64>)> {
+    let initial =
+        sp_state_machine::TrieBackendBuilder::<_, Blake2Hasher>::new(db.clone(), root).build();
+    // Complete-key hints acquire :code and :heappages in at most one call each.
+    let wasm = proof::with_key_hint(b":code", || initial.storage(b":code"))
+        .map_err(|e| db.take_error(db.failure.lock().take().unwrap_or(e)))?
+        .ok_or_else(|| Error::Invalid("no authenticated state :code".into()))?;
+    let heap_pages = proof::with_key_hint(b":heappages", || initial.storage(b":heappages"))
+        .map_err(|e| db.take_error(db.failure.lock().take().unwrap_or(e)))?
+        .map(|b| u64::decode(&mut &b[..]).map_err(|e| Error::Invalid(format!(":heappages: {e}"))))
+        .transpose()?;
+    Ok((wasm, heap_pages))
+}
+
+fn captured(capture: &Capture, block_hash: H256, parent_hash: H256) -> ReplayCapture {
+    let data = capture.0.lock();
+    ReplayCapture {
+        block_hash: format!("{block_hash:?}"),
+        parent_hash: format!("{parent_hash:?}"),
+        events: data.events.clone(),
+        spans: data.spans.iter().map(capture::Span::to_model).collect(),
+        transitions: data.transitions.clone(),
+        duration_ns: data
+            .spans
+            .iter()
+            .filter_map(|s| s.end_ns)
+            .max()
+            .unwrap_or(0),
+    }
 }

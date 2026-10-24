@@ -90,7 +90,6 @@ fn allowlist_rejects_unsafe_and_unproved_storage_and_unpinned_metadata() {
     for method in [
         "state_traceBlock",
         "state_getStorage",
-        "state_call",
         "author_submitExtrinsic",
         "state_getKeysPaged",
     ] {
@@ -745,6 +744,128 @@ fn warm_session_fetches_changed_external_runtime_code_at_its_full_key() {
             .unwrap()
             .iter()
             .any(|r| r["params"][0] == json!([rpc::hex0(b":code")]))
+    );
+    stop(halt, worker);
+}
+
+#[test]
+fn runtime_calls_pin_state_and_report_matching_and_mismatching_oracles() {
+    let path =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/replay/call-people-nonce");
+    let original = Artifact::load(&path).unwrap();
+    let fixture = original.clone();
+    let (rpc, requests, halt, worker) = server(move |request| {
+        let hash = fixture.block_hash;
+        match request["method"].as_str().unwrap() {
+            "chain_getHeader" => fixture.parent_header.clone(),
+            "chain_getFinalizedHead" | "chain_getBlockHash" => json!(hash),
+            "state_getRuntimeVersion" => fixture.runtime_version.clone(),
+            "state_getMetadata" => json!(fixture.metadata),
+            "state_getReadProof" => json!({"at":hash,"proof":fixture.proof_nodes}),
+            "state_call" if request["params"][0] == "Metadata_metadata_at_version" => {
+                json!(rpc::hex0(&Some(unhex(&fixture.metadata).unwrap()).encode()))
+            }
+            "state_call" => json!(fixture.call.as_ref().unwrap().result),
+            other => panic!("unexpected method {other}"),
+        }
+    });
+    for selector in [
+        "best".to_owned(),
+        "finalized".into(),
+        "1".into(),
+        format!("{:?}", original.block_hash),
+    ] {
+        let prepared = call::prepare(&rpc, &selector, "AccountNonceApi_account_nonce").unwrap();
+        assert_eq!(prepared.block_hash, original.block_hash);
+        assert_eq!(prepared.parent_header, original.parent_header);
+    }
+    let mut artifact = call::prepare(&rpc, "1", "AccountNonceApi_account_nonce").unwrap();
+    artifact.call.as_mut().unwrap().data = original.call.as_ref().unwrap().data.clone();
+    let replay = call::replay(
+        artifact,
+        Some(rpc.clone()),
+        &ReplaySession::new(None).unwrap(),
+        true,
+    )
+    .unwrap();
+    assert_eq!(replay.oracle_match, Some(true));
+    assert_eq!(replay.measured_rpc_count, 0);
+    assert!(
+        requests
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|r| r["method"] == "state_call")
+            .all(|r| r["params"][2] == json!(original.block_hash))
+    );
+    assert!(
+        requests
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|r| r["method"] == "state_getReadProof")
+            .all(|r| r["params"][1] == json!(original.block_hash))
+    );
+    stop(halt, worker);
+    let hash = original.block_hash;
+    let (rpc, _, halt, worker) = server(move |request| {
+        assert_eq!(request["params"][2], json!(hash));
+        json!("0x01000000")
+    });
+    let replay = call::replay(
+        original,
+        Some(rpc),
+        &ReplaySession::new(None).unwrap(),
+        true,
+    )
+    .unwrap();
+    assert_eq!(replay.oracle_match, Some(false));
+    let repeated = call::replay(
+        replay.artifact,
+        None,
+        &ReplaySession::new(None).unwrap(),
+        false,
+    )
+    .unwrap();
+    assert_eq!(repeated.oracle_match, Some(false));
+    stop(halt, worker);
+}
+
+#[test]
+fn state_call_requires_explicit_hash_and_valid_hex_before_network() {
+    let rpc = Rpc::new("http://127.0.0.1:1").unwrap();
+    for params in [
+        json!([]),
+        json!(["method", "0x"]),
+        json!(["method", "0x", "best"]),
+        json!(["method", "bad hex", H256::zero()]),
+    ] {
+        assert!(matches!(rpc.call("state_call", params), Err(Error::Rpc(_))));
+    }
+    assert_eq!(rpc.count(), 0);
+}
+
+#[test]
+fn prediction_history_includes_miss_paths_and_expires_after_three_replays() {
+    use sp_state_machine::TrieBackendStorage;
+    let parent = H256::repeat_byte(51);
+    let (rpc, _, halt, worker) = server(move |_| json!({"at":parent,"proof":[]}));
+    let session = ReplaySession::new(None).unwrap();
+    let db = ProofDb::with_session(Some(rpc), parent, session.clone());
+    // Root/iteration requests have no full storage-key hint. Keep their sibling paths too.
+    let _ = TrieBackendStorage::get(&db, &H256::repeat_byte(52), (&[0xab], None));
+    db.remember_key(b"complete storage key");
+    db.persist().unwrap();
+    let hints = session.predicted_keys();
+    assert!(hints.contains(b"complete storage key".as_slice()));
+    assert!(hints.contains(&vec![0xab, 0x50]));
+    for i in 0..3 {
+        session.remember_paths([vec![i]].into_iter().collect());
+    }
+    assert!(
+        !session
+            .predicted_keys()
+            .contains(b"complete storage key".as_slice())
     );
     stop(halt, worker);
 }

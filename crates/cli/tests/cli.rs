@@ -576,3 +576,112 @@ fn help_describes_best_concurrency_cache_and_otlp_default() {
             && text.contains("finalized")
     );
 }
+
+#[test]
+fn call_offline_exports_measured_named_ops_and_self_contained_round_trip() {
+    let _guard = REPLAY_TEST_LOCK.lock().unwrap();
+    let dir =
+        std::env::temp_dir().join(format!("frame-trace-call-roundtrip-{}", std::process::id()));
+    let out = run(&[
+        "call",
+        "--offline",
+        &fixture("replay/call-people-nonce"),
+        "--json",
+        "-",
+        "--save",
+        dir.to_str().unwrap(),
+    ]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["call"]["method"], "AccountNonceApi_account_nonce");
+    assert_eq!(json["call"]["result"], "0x00000000");
+    assert!(json["call"]["decoded"].is_null()); // recorded metadata is V14
+    assert_eq!(json["phases"][0]["kind"], "call");
+    assert_eq!(json["phases"][0]["ops"][0]["item"], "System::Account");
+    assert!(
+        json["phases"][0]["ops"][0]["timing"]["duration_ns"]
+            .as_u64()
+            .unwrap()
+            > 0
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains("root check: NOT APPLICABLE"));
+    assert!(stderr.contains("RPC calls: 0 (measured: 0)"));
+    let repeated = run(&["call", "--offline", dir.to_str().unwrap(), "--summary"]);
+    assert!(
+        repeated.status.success(),
+        "{}",
+        String::from_utf8_lossy(&repeated.stderr)
+    );
+    assert!(
+        String::from_utf8_lossy(&repeated.stdout)
+            .contains("call AccountNonceApi_account_nonce at #1")
+    );
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
+fn call_arguments_require_one_input_mode_and_offline_cannot_contact_rpc() {
+    for args in [
+        vec![
+            "call",
+            "--rpc",
+            "http://127.0.0.1:1",
+            "--method",
+            "AccountNonceApi_account_nonce",
+        ],
+        vec![
+            "call",
+            "--rpc",
+            "http://127.0.0.1:1",
+            "--method",
+            "method",
+            "--data",
+            "0x",
+            "--args",
+            "[]",
+        ],
+        vec!["call", "--offline", "missing", "--oracle"],
+        vec![
+            "call",
+            "--offline",
+            "missing",
+            "--rpc",
+            "http://127.0.0.1:1",
+        ],
+        vec!["call", "--offline", "missing", "--data", "0x"],
+    ] {
+        let out = run(&args);
+        assert_eq!(
+            out.status.code(),
+            Some(2),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+}
+
+#[test]
+fn call_public_offline_decodes_result_and_labels_recorded_oracle() {
+    let _guard = REPLAY_TEST_LOCK.lock().unwrap();
+    let out = run(&[
+        "call",
+        "--offline",
+        &fixture("replay/call-westend-nonce"),
+        "--json",
+        "-",
+    ]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["call"]["decoded"], "520");
+    assert_eq!(json["call"]["oracle_match"], true);
+    assert!(String::from_utf8_lossy(&out.stderr).contains("state_call oracle: MATCH (recorded)"));
+}

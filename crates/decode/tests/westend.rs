@@ -373,3 +373,52 @@ fn real_block_extrinsics_get_named_only_with_matching_metadata() {
     assert_eq!(other.phases[1].label, "extrinsic 0");
     assert!(other.phases[1].call.is_none() && other.phases[1].call_error.is_some());
 }
+
+#[test]
+fn runtime_api_json_args_and_complete_results() {
+    let bytes = std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../fixtures/metadata/westend-v16.scale"
+    ))
+    .unwrap();
+    let md = frame_trace_decode::Metadata::from_bytes(&bytes).unwrap();
+    let account = vec![7u8; 32];
+    let positional = md
+        .encode_runtime_args(
+            "AccountNonceApi_account_nonce",
+            &serde_json::json!([account]),
+        )
+        .unwrap();
+    let named = md
+        .encode_runtime_args(
+            "AccountNonceApi_account_nonce",
+            &serde_json::json!({"account":account}),
+        )
+        .unwrap();
+    assert_eq!(positional, account);
+    assert_eq!(named, positional);
+    assert_eq!(
+        md.decode_runtime_result("AccountNonceApi_account_nonce", &42u32.to_le_bytes())
+            .unwrap(),
+        "42"
+    );
+    assert!(
+        md.decode_runtime_result("AccountNonceApi_account_nonce", &[42, 0, 0, 0, 0])
+            .is_err()
+    );
+    for args in [
+        serde_json::json!([]),
+        serde_json::json!({"wrong":account}),
+        serde_json::json!([1.25]),
+        serde_json::json!([vec![0; 31]]),
+    ] {
+        assert!(
+            md.encode_runtime_args("AccountNonceApi_account_nonce", &args)
+                .is_err()
+        );
+    }
+    assert!(
+        md.encode_runtime_args("MissingApi_method", &serde_json::json!([]))
+            .is_err()
+    );
+}

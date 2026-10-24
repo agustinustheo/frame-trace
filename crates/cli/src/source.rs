@@ -161,6 +161,10 @@ pub fn replay_loaded(replay: frame_trace_replay::Replay, save: Option<&Path>) ->
         replay.artifact.save(dir)?;
     }
     eprintln!(
+        "proof acquisition #{}: {} rounds; {} RPC calls",
+        replay.block_number, replay.proof_round_trips, replay.rpc_count
+    );
+    eprintln!(
         "state root: computed {:?}; header {:?}",
         replay.computed_state_root, replay.expected_state_root
     );

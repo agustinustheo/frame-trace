@@ -9,7 +9,7 @@ mod key;
 mod metadata;
 pub mod ss58;
 
-pub use annotate::{AnnotatedBlock, AnnotatedOp, AnnotatedPhase, annotate};
+pub use annotate::{AnnotatedBlock, AnnotatedCall, AnnotatedOp, AnnotatedPhase, annotate};
 pub use key::KeyName;
 pub use metadata::{CallName, Metadata};
 
