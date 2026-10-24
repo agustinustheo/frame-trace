@@ -185,6 +185,8 @@ fn builds_block_phase_op_tree() {
 
 fn synthetic_block(ops: usize) -> AnnotatedBlock {
     let op = |seq| AnnotatedOp {
+        timing: None,
+        parent_span: None,
         seq,
         op: "get",
         child_trie: None,
@@ -202,6 +204,8 @@ fn synthetic_block(ops: usize) -> AnnotatedBlock {
         duplicate_read: seq > 0,
     };
     AnnotatedBlock {
+        runtime_spans: Vec::new(),
+        timing: None,
         block_number: Some(7),
         block_hash: "0x01".into(),
         parent_hash: "0x00".into(),
@@ -277,5 +281,91 @@ fn reports_spans_lost_to_export_errors() {
     assert!(
         err.to_string()
             .starts_with("512 of 2002 spans were not exported")
+    );
+}
+
+#[test]
+fn measured_intervals_and_runtime_parent_tree() {
+    use frame_trace_model::{MeasuredTiming, ReplayCapture, ReplayEvent, RuntimeSpan};
+    let span = |id, parent_id, name: &str, wasm, start_ns, end_ns| RuntimeSpan {
+        id,
+        parent_id,
+        name: name.into(),
+        target: if wasm {
+            "runtime".into()
+        } else {
+            "sp_io::storage".into()
+        },
+        wasm,
+        fields: Default::default(),
+        start_ns,
+        end_ns: Some(end_ns),
+        duration_ns: end_ns - start_ns,
+        enters: 1,
+        proof_start_bytes: 0,
+        proof_end_bytes: 0,
+    };
+    let capture = ReplayCapture {
+        block_hash: "0x01".into(),
+        parent_hash: "0x00".into(),
+        duration_ns: 120,
+        spans: vec![
+            span(1, None, "execute_block", true, 10, 100),
+            span(2, Some(1), "dispatch", true, 20, 70),
+            span(3, Some(2), "get", false, 30, 50),
+        ],
+        events: vec![ReplayEvent {
+            seq: 0,
+            at_ns: 45,
+            parent_id: Some(3),
+            target: "state".into(),
+            fields: [
+                ("method".into(), "Get".into()),
+                ("key".into(), "aa".into()),
+                ("result".into(), "Some(00)".into()),
+            ]
+            .into(),
+        }],
+        transitions: vec![],
+    };
+    let traced = TracedBlock::from_replay(&capture).unwrap();
+    assert_eq!(
+        traced.ops[0].timing,
+        Some(MeasuredTiming {
+            start_ns: 30,
+            duration_ns: 20
+        })
+    );
+    let mut block = annotate(&traced, None);
+    let start = SystemTime::UNIX_EPOCH;
+    let timing = Timing {
+        start,
+        op_width: Duration::from_secs(1),
+    };
+    let spans = export(&block, timing);
+    assert!(
+        spans
+            .iter()
+            .all(|s| attr(s, "frame.timing") == Some("measured".into()))
+    );
+    let dispatch = by_name(&spans, "dispatch");
+    assert_eq!(
+        dispatch.parent_span_id,
+        by_name(&spans, "execute_block").span_context.span_id()
+    );
+    let op = by_name(&spans, "get <unknown>");
+    assert_eq!(op.parent_span_id, dispatch.span_context.span_id());
+    assert_eq!(
+        (op.start_time, op.end_time),
+        (
+            start + Duration::from_nanos(30),
+            start + Duration::from_nanos(50)
+        )
+    );
+    block.runtime_spans.clear();
+    let spans = export(&block, timing);
+    assert_eq!(
+        by_name(&spans, "get <unknown>").parent_span_id,
+        by_name(&spans, "unsegmented").span_context.span_id()
     );
 }

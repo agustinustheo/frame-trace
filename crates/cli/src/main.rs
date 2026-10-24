@@ -5,7 +5,7 @@ use std::{fs, io::Write, path::PathBuf};
 use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
 use frame_trace_decode::{AnnotatedBlock, annotate};
-use frame_trace_model::TracedBlock;
+
 use frame_trace_otel::Timing;
 
 mod source;
@@ -24,6 +24,8 @@ enum Command {
     Block(BlockArgs),
     /// Print tables of storage use per phase and the busiest storage items.
     Summary(SummaryArgs),
+    /// Replay each new best block. Bounded queue and two replay workers.
+    Follow(FollowArgs),
 }
 
 #[derive(Args)]
@@ -50,6 +52,7 @@ struct SummaryArgs {
 fn main() -> Result<()> {
     match Cli::parse().command {
         Command::Block(args) => block(args),
+        Command::Follow(args) => follow(args),
         Command::Summary(args) => {
             let block = load(&args.source)?;
             print!("{}", summary::render(&block, args.top));
@@ -86,7 +89,7 @@ fn block(args: BlockArgs) -> Result<()> {
 
 fn load(args: &source::SourceArgs) -> Result<AnnotatedBlock> {
     let loaded = source::load(args)?;
-    let traced = TracedBlock::from_trace(&loaded.trace).context("parsing the block trace")?;
+    let traced = loaded.traced;
     if loaded.metadata.is_none() {
         eprintln!("warning: no --metadata given, storage keys and extrinsics will not be named");
     }
@@ -112,6 +115,143 @@ fn write_json(block: &AnnotatedBlock, path: &PathBuf) -> Result<()> {
         writeln!(std::io::stdout(), "{json}")?;
     } else {
         fs::write(path, json).with_context(|| format!("writing {}", path.display()))?;
+    }
+    Ok(())
+}
+
+#[derive(Args)]
+struct FollowArgs {
+    #[arg(long, value_name = "URL")]
+    rpc: String,
+    #[arg(long, value_name = "URL", num_args = 0..=1, default_missing_value = "http://127.0.0.1:4318")]
+    otlp: Option<String>,
+}
+
+fn follow(args: FollowArgs) -> Result<()> {
+    use std::{
+        collections::VecDeque,
+        sync::{
+            Arc, Mutex,
+            atomic::{AtomicBool, Ordering},
+            mpsc,
+        },
+        thread,
+        time::Duration,
+    };
+    let running = Arc::new(AtomicBool::new(true));
+    let signal = running.clone();
+    ctrlc::set_handler(move || signal.store(false, Ordering::SeqCst))?;
+    let (send, receive) = mpsc::sync_channel::<String>(8);
+    let receive = Arc::new(Mutex::new(receive));
+    let workers: Vec<_> = (0..2)
+        .map(|_| {
+            let receive = receive.clone();
+            let url = args.rpc.clone();
+            let otlp = args.otlp.clone();
+            let running = running.clone();
+            thread::spawn(move || {
+                loop {
+                    if !running.load(Ordering::SeqCst) {
+                        break;
+                    }
+                    let hash = match receive.lock() {
+                        Ok(rx) => match rx.recv() {
+                            Ok(hash) => hash,
+                            Err(_) => break,
+                        },
+                        Err(_) => break,
+                    };
+                    let result = (|| -> Result<()> {
+                        let rpc = frame_trace_replay::rpc::Rpc::new(&url)?;
+                        let loaded =
+                            source::replay_loaded(frame_trace_replay::online(&rpc, &hash)?, None)?;
+                        let mut block = annotate(&loaded.traced, loaded.metadata.as_ref());
+                        block.block_number = loaded.block_number;
+                        if let Some(endpoint) = &otlp {
+                            frame_trace_otel::export_otlp(&block, endpoint, Timing::default())?;
+                        }
+                        eprintln!(
+                            "traced best block #{} {}: {} ops",
+                            loaded.block_number.unwrap_or(0),
+                            hash,
+                            block.totals.ops
+                        );
+                        Ok(())
+                    })();
+                    if let Err(error) = result {
+                        eprintln!("skipped block {hash}: {error:#}");
+                    }
+                }
+            })
+        })
+        .collect();
+    // Poll the allowlisted chain_getHeader instead of using a subscription RPC outside the
+    // replay allowlist. Walk new ancestry to cover blocks between polls and report best reorgs.
+    let mut rpc = None;
+    let mut seen = VecDeque::new();
+    while running.load(Ordering::SeqCst) {
+        let result = (|| -> Result<()> {
+            if rpc.is_none() {
+                rpc = Some(frame_trace_replay::rpc::Rpc::new(&args.rpc)?);
+            }
+            let client = rpc.as_ref().context("RPC connection unavailable")?;
+            let mut header = client.call("chain_getHeader", serde_json::json!([]))?;
+            let mut hash = frame_trace_replay::header_hash(&header)?;
+            let mut pending = Vec::new();
+            for _ in 0..64 {
+                if seen.contains(&hash) {
+                    break;
+                }
+                pending.push(hash.clone());
+                if seen.is_empty() {
+                    break;
+                }
+                let parent = header["parentHash"]
+                    .as_str()
+                    .context("parent hash missing")?
+                    .to_owned();
+                if seen.contains(&parent) {
+                    break;
+                }
+                hash = parent;
+                header = client.call("chain_getHeader", serde_json::json!([hash]))?;
+            }
+            if pending.len() == 64 {
+                eprintln!("follow ancestry exceeded 64 blocks; older blocks skipped");
+            }
+            for hash in pending.into_iter().rev() {
+                match send.try_send(hash.clone()) {
+                    Ok(()) => {}
+                    Err(mpsc::TrySendError::Full(_)) => {
+                        eprintln!("skipped block {hash}: replay queue full")
+                    }
+                    Err(mpsc::TrySendError::Disconnected(_)) => {
+                        anyhow::bail!("replay workers stopped")
+                    }
+                }
+                seen.push_back(hash);
+                if seen.len() > 256 {
+                    seen.pop_front();
+                }
+            }
+            Ok(())
+        })();
+        if let Err(error) = result {
+            eprintln!("follow poll failed: {error:#}; reconnecting");
+            rpc = None;
+        }
+        for _ in 0..20 {
+            if !running.load(Ordering::SeqCst) {
+                break;
+            }
+            thread::sleep(Duration::from_millis(100));
+        }
+    }
+    drop(send);
+    for worker in workers {
+        worker
+            .join()
+            .map_err(|_| anyhow::anyhow!("replay worker panicked"))?;
     }
     Ok(())
 }

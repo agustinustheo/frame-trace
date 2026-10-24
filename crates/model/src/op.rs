@@ -59,6 +59,10 @@ pub enum OpKind {
     IndexTransaction,
     /// Renew an indexed transaction (`RenewTransactionIndex`).
     RenewTransactionIndex,
+    /// Backend successor lookup (an attempt; overlays may change its result).
+    NextKey,
+    /// Backend raw iterator advancement.
+    Iteration,
 }
 
 impl OpKind {
@@ -76,6 +80,8 @@ impl OpKind {
             OpKind::StorageRoot => "storage_root",
             OpKind::IndexTransaction => "index_transaction",
             OpKind::RenewTransactionIndex => "renew_transaction_index",
+            OpKind::NextKey => "next_key",
+            OpKind::Iteration => "iteration",
         }
     }
 
@@ -94,7 +100,7 @@ impl OpKind {
 
     /// Whether the op addresses a key (or prefix) in a trie.
     pub fn has_key(self) -> bool {
-        self.is_read() || self.is_write()
+        self.is_read() || self.is_write() || self == OpKind::NextKey
     }
 }
 
@@ -107,6 +113,10 @@ impl std::fmt::Display for OpKind {
 /// One storage operation, in block execution order.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct StorageOp {
+    /// Measured local replay interval, absent for legacy JSON.
+    pub timing: Option<crate::MeasuredTiming>,
+    /// Parent in the observed span tree.
+    pub parent_span: Option<u64>,
     /// Position in the block's op list (0-based).
     pub seq: usize,
     /// Index of the source event in `BlockTrace::events`.
@@ -142,6 +152,8 @@ impl StorageOp {
 
     fn new(kind: OpKind) -> Self {
         Self {
+            timing: None,
+            parent_span: None,
             seq: 0,
             event_index: 0,
             ext_id: None,
@@ -202,6 +214,12 @@ fn parse_event(event: &Event) -> Result<Option<StorageOp>, String> {
         "ChildStorageRoot" => (OpKind::StorageRoot, true),
         "IndexTransaction" => (OpKind::IndexTransaction, false),
         "RenewTransactionIndex" => (OpKind::RenewTransactionIndex, false),
+        "BackendNextKey" => (OpKind::NextKey, false),
+        "BackendChildNextKey" => (OpKind::NextKey, true),
+        "BackendIterNextKey" | "BackendIterNextPair" => (
+            OpKind::Iteration,
+            event.field("child_info").is_some_and(|v| !v.is_empty()),
+        ),
         // `Call` events (runtime entry points) and anything newer than this parser.
         _ => return Ok(None),
     };
@@ -243,6 +261,10 @@ fn parse_event(event: &Event) -> Result<Option<StorageOp>, String> {
         OpKind::ClearPrefix => {
             op.key = display_hex(required(event, "prefix")?)?;
         }
+        OpKind::NextKey => {
+            op.key = display_hex(required(event, "key")?)?;
+        }
+        OpKind::Iteration => {}
         OpKind::Clear
         | OpKind::KillChild
         | OpKind::StorageRoot

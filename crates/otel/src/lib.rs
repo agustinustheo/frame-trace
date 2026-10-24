@@ -89,6 +89,7 @@ impl Default for Timing {
 /// Spans [`record_block`] creates for `block`: root, phases and ops.
 pub fn span_count(block: &AnnotatedBlock) -> usize {
     1 + block.all_phases().map(|p| 1 + p.ops.len()).sum::<usize>()
+        + block.runtime_spans.iter().filter(|s| s.wasm).count()
 }
 
 /// A tracer provider exporting through `exporter` with a batch processor whose queue holds
@@ -163,6 +164,9 @@ pub fn export_block<E: SpanExporter + 'static>(
 /// Op `seq` occupies the time slot `[start + seq * op_width, start + (seq + 1) * op_width)`, so
 /// a nested phase sits inside its parent's span at the point where it ran.
 pub fn record_block(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) -> usize {
+    if block.timing.is_some() {
+        return record_measured(tracer, block, timing);
+    }
     let at = |slot: usize| timing.start + timing.op_width * u32::try_from(slot).unwrap_or(u32::MAX);
     let end = block
         .phases
@@ -207,6 +211,153 @@ pub fn record_block(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) 
         .sum::<usize>();
     root_cx.span().end_with_timestamp(at(end.max(1)));
     spans
+}
+
+fn record_measured(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) -> usize {
+    use std::collections::HashMap;
+    let at = |ns| timing.start + Duration::from_nanos(ns);
+    let mut attrs = vec![
+        KeyValue::new("frame.timing", "measured"),
+        KeyValue::new("frame.block.hash", block.block_hash.clone()),
+        KeyValue::new("frame.block.parent_hash", block.parent_hash.clone()),
+        KeyValue::new("frame.trace.skipped_events", count(block.skipped_events)),
+        KeyValue::new(
+            "frame.block.extrinsics",
+            count(
+                block
+                    .phases
+                    .iter()
+                    .filter(|p| p.extrinsic_index.is_some())
+                    .count(),
+            ),
+        ),
+    ];
+    if let Some(number) = block.block_number {
+        attrs.push(KeyValue::new("frame.block.number", count(number)));
+    }
+    attrs.extend(stats_attributes(&block.totals));
+    let root = tracer
+        .span_builder(block_name(block))
+        .with_start_time(at(0))
+        .with_attributes(attrs)
+        .start_with_context(tracer, &Context::new());
+    let root = Context::new().with_span(root);
+    let mut contexts = HashMap::new();
+    for observed in block.runtime_spans.iter().filter(|s| s.wasm) {
+        let mut parent_id = observed.parent_id;
+        let mut parent = &root;
+        // Capture IDs form a tree; bound traversal for defensive handling of caller-built data.
+        for _ in 0..block.runtime_spans.len() {
+            let Some(id) = parent_id else { break };
+            if let Some(cx) = contexts.get(&id) {
+                parent = cx;
+                break;
+            }
+            parent_id = block
+                .runtime_spans
+                .iter()
+                .find(|s| s.id == id)
+                .and_then(|s| s.parent_id);
+        }
+        let span = tracer
+            .span_builder(truncate(&observed.name))
+            .with_start_time(at(observed.start_ns))
+            .with_attributes([
+                KeyValue::new("frame.timing", "measured"),
+                KeyValue::new("frame.runtime.target", observed.target.clone()),
+                KeyValue::new(
+                    "frame.proof.marginal_bytes",
+                    count(
+                        observed
+                            .proof_end_bytes
+                            .saturating_sub(observed.proof_start_bytes),
+                    ),
+                ),
+            ])
+            .start_with_context(tracer, parent);
+        let cx = parent.with_span(span);
+        cx.span()
+            .end_with_timestamp(at(observed.end_ns.unwrap_or(observed.start_ns)));
+        contexts.insert(observed.id, cx);
+    }
+    for phase in &block.phases {
+        record_measured_phase(tracer, block, phase, &root, &contexts, timing.start);
+    }
+    root.span()
+        .end_with_timestamp(at(block.timing.map_or(0, |t| t.duration_ns)));
+    span_count(block)
+}
+
+fn record_measured_phase(
+    tracer: &SdkTracer,
+    block: &AnnotatedBlock,
+    phase: &AnnotatedPhase,
+    parent: &Context,
+    contexts: &std::collections::HashMap<u64, Context>,
+    start: SystemTime,
+) {
+    let at = |ns| start + Duration::from_nanos(ns);
+    let intervals: Vec<_> = phase
+        .with_nested()
+        .flat_map(|p| &p.ops)
+        .filter_map(|o| o.timing)
+        .collect();
+    let lo = intervals.iter().map(|t| t.start_ns).min().unwrap_or(0);
+    let hi = intervals
+        .iter()
+        .map(|t| t.start_ns.saturating_add(t.duration_ns))
+        .max()
+        .unwrap_or(lo);
+    let mut attrs = vec![
+        KeyValue::new("frame.timing", "measured"),
+        KeyValue::new("frame.phase", phase.kind),
+    ];
+    attrs.extend(stats_attributes(&phase.stats));
+    if let Some(i) = phase.extrinsic_index {
+        attrs.push(KeyValue::new("frame.extrinsic.index", i64::from(i)));
+    }
+    if let Some(call) = &phase.call {
+        attrs.push(KeyValue::new("frame.extrinsic.call", call.clone()));
+    }
+    let span = tracer
+        .span_builder(phase.label.clone())
+        .with_start_time(at(lo))
+        .with_attributes(attrs)
+        .start_with_context(tracer, parent);
+    let cx = parent.with_span(span);
+    for op in &phase.ops {
+        let mut parent_id = op.parent_span;
+        let mut parent = &cx;
+        for _ in 0..block.runtime_spans.len() {
+            let Some(id) = parent_id else { break };
+            if let Some(observed) = contexts.get(&id) {
+                parent = observed;
+                break;
+            }
+            parent_id = block
+                .runtime_spans
+                .iter()
+                .find(|s| s.id == id)
+                .and_then(|s| s.parent_id);
+        }
+        let t = op.timing.unwrap_or(frame_trace_model::MeasuredTiming {
+            start_ns: lo,
+            duration_ns: 0,
+        });
+        let mut span = tracer
+            .span_builder(truncate(&op.label))
+            .with_start_time(at(t.start_ns))
+            .with_attributes(op_attributes(op, phase.extrinsic_index))
+            .start_with_context(tracer, parent);
+        opentelemetry::trace::Span::end_with_timestamp(
+            &mut span,
+            at(t.start_ns.saturating_add(t.duration_ns)),
+        );
+    }
+    if let Some(nested) = &phase.post_inherents {
+        record_measured_phase(tracer, block, nested, &cx, contexts, start);
+    }
+    cx.span().end_with_timestamp(at(hi));
 }
 
 fn record_phase(
@@ -255,7 +406,14 @@ fn record_phase(
 
 fn op_attributes(op: &AnnotatedOp, extrinsic_index: Option<u32>) -> Vec<KeyValue> {
     let mut attrs = vec![
-        KeyValue::new("frame.timing", "synthetic"),
+        KeyValue::new(
+            "frame.timing",
+            if op.timing.is_some() {
+                "measured"
+            } else {
+                "synthetic"
+            },
+        ),
         KeyValue::new("db.system.name", DB_SYSTEM),
         KeyValue::new("db.operation.name", op.op),
         KeyValue::new("frame.storage.item", op.item.clone()),

@@ -72,10 +72,10 @@ fn block_writes_json() {
 }
 
 #[test]
-fn rpc_source_is_not_implemented_yet() {
-    let out = run(&["block", "--rpc", "ws://127.0.0.1:9944", "--block", "1"]);
+fn rpc_source_reports_connection_failure() {
+    let out = run(&["block", "--rpc", "ws://127.0.0.1:1", "--block", "1"]);
     assert!(!out.status.success());
-    assert!(String::from_utf8_lossy(&out.stderr).contains("not implemented yet"));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("connect ws://127.0.0.1:1"));
 }
 
 #[test]
@@ -254,4 +254,36 @@ fn child_trie_keys_are_named_and_grouped_by_key() {
         "{stdout}"
     );
     assert!(rows[1].contains("child:0x01[0xbb]"), "{stdout}");
+}
+
+#[test]
+fn offline_block_reports_root_and_writes_measured_named_json() {
+    let path = std::env::temp_dir().join(format!(
+        "frame-trace-offline-cli-{}.json",
+        std::process::id()
+    ));
+    let out = run(&[
+        "block",
+        "--offline",
+        &fixture("replay/people-transfer"),
+        "--json",
+        path.to_str().unwrap(),
+    ]);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "{stderr}");
+    assert!(
+        stderr.contains("root check: PASS; RPC calls: 0 (measured: 0)"),
+        "{stderr}"
+    );
+    let block: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
+    std::fs::remove_file(path).unwrap();
+    assert!(block["timing"]["duration_ns"].as_u64().unwrap() > 0);
+    assert!(
+        block["phases"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|p| p["call"] == "Balances.transfer_keep_alive")
+    );
+    assert!(block["phases"][0]["ops"][0]["timing"].is_object());
 }

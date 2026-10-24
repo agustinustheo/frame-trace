@@ -8,6 +8,10 @@ use crate::{KeyName, Metadata, key::well_known};
 /// A [`TracedBlock`] with every key and extrinsic named. Serialises to the `--json` output.
 #[derive(Debug, Clone, Serialize)]
 pub struct AnnotatedBlock {
+    /// Observed span tree, empty for legacy JSON.
+    pub runtime_spans: Vec<frame_trace_model::RuntimeSpan>,
+    /// Replay duration, absent for synthetic input.
+    pub timing: Option<frame_trace_model::MeasuredTiming>,
     /// Block number. `state_traceBlock` does not report it, so it is `None` unless the caller
     /// knows it (for example from the RPC source).
     pub block_number: Option<u64>,
@@ -71,6 +75,10 @@ impl AnnotatedPhase {
 /// One storage op with its key named.
 #[derive(Debug, Clone, Serialize)]
 pub struct AnnotatedOp {
+    /// Measured local replay interval.
+    pub timing: Option<frame_trace_model::MeasuredTiming>,
+    /// Parent capture span ID.
+    pub parent_span: Option<u64>,
     /// Position in the block.
     pub seq: usize,
     /// Operation name (`get`, `put`, ...).
@@ -109,6 +117,8 @@ pub struct AnnotatedOp {
 /// are `<unknown>` and extrinsics are unnamed.
 pub fn annotate(block: &TracedBlock, metadata: Option<&Metadata>) -> AnnotatedBlock {
     AnnotatedBlock {
+        runtime_spans: block.runtime_spans.clone(),
+        timing: block.timing,
         block_number: None,
         block_hash: block.block_hash.clone(),
         parent_hash: block.parent_hash.clone(),
@@ -182,6 +192,8 @@ fn annotate_op(op: &StorageOp, metadata: Option<&Metadata>) -> AnnotatedOp {
         op.kind.to_string()
     };
     AnnotatedOp {
+        timing: op.timing,
+        parent_span: op.parent_span,
         seq: op.seq,
         op: op.kind.as_str(),
         child_trie: op.child_trie.as_ref().map(PrintedBytes::to_hex),

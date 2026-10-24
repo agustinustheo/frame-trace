@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/model", "crates/decode", "crates/otel", "crates/cli"]
+members = ["crates/model", "crates/decode", "crates/otel", "crates/cli", "crates/replay"]
 
 [workspace.package]
 version = "0.1.0"
@@ -13,6 +13,7 @@ repository = "https://github.com/agustinustheo/frame-trace"
 frame-trace-model = { path = "crates/model" }
 frame-trace-decode = { path = "crates/decode" }
 frame-trace-otel = { path = "crates/otel" }
+frame-trace-replay = { path = "crates/replay" }
 
 anyhow = "1.0.104"
 bs58 = "0.5.1"
@@ -37,3 +38,6 @@ unsafe_code = "forbid"
 
 [workspace.lints.clippy]
 unwrap_used = "warn"
+
+[profile.dev]
+debug = 0

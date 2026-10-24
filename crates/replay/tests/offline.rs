@@ -1,0 +1,246 @@
+//! Real signed blocks and the public parachain execute without a node or any network access.
+#![allow(clippy::unwrap_used)]
+use frame_trace_model::{OpKind, PhaseKind, ReplayEvent, TracedBlock, rpc::parse_trace_block};
+use frame_trace_replay::{Artifact, Error, offline, replay};
+use serde_json::Value;
+use std::{collections::BTreeMap, path::PathBuf};
+
+fn fixture(name: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../fixtures/replay")
+        .join(name)
+}
+fn read(name: &str, file: &str) -> Vec<u8> {
+    zstd::stream::decode_all(std::fs::File::open(fixture(name).join(file)).unwrap()).unwrap()
+}
+fn keyed_events(events: &[ReplayEvent]) -> Vec<BTreeMap<String, String>> {
+    events
+        .iter()
+        .filter(|e| e.target == "state" && e.fields.contains_key("key"))
+        .map(|e| {
+            let mut fields = e.fields.clone();
+            fields.remove("ext_id");
+            fields
+        })
+        .collect()
+}
+fn keyed_phases(block: &TracedBlock) -> Vec<(PhaseKind, Vec<(OpKind, String)>)> {
+    block
+        .phases
+        .iter()
+        .flat_map(|p| std::iter::once(p).chain(p.post_inherents.as_deref()))
+        .map(|p| {
+            (
+                p.kind,
+                block
+                    .phase_ops(p)
+                    .filter(|o| {
+                        matches!(
+                            o.kind,
+                            OpKind::Get
+                                | OpKind::Hash
+                                | OpKind::Exists
+                                | OpKind::Put
+                                | OpKind::Clear
+                                | OpKind::Append
+                        )
+                    })
+                    .map(|o| (o.kind, o.key.to_hex()))
+                    .collect(),
+            )
+        })
+        .collect()
+}
+fn check(name: &str, wasm: bool) {
+    let result = offline(&fixture(name)).unwrap();
+    assert!(result.root_check);
+    assert_eq!((result.rpc_count, result.measured_rpc_count), (0, 0));
+    assert!(result.proof_bytes > 0);
+    assert_eq!(result.capture.spans.iter().any(|s| s.wasm), wasm);
+    assert!(!result.capture.transitions.is_empty());
+    assert!(
+        result
+            .capture
+            .events
+            .windows(2)
+            .all(|w| w[0].at_ns <= w[1].at_ns)
+    );
+    let block = TracedBlock::from_replay(&result.capture).unwrap();
+    assert!(block.ops.iter().all(|op| op.timing.is_some()));
+    assert!(
+        block
+            .ops
+            .iter()
+            .any(|op| op.timing.unwrap().duration_ns > 0)
+    );
+    for method in ["ClearPrefix", "StorageRoot"] {
+        assert!(
+            result.capture.events.iter().any(|e| e.target == "state"
+                && e.fields.get("method").is_some_and(|m| m == method)
+                && !e.fields.contains_key("key")),
+            "missing keyless {method}"
+        );
+    }
+    assert!(block.ops.iter().any(|op| op.kind == OpKind::Iteration));
+    for span in &result.capture.spans {
+        assert!(span.end_ns.is_some_and(|end| end >= span.start_ns));
+        if let Some(parent) = span.parent_id {
+            let parent = result
+                .capture
+                .spans
+                .iter()
+                .find(|s| s.id == parent)
+                .unwrap();
+            assert!(parent.start_ns <= span.start_ns);
+            assert!(parent.end_ns >= span.end_ns);
+        }
+    }
+    if fixture(name).join("oracle.json.zst").exists() {
+        let oracle =
+            parse_trace_block(std::str::from_utf8(&read(name, "oracle.json.zst")).unwrap())
+                .unwrap();
+        assert_eq!(
+            oracle.block_hash.trim_start_matches("0x"),
+            result.capture.block_hash.trim_start_matches("0x")
+        );
+        let expected: Vec<BTreeMap<String, String>> = oracle
+            .events
+            .iter()
+            .filter(|e| e.target == "state" && e.field("key").is_some())
+            .map(|e| {
+                e.data
+                    .string_values
+                    .iter()
+                    .filter(|(k, _)| k.as_str() != "ext_id")
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect()
+            })
+            .collect();
+        assert_eq!(
+            keyed_events(&result.capture.events),
+            expected,
+            "entire ordered keyed event list, including values"
+        );
+        assert_eq!(
+            keyed_phases(&block),
+            keyed_phases(&TracedBlock::from_trace(&oracle).unwrap()),
+            "identical phase ownership/boundaries for all oracle ops"
+        );
+    } else {
+        // Public safe endpoints do not expose the unsafe oracle. Compare E2's independently
+        // saved execution, with a separately repeated real root check here.
+        let events: Vec<ReplayEvent> =
+            serde_json::from_slice(&read(name, "reference-events.json.zst")).unwrap();
+        assert_eq!(keyed_events(&result.capture.events), keyed_events(&events));
+    }
+    let metadata = frame_trace_decode::Metadata::from_hex(&result.artifact.metadata).unwrap();
+    let annotated = frame_trace_decode::annotate(&block, Some(&metadata));
+    assert!(annotated.phases.iter().all(|p| p.call_error.is_none()));
+    if name == "people-transfer" {
+        assert!(
+            annotated
+                .phases
+                .iter()
+                .any(|p| p.call.as_deref() == Some("Balances.transfer_keep_alive"))
+        );
+    }
+    if name == "people-kill-prefix" {
+        assert_eq!(
+            block
+                .ops
+                .iter()
+                .filter(|o| o.kind == OpKind::ClearPrefix)
+                .count(),
+            2
+        );
+    }
+}
+
+#[test]
+fn signed_people_transfer() {
+    check("people-transfer", false);
+}
+#[test]
+fn prefix_deletion_people_block() {
+    check("people-kill-prefix", false);
+}
+#[test]
+fn traced_runtime_tree_and_batch() {
+    check("people-traced", true);
+}
+#[test]
+fn public_westend_asset_hub() {
+    check("westend-asset-hub", false);
+}
+#[test]
+fn tampered_expected_root_traps_in_core() {
+    let mut artifact = Artifact::load(&fixture("people-transfer")).unwrap();
+    artifact.block["header"]["stateRoot"] = Value::String(format!("0x{}", "42".repeat(32)));
+    // Recompute the header hash so validation reaches the runtime's actual root assertion.
+    let header: sp_runtime::generic::Header<u32, sp_runtime::traits::BlakeTwo256> =
+        serde_json::from_value(artifact.block["header"].clone()).unwrap();
+    artifact.block_hash = header.hash();
+    assert!(matches!(replay(artifact, None), Err(Error::Execution(_))));
+}
+#[test]
+fn tampered_parent_and_missing_proof_fail() {
+    let mut artifact = Artifact::load(&fixture("people-transfer")).unwrap();
+    artifact.parent_header["stateRoot"] = Value::String(format!("0x{}", "42".repeat(32)));
+    assert!(
+        replay(artifact, None)
+            .unwrap_err()
+            .to_string()
+            .contains("parent header hash mismatch")
+    );
+    let mut artifact = Artifact::load(&fixture("people-transfer")).unwrap();
+    artifact.proof_nodes.clear();
+    assert!(
+        replay(artifact, None)
+            .unwrap_err()
+            .to_string()
+            .contains("offline proof cache miss")
+    );
+}
+#[test]
+fn artifact_round_trip_and_version_rejection() {
+    let dir = std::env::temp_dir().join(format!("frame-trace-artifact-{}", std::process::id()));
+    let mut artifact = Artifact::load(&fixture("people-transfer")).unwrap();
+    artifact.save(&dir).unwrap();
+    assert_eq!(
+        Artifact::load(&dir).unwrap().proof_nodes,
+        artifact.proof_nodes
+    );
+    std::fs::remove_dir_all(dir).unwrap();
+    artifact.format_version = 2;
+    assert!(
+        replay(artifact, None)
+            .unwrap_err()
+            .to_string()
+            .contains("unsupported artifact version")
+    );
+}
+#[test]
+#[ignore = "requires public network and recent parent state"]
+fn public_network() {
+    let rpc = frame_trace_replay::rpc::Rpc::new("wss://westend-asset-hub-rpc.polkadot.io").unwrap();
+    let result = frame_trace_replay::online(&rpc, "best").unwrap();
+    assert!(result.root_check);
+    assert_eq!(result.measured_rpc_count, 0);
+}
+
+#[test]
+fn tampered_runtime_proof_node_is_rejected() {
+    let mut artifact = Artifact::load(&fixture("people-transfer")).unwrap();
+    let runtime_node = artifact
+        .proof_nodes
+        .iter_mut()
+        .max_by_key(|s| s.len())
+        .unwrap();
+    runtime_node.replace_range(2..4, "42");
+    assert!(
+        replay(artifact, None)
+            .unwrap_err()
+            .to_string()
+            .contains("offline proof cache miss")
+    );
+}

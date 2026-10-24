@@ -1,15 +1,10 @@
 //! Where a block trace and its metadata come from.
-//!
-//! Today only recorded files are supported. To add a source, add its arguments to
-//! [`SourceArgs`], a module next to [`file`] that returns a [`Loaded`], and a match arm in
-//! [`load`].
 
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 use clap::Args;
 use frame_trace_decode::Metadata;
-use frame_trace_model::rpc::BlockTrace;
 
 /// Arguments that select the block to trace.
 #[derive(Args)]
@@ -18,34 +13,61 @@ pub struct SourceArgs {
     #[arg(
         long,
         value_name = "TRACE.json",
-        required_unless_present = "rpc",
-        conflicts_with = "rpc"
+        required_unless_present_any = ["rpc", "offline"],
+        conflicts_with_all = ["rpc", "offline"]
     )]
     pub from_file: Option<PathBuf>,
     /// Runtime metadata of the block's runtime: SCALE bytes (`.scale`), or hex as returned by
     /// `state_getMetadata` (`.hex`, or the JSON-RPC response).
-    #[arg(long, value_name = "FILE")]
+    #[arg(long, value_name = "FILE", requires = "from_file")]
     pub metadata: Option<PathBuf>,
-    /// Node RPC endpoint, for example ws://127.0.0.1:9944 (not implemented yet).
-    #[arg(long, value_name = "URL", requires = "block")]
+    /// Node RPC endpoint, for example wss://westend-asset-hub-rpc.polkadot.io.
+    #[arg(
+        long,
+        value_name = "URL",
+        requires = "block",
+        conflicts_with = "offline"
+    )]
     pub rpc: Option<String>,
     /// Block number or hash to trace with --rpc.
     #[arg(long, value_name = "NUMBER|HASH")]
     pub block: Option<String>,
+    /// Replay a saved artifact with no network.
+    #[arg(long, value_name = "DIR", conflicts_with = "block")]
+    pub offline: Option<PathBuf>,
+    /// Save the replay context and proofs for offline use.
+    #[arg(long, value_name = "DIR", conflicts_with = "from_file")]
+    pub save: Option<PathBuf>,
 }
 
 /// A block trace and what is needed to decode it.
 pub struct Loaded {
-    pub trace: BlockTrace,
+    pub traced: frame_trace_model::TracedBlock,
     pub metadata: Option<Metadata>,
     pub block_number: Option<u64>,
 }
 
 pub fn load(args: &SourceArgs) -> Result<Loaded> {
+    if let Some(dir) = &args.offline {
+        let replay = frame_trace_replay::offline(dir).inspect_err(|_| {
+            eprintln!("root check: NOT VERIFIED; RPC calls: 0");
+        })?;
+        return replay_loaded(replay, args.save.as_deref());
+    }
     match (&args.from_file, &args.rpc) {
         (Some(trace), _) => file::load(trace, args.metadata.as_deref()),
-        (None, Some(url)) => rpc::load(url, args.block.as_deref().unwrap_or_default()),
-        (None, None) => bail!("pass --from-file or --rpc"),
+        (None, Some(url)) => {
+            let rpc = frame_trace_replay::rpc::Rpc::new(url).inspect_err(|_| {
+                eprintln!("root check: NOT VERIFIED; RPC calls: 0");
+            })?;
+            let replay =
+                frame_trace_replay::online(&rpc, args.block.as_deref().unwrap_or_default())
+                    .inspect_err(|_| {
+                        eprintln!("root check: NOT VERIFIED; RPC calls: {}", rpc.count());
+                    })?;
+            replay_loaded(replay, args.save.as_deref())
+        }
+        (None, None) => bail!("pass --rpc, --offline or --from-file"),
     }
 }
 
@@ -59,7 +81,7 @@ mod file {
             .with_context(|| format!("parsing {}", trace.display()))?;
         let metadata = metadata.map(load_metadata).transpose()?;
         Ok(Loaded {
-            trace,
+            traced: frame_trace_model::TracedBlock::from_trace(&trace)?,
             metadata,
             block_number: None,
         })
@@ -91,17 +113,18 @@ mod file {
     }
 }
 
-mod rpc {
-    use super::*;
-
-    /// TODO(rpc source): fetch over JSON-RPC instead of reading files. Planned as `crates/source`
-    /// (see SPEC.md): `chain_getBlockHash` for a number, `state_traceBlock(hash, "state", "", "")`,
-    /// `state_getMetadata` at the parent hash, `chain_getHeader` for the block number. Return the
-    /// same [`Loaded`], so nothing else changes. Keep the OTLP exporter outside any async
-    /// runtime: it uses a blocking HTTP client.
-    pub fn load(url: &str, block: &str) -> Result<Loaded> {
-        bail!(
-            "--rpc is not implemented yet (asked for block {block} from {url}); record the trace and use --from-file"
-        )
+/// Both block and summary consume the same faithful measured result.
+pub fn replay_loaded(replay: frame_trace_replay::Replay, save: Option<&Path>) -> Result<Loaded> {
+    eprintln!(
+        "root check: PASS; RPC calls: {} (measured: {}); execution proof: {} bytes",
+        replay.rpc_count, replay.measured_rpc_count, replay.proof_bytes
+    );
+    if let Some(dir) = save {
+        replay.artifact.save(dir)?;
     }
+    Ok(Loaded {
+        traced: frame_trace_model::TracedBlock::from_replay(&replay.capture)?,
+        metadata: Some(Metadata::from_hex(&replay.artifact.metadata)?),
+        block_number: Some(replay.block_number),
+    })
 }

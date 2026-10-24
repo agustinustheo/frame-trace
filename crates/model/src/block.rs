@@ -43,6 +43,10 @@ impl Phase {
 /// The storage ops of one block, in order, split into phases.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TracedBlock {
+    /// Observed runtime/host span tree, empty for legacy JSON.
+    pub runtime_spans: Vec<crate::RuntimeSpan>,
+    /// Local replay time, absent for legacy JSON.
+    pub timing: Option<crate::MeasuredTiming>,
     /// Block hash as reported by the node.
     pub block_hash: String,
     /// Parent hash as reported by the node.
@@ -69,6 +73,8 @@ impl TracedBlock {
             })
             .collect();
         Ok(Self {
+            runtime_spans: Vec::new(),
+            timing: None,
             block_hash: trace.block_hash.clone(),
             parent_hash: trace.parent_hash.clone(),
             ops,

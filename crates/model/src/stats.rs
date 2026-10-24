@@ -44,7 +44,7 @@ impl Stats {
                 stats.reads += 1;
                 stats.bytes_read += len;
                 stats.duplicate_reads += usize::from(op.duplicate_read);
-            } else {
+            } else if op.kind.is_write() {
                 stats.writes += 1;
                 stats.bytes_written += len;
             }
