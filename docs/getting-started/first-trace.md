@@ -1,6 +1,6 @@
 # Your first trace in Jaeger
 
-In five minutes you will trace a live Westend Asset Hub block and open it in Jaeger.
+In five minutes you will trace a live [Westend Asset Hub](../reference/glossary.md#westend-asset-hub) block and open it in Jaeger.
 You need frame-trace [installed](install.md) and Docker running.
 
 ## 1. Start Jaeger
@@ -45,13 +45,13 @@ What the lines mean:
 | Line | Meaning |
 | --- | --- |
 | `fetching state` | frame-trace is asking the node for the storage the block needs, with proofs. |
-| `loading runtime and preparing state` | frame-trace is loading the chain's own runtime, taken from the parent block's state. |
-| `root check: PASS` | The replay produced the same state root as the block header. See [What a replay proves](../concepts/what-a-replay-proves.md). |
+| `loading runtime and preparing state` | frame-trace is loading the chain's own [runtime](../reference/glossary.md#runtime), taken from the parent block's state. |
+| `root check: PASS` | The replay produced the same [state root](../reference/glossary.md#state-root) as the block header. See [What a replay proves](../concepts/what-a-replay-proves.md). |
 | `RPC calls: 93 (timed replay: 0)` | 93 requests to the node in total. The timed replay, which the trace comes from, made none. |
 | `execution proof: 90712 bytes` | An estimate of the storage proof size for the whole block. See [Proof bytes](../concepts/proof-bytes.md). |
 | `64 proof request rounds` | How many times frame-trace had to go back to the node for more state. |
 | `state root: computed …; header …` | The root your machine computed, next to the root in the block header. They are equal. |
-| `exported 555 spans` | Jaeger accepted all 555 spans: the block, its phases and every storage operation. frame-trace fails if the receiver rejects any span. A receiver can still drop data later, for example through sampling or retention. |
+| `exported 555 spans` | Jaeger accepted all 555 [spans](../reference/glossary.md#span-and-trace): the block, its phases and every storage operation. frame-trace fails if the receiver rejects any span. A receiver can still drop data later, for example through sampling or retention. |
 
 ## 3. Open the trace
 
@@ -66,7 +66,9 @@ You should see this:
 ![The block trace in Jaeger with five phases and numbered callouts](../images/first-trace.png)
 
 1. The block span. Its name has the block number and a short hash.
-2. The [phases](../concepts/phases.md) of the block, in the order they ran: initialization, the two required extrinsics, post inherents and finalization.
+2. The [phases](../concepts/phases.md) of the block, in the order they ran: initialization, the two required extrinsics ([inherents](../reference/glossary.md#inherent)), post inherents and finalization.
+   Post inherents is a top-level phase here because this block has only inherents.
+   In a block with a user transaction, it sits inside that transaction's extrinsic instead.
 3. The badge counts the spans inside each phase. Here those are storage operations.
 4. Each bar shows how long the phase took on your machine.
 5. The total number of spans in the trace.

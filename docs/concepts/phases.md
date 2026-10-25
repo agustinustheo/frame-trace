@@ -2,7 +2,9 @@
 
 A **phase** is one part of a block's execution.
 frame-trace puts every storage operation in exactly one phase.
-In Jaeger each phase is a child of the block span.
+In Jaeger every phase is a child of the block span, except `post inherents (on_poll)`.
+That phase sits inside the first extrinsic that is not an inherent, when the block has one.
+When the block has only inherents, it is a top-level phase of its own, just before finalization.
 In the tables each phase is a row.
 
 ## The phases, in order
@@ -11,7 +13,7 @@ In the tables each phase is a row.
 | --- | --- |
 | `initialization` | Block setup and every pallet's `on_initialize` hook. |
 | `extrinsic N: Pallet.call` | One extrinsic, numbered from 0 in block order, for example `extrinsic 2: Utility.batch`. |
-| `post inherents (on_poll)` | Hooks that run after the required extrinsics, such as `on_poll`. |
+| `post inherents (on_poll)` | Hooks such as `on_poll` that run once the inherents are done. They sit inside the first non-inherent extrinsic, or stand alone before finalization when there is none. See below. |
 | `finalization` | `on_idle` hooks, when weight remains and no multi-block migration is running, then every pallet's `on_finalize` hook, then the final checks. |
 
 Here is block #4 of the People fixture as `summary` prints it:

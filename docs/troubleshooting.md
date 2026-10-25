@@ -144,7 +144,7 @@ frame-trace printed `exported <N> spans`, but Jaeger shows nothing.
 - Pick the service `frame-trace` and click **Find Traces**.
 - Widen **Lookback**. Traces are stamped with the time you ran frame-trace.
 - Check that frame-trace and the page you opened talk to the same Jaeger. Jaeger's default in-memory storage loses traces on restart.
-- Without `--otlp`, frame-trace sends nothing. It prints `Use --otlp or --json to export it.`
+- Without `--otlp`, frame-trace sends nothing to Jaeger. When you give neither `--otlp` nor `--json`, `block` ends with `Use --otlp or --json to export it.`
 
 ## `unsupported metadata version V13 (need V14, V15 or V16)`
 

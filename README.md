@@ -9,11 +9,11 @@ Replay any block of a Polkadot SDK chain on your machine and see every storage r
 ## What you get
 
 - **Every storage read and write of a block**, in order, with decoded names such as `System::Account(5Grw…)`.
-- **Why each read cost what it did**: answered from the block's own cache or from the trie, and how many bytes it added to the block's proof.
+- **Why each read cost what it did**: answered from the block's own [cache](docs/reference/glossary.md#cache) or from the [trie](docs/reference/glossary.md#trie), and how many bytes it added to the block's proof.
 - **The busiest storage items, repeated reads and costs per extrinsic**, for one block or a range of thousands.
-- **A trace you can trust.** frame-trace checks every value it fetches against the chain's state root. After the replay, the root check confirms your machine reached the same state as the chain.
+- **A trace you can trust.** frame-trace checks every value it fetches against the chain's [state root](docs/reference/glossary.md#state-root). After the replay, the root check confirms your machine reached the same state as the chain.
 
-It works with any node over normal RPC. You need no unsafe methods and no special node build.
+It works with any node over normal RPC, with no unsafe methods or special node build.
 
 ## Five-minute start
 
@@ -31,7 +31,7 @@ Start Jaeger:
 docker run -d --rm --name jaeger -p 16686:16686 -p 4318:4318 jaegertracing/jaeger:latest
 ```
 
-Trace the latest finalized Westend Asset Hub block and send it to Jaeger:
+Trace the latest finalized [Westend Asset Hub](docs/reference/glossary.md#westend-asset-hub) block and send it to Jaeger:
 
 ```sh
 frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block finalized --otlp
@@ -53,13 +53,13 @@ So the trace shows what the block really did.
 
 Open <http://127.0.0.1:16686>, pick the service `frame-trace` and click **Find Traces**.
 Open the trace named `frame-trace: block #<number> (0x…)`.
-You will see the block's phases: initialization, the required extrinsics, post inherents and finalization.
+You will see the block's [phases](docs/concepts/phases.md): initialization, the required extrinsics, post inherents and finalization (this block has only inherents, so post inherents is its own phase).
 Each phase holds its storage reads and writes.
 Click any read to see where it was answered and its proof bytes.
 
 ## Learn more
 
-The [documentation](docs/README.md) has:
+The [documentation](docs/README.md) has a [glossary](docs/reference/glossary.md) and:
 
 - **Getting started:** [install](docs/getting-started/install.md), [your first trace](docs/getting-started/first-trace.md), [reading a trace](docs/getting-started/reading-a-trace.md).
 - **Guides** named after the job: [find repeated reads](docs/guides/find-repeated-reads.md), [measure proof size](docs/guides/measure-proof-size.md), [trace a runtime API call](docs/guides/trace-a-runtime-api-call.md), [analyse many blocks](docs/guides/analyse-many-blocks.md) and [more](docs/SUMMARY.md).

@@ -16,9 +16,12 @@ block #4 (0x06618995…0637)                  block span
 │  │  └─ batch                              runtime span
 │  │     └─ transfer_keep_alive             runtime span
 │  │        └─ get System::Account(5FHn…)   storage operation span
-│  └─ post inherents (on_poll)              phase span, nested
+│  └─ post inherents (on_poll)              phase span, inside the first non-inherent extrinsic
 └─ finalization                             phase span
 ```
+
+Phases are children of the block span, except `post inherents (on_poll)`: it sits inside the first extrinsic that is not an inherent, or is a top-level phase before finalization when the block has only inherents.
+See [Phases of a block](../concepts/phases.md).
 
 ## Span names
 

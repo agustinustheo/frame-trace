@@ -1,7 +1,7 @@
 # Reading a trace
 
 This page walks through one trace on screen, region by region.
-It uses block #4 of a People chain, which ships with the repository.
+It uses block #4 of a [People chain](../reference/glossary.md#people-chain), which ships with the repository.
 Its runtime was built with tracing, so you also see runtime calls such as `set`.
 
 Send it to Jaeger from the `frame-trace` directory:
@@ -39,7 +39,7 @@ Each row is one of four kinds:
 | Row | Example | What it is |
 | --- | --- | --- |
 | Block | `block #4 (0x06618995…0637)` | The whole block. One per trace. |
-| Phase | `extrinsic 1: Timestamp.set` | One [phase](../concepts/phases.md) of the block. |
+| Phase | `extrinsic 1: Timestamp.set` | One [phase](../concepts/phases.md) of the block, here one [extrinsic](../reference/glossary.md#extrinsic). |
 | Runtime call | `apply_extrinsic`, `set`, `on_initialize: Aura` | A span the runtime itself reported. Only runtimes built with tracing have these. See [See runtime calls inside extrinsics](../guides/see-runtime-calls.md). |
 | Storage operation | `get Timestamp::Now` | One storage call: the operation, then the decoded key. |
 
@@ -80,11 +80,11 @@ The other attributes on this span:
 
 | Attribute | Meaning |
 | --- | --- |
-| `db.collection.name` | The pallet that owns the key, `Timestamp`. |
+| `db.collection.name` | The [pallet](../reference/glossary.md#pallet) that owns the key, `Timestamp`. |
 | `db.operation.name` | The storage operation, `get`. |
 | `frame.extrinsic.index` | The extrinsic this read belongs to, 1. |
 | `frame.storage.duplicate_read` | `true` if the same key was already read in this phase. |
-| `frame.storage.item` | The storage item, `Timestamp::Now`. |
+| `frame.storage.item` | The [storage item](../reference/glossary.md#storage-item-and-key), `Timestamp::Now`. |
 | `frame.storage.key` | The full raw key in hex. |
 | `frame.storage.key_complete` | `true` if the key was decoded completely. |
 | `frame.storage.seq` | The position of this operation in the block, counting from 0. |

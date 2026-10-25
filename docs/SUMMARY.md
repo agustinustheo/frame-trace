@@ -35,6 +35,7 @@
 - [Span names and attributes](reference/spans.md)
 - [JSON output](reference/json.md)
 - [Saved block format](reference/saved-block-format.md)
+- [Glossary](reference/glossary.md)
 
 # Troubleshooting
 
