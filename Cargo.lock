@@ -2079,12 +2079,18 @@ dependencies = [
 name = "frame-trace-otel"
 version = "0.1.0"
 dependencies = [
+ "async-trait",
  "frame-trace-decode",
  "frame-trace-model",
  "frame-trace-replay",
  "opentelemetry",
+ "opentelemetry-http",
  "opentelemetry-otlp",
+ "opentelemetry-proto",
  "opentelemetry_sdk",
+ "prost",
+ "reqwest",
+ "serde_json",
  "thiserror 2.0.21",
 ]
 

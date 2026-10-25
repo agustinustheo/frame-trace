@@ -83,6 +83,66 @@ fn sources_are_required_as_alternatives_and_cannot_be_mixed() {
 }
 
 #[test]
+fn ignored_source_options_are_rejected_before_loading_or_connecting() {
+    for command in ["block", "summary"] {
+        for source in ["--rpc", "--offline", "--from-json"] {
+            let mut args = vec![command, source, "missing", "--metadata", "missing.scale"];
+            if source == "--rpc" {
+                args.extend(["--block", "1"]);
+            }
+            let out = run(&args);
+            let error = String::from_utf8_lossy(&out.stderr);
+            assert_eq!(out.status.code(), Some(2), "{args:?}: {error}");
+            assert!(error.contains("cannot be used with"), "{error}");
+            assert!(error.contains("--metadata <FILE>"), "{error}");
+            assert!(error.contains(source), "{error}");
+        }
+        for source in ["--from-file", "--from-json"] {
+            for flags in [
+                vec!["--block", "1"],
+                vec!["--proof-concurrency", "8"],
+                vec!["--cache-dir", "cache"],
+                vec!["--cache-max-bytes", "1073741824"],
+                vec!["--unauthenticated-metadata"],
+                vec!["--rpc-metadata-fallback"],
+            ] {
+                let mut args = vec![command, source, "missing"];
+                args.extend(flags);
+                let out = run(&args);
+                let error = String::from_utf8_lossy(&out.stderr);
+                assert_eq!(out.status.code(), Some(2), "{args:?}: {error}");
+                assert!(error.contains("cannot be used with"), "{error}");
+            }
+        }
+    }
+    for command in ["block", "summary", "call"] {
+        let out = run(&[command, "--offline", "missing", "--proof-concurrency", "8"]);
+        let error = String::from_utf8_lossy(&out.stderr);
+        assert_eq!(out.status.code(), Some(2), "{error}");
+        assert!(error.contains("cannot be used with"), "{error}");
+    }
+    for source in [vec!["missing.json"], vec!["--from-json", "missing.json"]] {
+        for flags in [
+            ["--from", "1"],
+            ["--to", "2"],
+            ["--last", "2"],
+            ["--concurrency", "2"],
+            ["--proof-concurrency", "8"],
+            ["--cache-dir", "cache"],
+            ["--cache-max-bytes", "1073741824"],
+        ] {
+            let mut args = vec!["report"];
+            args.extend(&source);
+            args.extend(flags);
+            let out = run(&args);
+            let error = String::from_utf8_lossy(&out.stderr);
+            assert_eq!(out.status.code(), Some(2), "{args:?}: {error}");
+            assert!(error.contains("cannot be used with"), "{error}");
+        }
+    }
+}
+
+#[test]
 fn command_help_has_plain_descriptions_examples_and_hidden_compatible_aliases() {
     for (command, description) in [
         (
@@ -345,6 +405,130 @@ fn block_fails_when_the_collector_rejects_spans() {
         stderr.contains("321 of 321 spans were not exported"),
         "{stderr}"
     );
+}
+
+fn otlp_response(
+    content_type: &'static str,
+    body: Vec<u8>,
+) -> (String, std::thread::JoinHandle<()>) {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    let server = std::thread::spawn(move || {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(10);
+        let mut stream = loop {
+            match listener.accept() {
+                Ok((stream, _)) => break stream,
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    assert!(std::time::Instant::now() < deadline, "receiver timed out");
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+                Err(e) => panic!("accept: {e}"),
+            }
+        };
+        stream.set_nonblocking(false).unwrap();
+        stream
+            .set_read_timeout(Some(std::time::Duration::from_secs(10)))
+            .unwrap();
+        let mut reader = BufReader::new(stream.try_clone().unwrap());
+        let mut length = 0;
+        let mut line = String::new();
+        reader.read_line(&mut line).unwrap();
+        assert_eq!(line, "POST /v1/traces HTTP/1.1\r\n");
+        loop {
+            line.clear();
+            assert!(reader.read_line(&mut line).unwrap() > 0);
+            if line == "\r\n" {
+                break;
+            }
+            if let Some(value) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+                length = value.trim().parse::<usize>().unwrap();
+            }
+        }
+        assert!(length > 0);
+        reader.read_exact(&mut vec![0; length]).unwrap();
+        write!(stream, "HTTP/1.1 200 OK\r\ncontent-type: {content_type}\r\ncontent-length: {}\r\nconnection: close\r\n\r\n", body.len()).unwrap();
+        stream.write_all(&body).unwrap();
+    });
+    (url, server)
+}
+
+#[test]
+fn block_fails_on_protobuf_partial_success_without_printing_exported() {
+    // ExportTraceServiceResponse { partial_success: { rejected_spans: 7,
+    // error_message: "quota" } }, encoded as protobuf.
+    let (url, server) = otlp_response(
+        "application/x-protobuf",
+        b"\x0a\x09\x08\x07\x12\x05quota".to_vec(),
+    );
+    let out = run(&[
+        "block",
+        "--from-file",
+        &fixture("model/real/people-paseo-block-1-trace-state.json"),
+        "--otlp",
+        &url,
+    ]);
+    server.join().unwrap();
+    let error = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(1), "{error}");
+    assert!(
+        error.contains("7 of 321 spans rejected by the receiver: quota"),
+        "{error}"
+    );
+    assert!(!error.contains("exported 321 spans"), "{error}");
+}
+
+#[test]
+fn block_fails_on_json_partial_success_with_string_or_numeric_counts() {
+    for count in [r#""7""#, "7"] {
+        let body =
+            format!(r#"{{"partialSuccess":{{"rejectedSpans":{count},"errorMessage":"quota"}}}}"#);
+        let (url, server) = otlp_response("application/json; charset=utf-8", body.into_bytes());
+        let out = run(&[
+            "block",
+            "--from-file",
+            &fixture("model/real/people-paseo-block-1-trace-state.json"),
+            "--otlp",
+            &url,
+        ]);
+        server.join().unwrap();
+        let error = String::from_utf8_lossy(&out.stderr);
+        assert_eq!(out.status.code(), Some(1), "{error}");
+        assert!(
+            error.contains("7 of 321 spans rejected by the receiver: quota"),
+            "{error}"
+        );
+        assert!(!error.contains("exported 321 spans"), "{error}");
+    }
+}
+
+#[test]
+fn block_exports_on_normal_success_and_zero_rejections() {
+    for (content_type, body) in [
+        ("application/x-protobuf", Vec::new()),
+        ("application/x-protobuf", b"\x0a\x07\x12\x05quota".to_vec()),
+        ("application/json", b"{}".to_vec()),
+        (
+            "application/json",
+            br#"{"partialSuccess":{"rejectedSpans":"0","errorMessage":"warning"}}"#.to_vec(),
+        ),
+    ] {
+        let (url, server) = otlp_response(content_type, body);
+        let out = run(&[
+            "block",
+            "--from-file",
+            &fixture("model/real/people-paseo-block-1-trace-state.json"),
+            "--otlp",
+            &url,
+        ]);
+        server.join().unwrap();
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert_eq!(out.status.code(), Some(0), "{stderr}");
+        assert!(
+            stderr.contains(&format!("exported 321 spans to {url}")),
+            "{stderr}"
+        );
+    }
 }
 
 #[test]

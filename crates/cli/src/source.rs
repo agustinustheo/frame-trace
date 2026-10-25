@@ -22,7 +22,7 @@ pub struct SourceArgs {
     pub from_json: Option<PathBuf>,
     /// Runtime metadata of the block's runtime: SCALE bytes (`.scale`), or hex as returned by
     /// `state_getMetadata` (`.hex`, or the JSON-RPC response).
-    #[arg(long, value_name = "FILE", requires = "from_file")]
+    #[arg(long, value_name = "FILE", requires = "from_file", conflicts_with_all = ["rpc", "offline", "from_json"])]
     pub metadata: Option<PathBuf>,
     /// Node RPC endpoint, for example wss://westend-asset-hub-rpc.polkadot.io.
     #[arg(
@@ -33,7 +33,7 @@ pub struct SourceArgs {
     )]
     pub rpc: Option<String>,
     /// Block number, hash, `best` or `finalized` to trace with --rpc.
-    #[arg(long, value_name = "NUMBER|HASH|best|finalized")]
+    #[arg(long, value_name = "NUMBER|HASH|best|finalized", requires = "rpc", conflicts_with_all = ["from_file", "from_json", "offline"])]
     pub block: Option<String>,
     /// Replay a saved artifact with no network.
     #[arg(long, value_name = "DIR", conflicts_with = "block")]
@@ -42,16 +42,16 @@ pub struct SourceArgs {
     #[arg(long, value_name = "DIR", conflicts_with = "from_file")]
     pub save: Option<PathBuf>,
     /// Maximum concurrent proof requests (1–64; up to 32 keys per request).
-    #[arg(long, default_value_t = 8, value_parser = clap::value_parser!(u8).range(1..=64))]
+    #[arg(long, default_value_t = 8, requires = "rpc", conflicts_with_all = ["from_file", "from_json", "offline"], value_parser = clap::value_parser!(u8).range(1..=64))]
     pub proof_concurrency: u8,
     /// Persistent authenticated proof nodes and compiled Wasm cache directory.
-    #[arg(long, value_name = "DIR")]
+    #[arg(long, value_name = "DIR", conflicts_with_all = ["from_file", "from_json"])]
     pub cache_dir: Option<PathBuf>,
     /// Disk cache limit in bytes; runtime code in use is kept.
-    #[arg(long, default_value_t = 1073741824)]
+    #[arg(long, default_value_t = 1073741824, conflicts_with_all = ["from_file", "from_json"])]
     pub cache_max_bytes: u64,
     /// Allow unverified metadata from the node or saved replay.
-    #[arg(long = "unauthenticated-metadata", alias = "rpc-metadata-fallback")]
+    #[arg(long = "unauthenticated-metadata", alias = "rpc-metadata-fallback", conflicts_with_all = ["from_file", "from_json"])]
     pub rpc_metadata_fallback: bool,
     /// Execute this Wasm instead of the authenticated :code, for example the same runtime
     /// built with `with-tracing`. Bypasses the code-hash check. Labelled on stderr, in JSON

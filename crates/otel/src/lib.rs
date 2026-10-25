@@ -20,15 +20,16 @@
 use std::time::{Duration, SystemTime};
 
 mod delivery;
+mod http;
 
 pub use delivery::{Delivery, DeliveryHandle, Tracked};
 use frame_trace_decode::{AnnotatedBlock, AnnotatedOp, AnnotatedPhase};
 use frame_trace_model::Stats;
+pub use http::HttpExporter;
 use opentelemetry::{
     Array, Context, KeyValue, StringValue, Value,
     trace::{SpanKind, TraceContextExt, Tracer, TracerProvider as _},
 };
-use opentelemetry_otlp::WithExportConfig;
 use opentelemetry_sdk::{
     Resource,
     trace::{BatchConfigBuilder, BatchSpanProcessor, SdkTracer, SdkTracerProvider, SpanExporter},
@@ -52,6 +53,16 @@ pub enum Error {
     /// Export or shutdown failed.
     #[error("export failed: {0}")]
     Export(#[from] opentelemetry_sdk::error::OTelSdkError),
+    /// The receiver accepted the HTTP request but rejected some of its spans.
+    #[error("{rejected} of {total} spans rejected by the receiver: {message}")]
+    Rejected {
+        /// Spans explicitly rejected across all batches.
+        rejected: u64,
+        /// Spans created.
+        total: usize,
+        /// The first rejection message from the receiver.
+        message: String,
+    },
     /// Some spans never reached the backend: rejected by the exporter or dropped by the SDK.
     #[error(
         "{lost} of {total} spans were not exported{}",
@@ -123,22 +134,32 @@ pub fn provider<E: SpanExporter + 'static>(exporter: E, max_spans: usize) -> Sdk
 
 /// An OTLP/HTTP (protobuf) span exporter. `/v1/traces` is appended to `endpoint` unless present,
 /// so `http://127.0.0.1:4318` works.
-pub fn otlp_http_exporter(endpoint: &str) -> Result<opentelemetry_otlp::SpanExporter, Error> {
+pub fn otlp_http_exporter(endpoint: &str) -> Result<HttpExporter, Error> {
     let base = endpoint.trim_end_matches('/');
     let url = if base.ends_with("/v1/traces") {
         base.to_owned()
     } else {
         format!("{base}/v1/traces")
     };
-    Ok(opentelemetry_otlp::SpanExporter::builder()
-        .with_http()
-        .with_endpoint(url)
-        .build()?)
+    HttpExporter::new(url)
 }
 
 /// Exports `block` to an OTLP/HTTP endpoint. See [`export_block`].
 pub fn export_otlp(block: &AnnotatedBlock, endpoint: &str, timing: Timing) -> Result<usize, Error> {
-    export_block(otlp_http_exporter(endpoint)?, block, timing)
+    let exporter = otlp_http_exporter(endpoint)?;
+    let rejections = exporter.rejections.clone();
+    let result = export_block(exporter, block, timing);
+    let rejections = rejections
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if rejections.rejected > 0 {
+        return Err(Error::Rejected {
+            rejected: rejections.rejected,
+            total: span_count(block),
+            message: rejections.message.clone(),
+        });
+    }
+    result
 }
 
 /// Exports `block` through `exporter` and waits until every span was handed over. Returns the

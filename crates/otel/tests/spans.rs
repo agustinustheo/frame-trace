@@ -250,6 +250,99 @@ fn exports_thousands_of_ops_without_drops() {
 }
 
 #[test]
+fn otlp_partial_rejections_are_totalled_across_batches_without_retries() {
+    use std::{
+        io::{BufRead, BufReader, Read, Write},
+        net::TcpListener,
+        time::Instant,
+    };
+
+    use opentelemetry_proto::tonic::collector::trace::v1::{
+        ExportTracePartialSuccess, ExportTraceServiceRequest, ExportTraceServiceResponse,
+    };
+    use prost::Message;
+
+    for rejected in [[3, 0], [2, 5], [0, 0]] {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let endpoint = format!("http://{}/v1/traces/", listener.local_addr().unwrap());
+        let server = std::thread::spawn(move || {
+            let deadline = Instant::now() + Duration::from_secs(10);
+            let mut batches = Vec::new();
+            while batches.iter().sum::<usize>() < 1002 {
+                let rejected_spans = rejected.get(batches.len()).copied().unwrap_or(0);
+                let mut stream = loop {
+                    match listener.accept() {
+                        Ok((stream, _)) => break stream,
+                        Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                            assert!(Instant::now() < deadline, "receiver timed out");
+                            std::thread::sleep(Duration::from_millis(10));
+                        }
+                        Err(e) => panic!("accept: {e}"),
+                    }
+                };
+                stream.set_nonblocking(false).unwrap();
+                stream
+                    .set_read_timeout(Some(Duration::from_secs(10)))
+                    .unwrap();
+                let mut reader = BufReader::new(stream.try_clone().unwrap());
+                let mut length = 0;
+                let mut line = String::new();
+                reader.read_line(&mut line).unwrap();
+                assert_eq!(line, "POST /v1/traces HTTP/1.1\r\n");
+                loop {
+                    line.clear();
+                    assert!(reader.read_line(&mut line).unwrap() > 0);
+                    if line == "\r\n" {
+                        break;
+                    }
+                    if let Some(value) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+                        length = value.trim().parse::<usize>().unwrap();
+                    }
+                }
+                let mut body = vec![0; length];
+                reader.read_exact(&mut body).unwrap();
+                let request = ExportTraceServiceRequest::decode(body.as_slice()).unwrap();
+                let count: usize = request
+                    .resource_spans
+                    .iter()
+                    .flat_map(|r| &r.scope_spans)
+                    .map(|s| s.spans.len())
+                    .sum();
+                batches.push(count);
+                let body = ExportTraceServiceResponse {
+                    partial_success: Some(ExportTracePartialSuccess {
+                        rejected_spans,
+                        error_message: "quota".into(),
+                    }),
+                }
+                .encode_to_vec();
+                write!(stream, "HTTP/1.1 200 OK\r\ncontent-type: application/x-protobuf\r\ncontent-length: {}\r\nconnection: close\r\n\r\n", body.len()).unwrap();
+                stream.write_all(&body).unwrap();
+            }
+            batches
+        });
+        let result =
+            frame_trace_otel::export_otlp(&synthetic_block(1000), &endpoint, Timing::default());
+        let batches = server.join().unwrap();
+        assert_eq!(batches.iter().sum::<usize>(), 1002);
+        assert!(batches.len() >= 2, "{batches:?}");
+        let expected = rejected.into_iter().sum::<i64>();
+        if expected == 0 {
+            assert_eq!(result.unwrap(), 1002);
+        } else {
+            assert!(
+                matches!(result, Err(frame_trace_otel::Error::Rejected { rejected, total: 1002, .. }) if rejected == expected as u64)
+            );
+            assert_eq!(
+                result.unwrap_err().to_string(),
+                format!("{expected} of 1002 spans rejected by the receiver: quota")
+            );
+        }
+    }
+}
+
+#[test]
 fn runtime_override_is_labelled_on_the_root_span() {
     let mut block = synthetic_block(1);
     block.runtime_override = Some(frame_trace_decode::RuntimeOverrideInfo {

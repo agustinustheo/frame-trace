@@ -21,25 +21,25 @@ pub struct ReportArgs {
     #[arg(long, value_name = "URL", conflicts_with_all=["files", "from_json"])]
     rpc: Option<String>,
     /// First block number in the inclusive finalized range (non-genesis).
-    #[arg(long, requires = "rpc", conflicts_with = "last")]
+    #[arg(long, requires = "rpc", conflicts_with_all = ["last", "files", "from_json"])]
     from: Option<u64>,
     /// Last block number in the inclusive range; cannot exceed finalized head.
-    #[arg(long, requires = "from", conflicts_with = "last")]
+    #[arg(long, requires = "from", conflicts_with_all = ["last", "files", "from_json"])]
     to: Option<u64>,
     /// Most recent K blocks anchored to one finalized head.
-    #[arg(long, requires="rpc", conflicts_with_all=["from", "to"], value_parser=clap::value_parser!(u32).range(1..=10000))]
+    #[arg(long, requires="rpc", conflicts_with_all=["from", "to", "files", "from_json"], value_parser=clap::value_parser!(u32).range(1..=10000))]
     last: Option<u32>,
     /// Concurrent block replays (proof request concurrency is separate).
-    #[arg(long, default_value_t=2, value_parser=clap::value_parser!(u8).range(1..=4))]
+    #[arg(long, default_value_t=2, requires = "rpc", conflicts_with_all = ["files", "from_json"], value_parser=clap::value_parser!(u8).range(1..=4))]
     concurrency: u8,
     /// Maximum concurrent proof requests across all blocks (1–64).
-    #[arg(long, default_value_t=8, value_parser=clap::value_parser!(u8).range(1..=64))]
+    #[arg(long, default_value_t=8, requires = "rpc", conflicts_with_all = ["files", "from_json"], value_parser=clap::value_parser!(u8).range(1..=64))]
     proof_concurrency: u8,
     /// Persist authenticated proof nodes and compiled Wasm in this directory.
-    #[arg(long)]
+    #[arg(long, requires = "rpc", conflicts_with_all = ["files", "from_json"])]
     cache_dir: Option<PathBuf>,
     /// Combined proof-node/compiled-Wasm disk cache limit in bytes (default 1 GiB).
-    #[arg(long, default_value_t = 1073741824)]
+    #[arg(long, default_value_t = 1073741824, requires = "rpc", conflicts_with_all = ["files", "from_json"])]
     cache_max_bytes: u64,
     /// Maximum rows in each ranked item, extrinsic and hook table (JSON is complete).
     #[arg(long, default_value_t = 15)]
