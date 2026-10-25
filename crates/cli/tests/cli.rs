@@ -21,6 +21,155 @@ fn run(args: &[&str]) -> Output {
 }
 
 #[test]
+fn sources_are_required_as_alternatives_and_cannot_be_mixed() {
+    for (command, choices) in [
+        (
+            "block",
+            vec![
+                "--rpc <URL>",
+                "--offline <DIR>",
+                "--from-file <FILE>",
+                "--from-json <FILE>",
+            ],
+        ),
+        (
+            "summary",
+            vec![
+                "--rpc <URL>",
+                "--offline <DIR>",
+                "--from-file <FILE>",
+                "--from-json <FILE>",
+            ],
+        ),
+        ("call", vec!["--rpc <URL>", "--offline <DIR>"]),
+        (
+            "report",
+            vec!["--rpc <URL>", "BLOCK.json", "--from-json <BLOCK.json>"],
+        ),
+    ] {
+        let out = run(&[command]);
+        let error = String::from_utf8_lossy(&out.stderr);
+        assert_eq!(out.status.code(), Some(2), "{error}");
+        let required = error.lines().nth(1).unwrap();
+        assert!(required.contains('|'), "{error}");
+        for choice in choices {
+            assert!(required.contains(choice), "missing {choice}: {error}");
+        }
+    }
+    for command in ["block", "summary"] {
+        for sources in [
+            ["--offline", "missing", "--from-file", "missing"],
+            ["--offline", "missing", "--from-json", "missing"],
+            ["--from-file", "missing", "--from-json", "missing"],
+        ] {
+            let mut args = vec![command];
+            args.extend(sources);
+            assert_eq!(run(&args).status.code(), Some(2));
+        }
+    }
+    for args in [
+        vec!["call", "--rpc", "http://127.0.0.1:1"],
+        vec![
+            "call",
+            "--rpc",
+            "http://127.0.0.1:1",
+            "--method",
+            "Core_version",
+        ],
+        vec!["report", "--rpc", "http://127.0.0.1:1", "missing.json"],
+    ] {
+        assert_eq!(run(&args).status.code(), Some(2));
+    }
+}
+
+#[test]
+fn command_help_has_plain_descriptions_examples_and_hidden_compatible_aliases() {
+    for (command, description) in [
+        (
+            "block",
+            "Trace storage use in one block and export it to JSON or a trace viewer",
+        ),
+        (
+            "summary",
+            "Show storage use by block phase and storage item",
+        ),
+        (
+            "call",
+            "Trace storage use and the result of a runtime API call",
+        ),
+        (
+            "report",
+            "Compare storage use across saved blocks or a range of finalized blocks",
+        ),
+        ("follow", "Trace new finalized blocks as they arrive"),
+    ] {
+        let out = run(&[command, "--help"]);
+        assert!(out.status.success());
+        let help = String::from_utf8(out.stdout).unwrap();
+        assert!(help.starts_with(description), "{help}");
+        assert_eq!(
+            help.matches(&format!("  frame-trace {command} ")).count(),
+            2,
+            "{help}"
+        );
+        assert!(
+            !help.contains("--oracle") && !help.contains("--rpc-metadata-fallback"),
+            "{help}"
+        );
+        if command == "call" {
+            assert!(help.contains("--check-state-call"), "{help}");
+        }
+        if command != "report" {
+            assert!(help.contains("1–64"), "{help}");
+        }
+    }
+    for flag in ["--check-state-call", "--oracle"] {
+        let out = run(&["call", "--offline", "missing", flag]);
+        assert_eq!(out.status.code(), Some(2));
+        assert!(!String::from_utf8_lossy(&out.stderr).contains("unexpected argument"));
+    }
+}
+
+#[test]
+fn offline_call_hex_fallback_explains_optional_metadata_proof_limits() {
+    let _guard = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    let out = run(&[
+        "call",
+        "--offline",
+        &fixture("replay/call-people-nonce"),
+        "--summary",
+        "--json",
+        "-",
+    ]);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "{stderr}");
+    assert!(stderr.contains("notice: local metadata unavailable (saved proof does not cover metadata execution); using unnamed storage and hex results"), "{stderr}");
+    assert!(
+        !stderr.contains("invalid replay input") && !stderr.contains("missing/invalid"),
+        "{stderr}"
+    );
+    for label in ["reads: cache", "trie (already in proof)", "trie (new)"] {
+        assert!(stderr.contains(label), "{stderr}");
+    }
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["call"]["result"], "0x00000000");
+    assert!(json["call"]["decoded"].is_null());
+    assert_eq!(json["phases"][0]["kind"], "call");
+    let origins: Vec<_> = json["phases"][0]["ops"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|op| op["origin"].as_str())
+        .collect();
+    assert!(!origins.is_empty());
+    assert!(
+        origins
+            .iter()
+            .all(|origin| ["overlay", "backend_warm", "backend_cold"].contains(origin))
+    );
+}
+
+#[test]
 fn summary_prints_phase_and_item_tables() {
     let out = run(&[
         "summary",
@@ -217,9 +366,22 @@ fn summary_shows_post_inherents_inside_the_first_signed_extrinsic() {
         rows[transfer + 1].contains("└ post inherents (on_poll)"),
         "{stdout}"
     );
+    for internal in ["post_inherents", "signed_extrinsics", "extrinsics_unknown"] {
+        assert!(!stdout.contains(internal), "{stdout}");
+    }
+    assert!(
+        stdout.matches("post inherents (on_poll)").count() >= 2,
+        "{stdout}"
+    );
     // 103 own ops (check reads + its work), 14 nested.
-    assert!(rows[transfer].contains("┆ 103 ┆"), "{stdout}");
-    assert!(rows[transfer + 1].contains("┆  14 ┆"), "{stdout}");
+    assert!(
+        rows[transfer].split('┆').nth(1).unwrap().trim() == "103",
+        "{stdout}"
+    );
+    assert!(
+        rows[transfer + 1].split('┆').nth(1).unwrap().trim() == "14",
+        "{stdout}"
+    );
 }
 
 #[test]
@@ -277,7 +439,7 @@ fn offline_block_reports_root_and_writes_measured_named_json() {
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success(), "{stderr}");
     assert!(
-        stderr.contains("root check: PASS; RPC calls: 0 (measured: 0)"),
+        stderr.contains("root check: PASS; RPC calls: 0 (timed replay: 0)"),
         "{stderr}"
     );
     let block: serde_json::Value = serde_json::from_slice(&std::fs::read(&path).unwrap()).unwrap();
@@ -425,7 +587,7 @@ fn cli_save_then_offline_ignores_unauthenticated_rpc_metadata() {
             "{}",
             String::from_utf8_lossy(&output.stderr)
         );
-        assert!(String::from_utf8_lossy(&output.stderr).contains("RPC calls: 0 (measured: 0)"));
+        assert!(String::from_utf8_lossy(&output.stderr).contains("RPC calls: 0 (timed replay: 0)"));
         assert!(!output.stdout.is_empty());
     }
     std::fs::remove_dir_all(dir).unwrap();
@@ -496,7 +658,7 @@ fn follow_mock_node_retries_failed_blocks_observes_new_heads_and_cancels() {
         }
         if text.contains(&format!("block {expected_new} not found"))
             && text.contains("retrying block")
-            && text.contains(&format!("terminal block {expected_new}"))
+            && text.contains(&format!("stopped retrying block {expected_new}"))
         {
             passed = true;
             break;
@@ -525,7 +687,7 @@ fn follow_mock_node_retries_failed_blocks_observes_new_heads_and_cancels() {
     assert!(failures.load(Ordering::SeqCst) >= 5);
     assert!(
         text.contains("in-flight=")
-            && text.contains("terminal=")
+            && text.contains("stopped=")
             && text.contains("follow stopped")
             && !text.contains("panicked at")
     );
@@ -637,7 +799,7 @@ fn call_offline_exports_measured_named_ops_and_self_contained_round_trip() {
     );
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(stderr.contains("root check: NOT APPLICABLE"));
-    assert!(stderr.contains("RPC calls: 0 (measured: 0)"));
+    assert!(stderr.contains("RPC calls: 0 (timed replay: 0)"));
     assert!(
         stderr.contains("V14 metadata has no runtime API types")
             && !stderr.contains("invalid metadata:")
@@ -723,7 +885,7 @@ fn call_public_offline_decodes_result_and_labels_recorded_oracle() {
     assert_eq!(json["call"]["oracle_source"], "recorded (unverified)");
     assert!(
         String::from_utf8_lossy(&out.stderr)
-            .contains("state_call oracle: MATCH (recorded; unverified)")
+            .contains("state_call check: MATCH (recorded; unverified)")
     );
 }
 
@@ -989,7 +1151,7 @@ fn report_last_pins_finalized_hash_and_exports_replay_statistics() {
     assert_eq!(json["totals"]["proof_bytes"], 6479 + 6867);
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert_eq!(stderr.matches("root check: PASS").count(), 2);
-    assert_eq!(stderr.matches("(measured: 0)").count(), 2);
+    assert_eq!(stderr.matches("(timed replay: 0)").count(), 2);
 }
 
 #[test]
@@ -1017,7 +1179,7 @@ fn report_help_and_write_errors_explain_options_and_paths() {
     for expected in [
         "First block",
         "Last block",
-        "Shared maximum",
+        "Maximum concurrent proof requests across all blocks",
         "compiled Wasm",
         "disk cache",
         "Maximum rows",

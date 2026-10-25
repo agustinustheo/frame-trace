@@ -122,7 +122,9 @@ fn replay_inner(
         return Err(Error::Invalid("block artifact: use block --offline".into()));
     }
     if oracle && rpc.is_none() {
-        return Err(Error::Invalid("a live oracle requires RPC".into()));
+        return Err(Error::Invalid(
+            "a live state_call check requires RPC".into(),
+        ));
     }
     let root = *state.state_root();
     let db = open_db(&artifact, rpc.clone(), session, &state)?;
@@ -151,7 +153,7 @@ fn replay_inner(
         )
     };
     eprintln!(
-        "call {} at #{}: compiling/loading runtime and discovering state",
+        "call {} at #{}: loading runtime and preparing state",
         call.method,
         state.number()
     );
@@ -172,7 +174,7 @@ fn replay_inner(
     let oracle_output = if oracle {
         let value = rpc
             .as_ref()
-            .ok_or_else(|| Error::Invalid("oracle needs RPC".into()))?
+            .ok_or_else(|| Error::Invalid("state_call check needs RPC".into()))?
             .call("state_call", json!([call.method, call.data, state.hash()]))?;
         Some(unhex(value.as_str().ok_or_else(|| {
             Error::Rpc("state_call: non-string result".into())

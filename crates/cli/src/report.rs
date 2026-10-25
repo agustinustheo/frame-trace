@@ -1,6 +1,6 @@
 //! Aggregation of the public JSON format. No replay is needed for saved traces.
 use anyhow::{Context, Result, ensure};
-use clap::{Args, ValueEnum};
+use clap::{ArgGroup, Args, ValueEnum};
 use frame_trace_decode::{AnnotatedBlock, AnnotatedOp};
 use serde::Serialize;
 use std::{
@@ -9,15 +9,16 @@ use std::{
 };
 
 #[derive(Args)]
+#[command(group(ArgGroup::new("source").required(true).multiple(true).args(["rpc", "files", "from_json"])))]
 pub struct ReportArgs {
     /// Saved block --json files.
-    #[arg(value_name="BLOCK.json", required_unless_present_any=["rpc","from_json"], conflicts_with="rpc")]
+    #[arg(value_name = "BLOCK.json", conflicts_with = "rpc")]
     files: Vec<PathBuf>,
     /// Additional saved block --json files.
     #[arg(long, value_name = "BLOCK.json", conflicts_with = "rpc")]
     from_json: Vec<PathBuf>,
-    /// Replay finalized blocks using shared proof/runtime/metadata caches.
-    #[arg(long, conflicts_with_all=["files", "from_json"])]
+    /// Replay a range of finalized blocks from a node.
+    #[arg(long, value_name = "URL", conflicts_with_all=["files", "from_json"])]
     rpc: Option<String>,
     /// First block number in the inclusive finalized range (non-genesis).
     #[arg(long, requires = "rpc", conflicts_with = "last")]
@@ -31,7 +32,7 @@ pub struct ReportArgs {
     /// Concurrent block replays (proof request concurrency is separate).
     #[arg(long, default_value_t=2, value_parser=clap::value_parser!(u8).range(1..=4))]
     concurrency: u8,
-    /// Shared maximum simultaneous proof RPC requests (1–64).
+    /// Maximum concurrent proof requests across all blocks (1–64).
     #[arg(long, default_value_t=8, value_parser=clap::value_parser!(u8).range(1..=64))]
     proof_concurrency: u8,
     /// Persist authenticated proof nodes and compiled Wasm in this directory.
@@ -638,7 +639,7 @@ fn render_sorted(r: &Report, top: usize, sort: SortKey) -> String {
 pub fn render_body(r: &Report, top: usize, sort: SortKey) -> String {
     let t = &r.totals;
     let mut out = format!(
-        "{} block(s); {} ops; reads {} = overlay {} + backend {} (warm {}, cold {}) + unknown {}\nDuplicates {} = overlay {}, warm {}, cold {}, unknown {}; proof {} ({} ops observed; {} unattributed{})\n",
+        "{} block(s); {} operations; reads {} = cache {} + trie {} (already in proof {}, new {}) + unknown {}\nDuplicate reads {} = cache {}, trie (already in proof) {}, trie (new) {}, unknown {}; proof {} ({} operations with proof data; {} not assigned to operations{})\n",
         r.blocks,
         t.ops,
         t.reads,
@@ -658,22 +659,32 @@ pub fn render_body(r: &Report, top: usize, sort: SortKey) -> String {
             .map_or_else(|| "n/a".into(), |bytes| format!("{bytes} B")),
         r.over_attributed_proof_bytes
             .filter(|&bytes| bytes > 0)
-            .map_or_else(String::new, |bytes| format!("; {bytes} B over-attributed"))
+            .map_or_else(String::new, |bytes| format!(
+                "; {bytes} B counted more than once"
+            ))
     );
     if let Some(bytes) = r.over_attributed_proof_bytes.filter(|&bytes| bytes > 0) {
         out += &format!(
-            "warning: attributed proof bytes exceed the execution proof by {bytes} B in {} block(s); \
-             rollback can re-add proof paths, so per-op sums are not standalone proofs\n",
+            "warning: proof bytes assigned to operations exceed the execution proof by {bytes} B in {} block(s); \
+             rolled-back changes can count the same proof data again; use the execution proof for the total\n",
             r.over_attributed_blocks
         );
     }
     out += "\n";
-    let mut phases =
-        crate::summary::table(1, &["phase", "ops %", "storage %", "proof %", "proof B"]);
+    let mut phases = crate::summary::table(
+        1,
+        &[
+            "phase",
+            "operations %",
+            "storage time %",
+            "proof %",
+            "proof bytes",
+        ],
+    );
     for name in &r.phase_order {
         let p = &r.phases[name];
         phases.add_row(vec![
-            name.clone(),
+            frame_trace_model::PhaseKind::label(name).to_owned(),
             format!("{:.1}", p.ops_share * 100.0),
             format!("{:.1}", p.storage_time_share * 100.0),
             p.proof_bytes_share
@@ -691,10 +702,10 @@ pub fn render_body(r: &Report, top: usize, sort: SortKey) -> String {
         1,
         &[
             "pallet.call",
-            "n",
-            "ops med/p95",
-            "proof B med/p95",
-            "storage µs med/p95",
+            "count",
+            "operations median/p95",
+            "proof bytes median/p95",
+            "storage time µs median/p95",
         ],
     );
     let mut rows: Vec<_> = r.extrinsics.iter().collect();
@@ -723,8 +734,16 @@ pub fn render_body(r: &Report, top: usize, sort: SortKey) -> String {
         truncated(r.extrinsics.len(), top)
     );
     if !r.hooks.is_empty() {
-        let mut hooks =
-            crate::summary::table(1, &["hook: pallet", "n", "ops", "proof B", "span µs"]);
+        let mut hooks = crate::summary::table(
+            1,
+            &[
+                "hook: pallet",
+                "count",
+                "operations",
+                "proof bytes",
+                "span time µs",
+            ],
+        );
         let mut rows: Vec<_> = r.hooks.iter().collect();
         rows.sort_by(|a, b| {
             sort.cost(&b.1.tally)
@@ -805,7 +824,8 @@ pub fn proof_label(t: &Tally) -> String {
         t.proof_bytes.to_string()
     }
 }
-/// Shared origin column: overlay, warm, cold, unknown.
+/// Stable JSON origins map to terminal columns: cache, trie (already in proof),
+/// trie (new), unknown. Never rename the serialized identifiers.
 pub fn origin_index(origin: Option<&str>) -> usize {
     match origin {
         Some("overlay") => 0,
@@ -826,13 +846,16 @@ pub fn item_table(
         1,
         &[
             "item",
-            "R overlay/warm/cold/?",
-            "W",
-            "iter",
-            "read B",
-            "written B",
-            "dup",
-            "proof B",
+            "reads: cache",
+            "trie (already in proof)",
+            "trie (new)",
+            "unknown",
+            "writes",
+            "iterations",
+            "bytes read",
+            "bytes written",
+            "duplicate reads",
+            "proof bytes",
         ],
     );
     let mut rows: Vec<_> = items.iter().collect();
@@ -845,10 +868,10 @@ pub fn item_table(
     for (item, t) in rows.into_iter().take(top) {
         table.add_row(vec![
             item.clone(),
-            format!(
-                "{}/{}/{}/{}",
-                t.overlay, t.backend_warm, t.backend_cold, t.origin_unknown
-            ),
+            t.overlay.to_string(),
+            t.backend_warm.to_string(),
+            t.backend_cold.to_string(),
+            t.origin_unknown.to_string(),
             t.writes.to_string(),
             t.iterations.to_string(),
             t.bytes_read.to_string(),
@@ -1092,7 +1115,9 @@ mod round5_tests {
         let block = legacy();
         let text = render(&aggregate(std::slice::from_ref(&block)), 1);
         assert!(
-            text.contains("proof n/a (0 ops observed; n/a unattributed)"),
+            text.contains(
+                "proof n/a (0 operations with proof data; n/a not assigned to operations)"
+            ),
             "{text}"
         );
         assert!(!text.contains("n/a B"));
@@ -1111,14 +1136,14 @@ mod round5_tests {
         let attributed = r.totals.proof_bytes;
         assert!(
             text.contains(&format!(
-                "proof {attributed} B (partial) ({} ops observed; {} B unattributed)",
+                "proof {attributed} B (partial) ({} operations with proof data; {} B not assigned to operations)",
                 r.totals.proof_ops_observed,
                 100 - attributed
             )),
             "{text}"
         );
         assert_eq!(r.over_attributed_proof_bytes, Some(0));
-        assert!(!text.contains("over-attributed"));
+        assert!(!text.contains("counted more than once"));
     }
     #[test]
     fn over_attribution_is_reported_instead_of_clamped_to_zero() {
@@ -1142,10 +1167,12 @@ mod round5_tests {
         assert_eq!(r.execution_proof_bytes, Some(1_000_005));
         let text = render(&r, 1);
         assert!(
-            text.contains(&format!("; {} B over-attributed)", attributed - 5)),
+            text.contains(&format!("; {} B counted more than once)", attributed - 5)),
             "{text}"
         );
-        assert!(text.contains("warning: attributed proof bytes exceed the execution proof"));
+        assert!(
+            text.contains("warning: proof bytes assigned to operations exceed the execution proof")
+        );
         let json = serde_json::to_value(&r).unwrap();
         assert_eq!(json["over_attributed_proof_bytes"], attributed - 5);
         assert_eq!(json["over_attributed_blocks"], 1);

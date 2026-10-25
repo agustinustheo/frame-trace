@@ -3,21 +3,21 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
-use clap::Args;
+use clap::{ArgGroup, Args};
 use frame_trace_decode::Metadata;
 
 /// Arguments that select the block to trace.
 #[derive(Args)]
+#[command(group(ArgGroup::new("source").required(true).args(["rpc", "offline", "from_file", "from_json"])))]
 pub struct SourceArgs {
     /// Recorded `state_traceBlock` response (JSON-RPC envelope or bare result).
     #[arg(
         long,
-        value_name = "TRACE.json",
-        required_unless_present_any = ["rpc", "offline", "from_json"],
+        value_name = "FILE",
         conflicts_with_all = ["rpc", "offline", "from_json"]
     )]
     pub from_file: Option<PathBuf>,
-    /// Saved block --json output; summary reads this without replay.
+    /// Read saved block --json output without replay.
     #[arg(long, value_name = "FILE", conflicts_with_all = ["rpc", "offline", "from_file", "save", "metadata", "block"])]
     pub from_json: Option<PathBuf>,
     /// Runtime metadata of the block's runtime: SCALE bytes (`.scale`), or hex as returned by
@@ -41,16 +41,16 @@ pub struct SourceArgs {
     /// Save the replay context and proofs for offline use.
     #[arg(long, value_name = "DIR", conflicts_with = "from_file")]
     pub save: Option<PathBuf>,
-    /// Maximum concurrent proof requests (keys are batched, 32 per request).
+    /// Maximum concurrent proof requests (1–64; up to 32 keys per request).
     #[arg(long, default_value_t = 8, value_parser = clap::value_parser!(u8).range(1..=64))]
     pub proof_concurrency: u8,
     /// Persistent authenticated proof nodes and compiled Wasm cache directory.
     #[arg(long, value_name = "DIR")]
     pub cache_dir: Option<PathBuf>,
-    /// Combined disk cache limit in bytes; active runtime modules remain pinned.
+    /// Disk cache limit in bytes; runtime code in use is kept.
     #[arg(long, default_value_t = 1073741824)]
     pub cache_max_bytes: u64,
-    /// Allow UNAUTHENTICATED metadata: RPC online, stored artifact metadata offline.
+    /// Allow unverified metadata from the node or saved replay.
     #[arg(long = "unauthenticated-metadata", alias = "rpc-metadata-fallback")]
     pub rpc_metadata_fallback: bool,
     /// Execute this Wasm instead of the authenticated :code, for example the same runtime
@@ -206,7 +206,7 @@ mod file {
 /// Both block and summary consume the same faithful measured result.
 pub fn replay_loaded(replay: frame_trace_replay::Replay, save: Option<&Path>) -> Result<Loaded> {
     eprintln!(
-        "root check: {}{}; RPC calls: {} (measured: {}); execution proof: {} bytes",
+        "root check: {}{}; RPC calls: {} (timed replay: {}); execution proof: {} bytes",
         if replay.root_check { "PASS" } else { "FAIL" },
         if replay.runtime_override.is_some() {
             " with RUNTIME OVERRIDE"
@@ -221,7 +221,7 @@ pub fn replay_loaded(replay: frame_trace_replay::Replay, save: Option<&Path>) ->
         replay.artifact.save(dir)?;
     }
     eprintln!(
-        "proof acquisition #{}: {} rounds; {} RPC calls",
+        "fetching state #{}: {} proof request rounds; {} RPC calls",
         replay.block_number, replay.proof_round_trips, replay.rpc_count
     );
     eprintln!(

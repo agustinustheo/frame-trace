@@ -210,7 +210,7 @@ impl ReplaySession {
             .sum();
         if pinned_bytes > self.cache_max_bytes && !index.warned_small {
             eprintln!(
-                "warning: --cache-max-bytes {} is smaller than active runtime modules ({} bytes); retaining pinned Wasm",
+                "warning: --cache-max-bytes {} is smaller than active runtime modules ({} bytes); keeping runtime code in use",
                 self.cache_max_bytes, pinned_bytes
             );
             index.warned_small = true;

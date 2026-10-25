@@ -2,7 +2,7 @@
 use std::{path::PathBuf, time::Duration};
 
 use anyhow::{Context, Result};
-use clap::Args;
+use clap::{ArgGroup, Args};
 use frame_trace_decode::{AnnotatedCall, Metadata, annotate};
 use frame_trace_replay::{
     Artifact, ReplaySession, call,
@@ -10,30 +10,39 @@ use frame_trace_replay::{
 };
 
 #[derive(Args)]
+#[command(
+    group(ArgGroup::new("source").required(true).args(["rpc", "offline"])),
+    group(ArgGroup::new("call_input").args(["data", "args"]))
+)]
 pub struct CallArgs {
     /// Safe node RPC endpoint.
-    #[arg(long, required_unless_present = "offline", conflicts_with = "offline")]
+    #[arg(long, value_name = "URL", requires_all = ["method", "call_input"])]
     rpc: Option<String>,
     /// State block number, hash, best (default), or finalized.
     #[arg(long, requires = "rpc", conflicts_with = "offline")]
     at: Option<String>,
     /// Runtime API export, for example AccountNonceApi_account_nonce.
-    #[arg(long, required_unless_present = "offline", conflicts_with = "offline")]
+    #[arg(long, conflicts_with = "offline")]
     method: Option<String>,
     /// Hex SCALE-encoded arguments (0x for no arguments).
-    #[arg(long, required_unless_present_any = ["args", "offline"], conflicts_with_all = ["args", "offline"])]
+    #[arg(long, conflicts_with_all = ["args", "offline"])]
     data: Option<String>,
     /// JSON positional array or named object, encoded using V15+ runtime API metadata.
     #[arg(long, conflicts_with = "offline")]
     args: Option<String>,
-    /// Replay a saved call without creating an RPC client.
-    #[arg(long)]
+    /// Replay a saved call with no network.
+    #[arg(long, value_name = "DIR")]
     offline: Option<PathBuf>,
     /// Save a self-contained call artifact.
     #[arg(long)]
     save: Option<PathBuf>,
-    /// Compare with state_call at the identical block hash.
-    #[arg(long, requires = "rpc", conflicts_with = "offline")]
+    /// Compare the result with the node's state_call at the same block hash.
+    #[arg(
+        long = "check-state-call",
+        alias = "oracle",
+        requires = "rpc",
+        conflicts_with = "offline"
+    )]
     oracle: bool,
     /// Print storage summary tables.
     #[arg(long)]
@@ -44,16 +53,16 @@ pub struct CallArgs {
     /// OTLP/HTTP endpoint (bare --otlp uses http://127.0.0.1:4318).
     #[arg(long, num_args = 0..=1, default_missing_value = "http://127.0.0.1:4318")]
     otlp: Option<String>,
-    /// Maximum concurrent proof requests; each request batches up to 32 keys.
+    /// Maximum concurrent proof requests (1–64; up to 32 keys per request).
     #[arg(long, default_value_t = 8, value_parser = clap::value_parser!(u8).range(1..=64))]
     proof_concurrency: u8,
     /// Persistent authenticated proof-node and compiled Wasm cache directory.
     #[arg(long, value_name = "DIR")]
     cache_dir: Option<PathBuf>,
-    /// Combined disk cache limit in bytes; active runtime modules remain pinned.
+    /// Disk cache limit in bytes; runtime code in use is kept.
     #[arg(long, default_value_t = 1073741824)]
     cache_max_bytes: u64,
-    /// Allow UNAUTHENTICATED metadata: RPC online, stored artifact metadata offline.
+    /// Allow unverified metadata from the node or saved replay.
     #[arg(long = "unauthenticated-metadata", alias = "rpc-metadata-fallback")]
     rpc_metadata_fallback: bool,
     /// Execute this Wasm instead of the authenticated :code, for example the same runtime
@@ -178,19 +187,19 @@ pub fn run(args: CallArgs) -> Result<()> {
         phase.label = context.method.clone();
     }
     eprintln!(
-        "call {} at #{}: {} storage ops; result: {}",
+        "call {} at #{}: {} storage operations; result: {}",
         context.method,
         replay.block_number,
         trace.totals.ops,
         preview(decoded.as_deref().unwrap_or(&hex0(&replay.result)))
     );
     eprintln!(
-        "root check: NOT APPLICABLE (runtime API call); authenticated state proofs; RPC calls: {} (measured: {}); execution proof: {} bytes; proof rounds: {}",
+        "root check: NOT APPLICABLE (runtime API call); authenticated state proofs; RPC calls: {} (timed replay: {}); execution proof: {} bytes; proof request rounds: {}",
         replay.rpc_count, replay.measured_rpc_count, replay.proof_bytes, replay.proof_round_trips
     );
     if let Some(matched) = replay.oracle_match {
         eprintln!(
-            "state_call oracle: {}{}",
+            "state_call check: {}{}",
             if matched { "MATCH" } else { "MISMATCH" },
             if args.offline.is_some() {
                 " (recorded; unverified)"

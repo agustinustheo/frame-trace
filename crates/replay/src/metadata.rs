@@ -93,6 +93,18 @@ pub(crate) fn load(
     });
     // A failed optional metadata export must not poison a subsequent --data execution.
     db.failure.lock().take();
+    // Offline artifacts need only cover the requested execution. Optional metadata may
+    // read additional state; a missing node here does not invalidate the saved call.
+    let unavailable_reason = |error: &Error| match error {
+        Error::Invalid(detail)
+            if db.rpc().is_none()
+                && detail.starts_with("proof node ")
+                && detail.contains("missing/invalid at path ") =>
+        {
+            "saved proof does not cover metadata execution".to_owned()
+        }
+        other => other.to_string(),
+    };
     match result {
         Ok(metadata) => {
             let events = &capture.0.lock().events;
@@ -150,7 +162,8 @@ pub(crate) fn load(
         }
         Err(error) if session.rpc_metadata_fallback => {
             eprintln!(
-                "warning: local metadata unavailable ({error}); UNAUTHENTICATED METADATA (RPC online; stored artifact offline)"
+                "warning: local metadata unavailable ({}); UNAUTHENTICATED METADATA (unverified names from the node or saved replay)",
+                unavailable_reason(&error)
             );
             artifact.metadata = match db.rpc() {
                 Some(rpc) => metadata_result(rpc.call("state_getMetadata", json!([state.hash()])))?,
@@ -159,7 +172,8 @@ pub(crate) fn load(
         }
         Err(error) => {
             eprintln!(
-                "notice: local metadata unavailable ({error}); using unnamed storage and hex results"
+                "notice: local metadata unavailable ({}); using unnamed storage and hex results",
+                unavailable_reason(&error)
             );
             artifact.metadata.clear();
         }

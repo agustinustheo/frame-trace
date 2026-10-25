@@ -37,19 +37,19 @@ fn phases(block: &AnnotatedBlock) -> Table {
         1,
         &[
             "phase",
-            "ops",
+            "operations",
             "reads",
             "writes",
-            "proof B",
-            "storage µs",
-            "wall µs",
+            "proof bytes",
+            "storage time µs",
+            "wall time µs",
         ],
     );
     for phase in &block.phases {
-        table.add_row(phase_row(phase, phase.label.clone()));
+        table.add_row(phase_row(phase, phase_label(phase)));
         // Runs inside the extrinsic (between its checks and its own work); not in its row.
         if let Some(nested) = &phase.post_inherents {
-            table.add_row(phase_row(nested, format!("  └ {}", nested.label)));
+            table.add_row(phase_row(nested, format!("  └ {}", phase_label(nested))));
         }
     }
     let mut total = stats_row("total".into(), &block.totals);
@@ -64,6 +64,22 @@ fn phases(block: &AnnotatedBlock) -> Table {
     ]);
     table.add_row(total);
     table
+}
+
+/// Derive terminal labels from stable identifiers, including when reading older saved JSON.
+fn phase_label(phase: &frame_trace_decode::AnnotatedPhase) -> String {
+    if phase.kind == "apply_extrinsic" {
+        if let Some(index) = phase.extrinsic_index {
+            let mut label = format!("extrinsic {index}");
+            if let Some(call) = &phase.call {
+                label += &format!(": {call}");
+            }
+            return label;
+        }
+    } else if phase.kind != "call" {
+        return frame_trace_model::PhaseKind::label(&phase.kind).into();
+    }
+    phase.label.clone()
 }
 
 fn phase_row(phase: &frame_trace_decode::AnnotatedPhase, label: String) -> Vec<String> {
@@ -91,10 +107,10 @@ fn duplicates(block: &AnnotatedBlock, top: usize) -> Table {
         &[
             "phase",
             "key",
-            "dup reads",
-            "overlay",
-            "warm",
-            "cold",
+            "duplicate reads",
+            "cache",
+            "trie (already in proof)",
+            "trie (new)",
             "unknown",
         ],
     );
@@ -115,13 +131,13 @@ fn duplicates(block: &AnnotatedBlock, top: usize) -> Table {
         rows.sort_by(|a, b| b.1[0].cmp(&a.1[0]).then(a.0.seq.cmp(&b.0.seq)));
         let omitted = rows.len().saturating_sub(top);
         for (op, n) in rows.into_iter().take(top) {
-            let mut row = vec![phase.label.clone(), key_name(op)];
+            let mut row = vec![phase_label(phase), key_name(op)];
             row.extend(n.map(|n| n.to_string()));
             table.add_row(row);
         }
         if omitted > 0 {
             table.add_row(vec![
-                phase.label.clone(),
+                phase_label(phase),
                 format!("… {omitted} more"),
                 String::new(),
                 String::new(),

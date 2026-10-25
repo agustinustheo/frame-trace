@@ -359,7 +359,7 @@ fn measured_run_rpc_guard_detects_network_activity() {
     let error = without_rpc(Some(&rpc), || rpc.call("chain_getHeader", json!([])))
         .unwrap_err()
         .to_string();
-    assert!(error.contains("measured run used RPC"), "{error}");
+    assert!(error.contains("timed replay used RPC"), "{error}");
     assert_eq!(requests.lock().unwrap().len(), 1);
     stop(halt, worker);
 }

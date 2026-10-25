@@ -91,6 +91,18 @@ impl PhaseKind {
         }
     }
 
+    /// Human terminal labels for stable JSON identifiers. Keep `name()` snake_case;
+    /// use this mapping rather than exposing those identifiers in terminal tables.
+    pub fn label(name: &str) -> &str {
+        match name {
+            "post_inherents" => "post inherents (on_poll)",
+            "signed_extrinsics" => "signed extrinsics",
+            "extrinsics_unknown" => "extrinsics (signature unknown)",
+            "inherents" => "inherents (required extrinsics)",
+            other => other,
+        }
+    }
+
     /// The extrinsic index for [`PhaseKind::ApplyExtrinsic`].
     pub fn extrinsic_index(self) -> Option<u32> {
         match self {
@@ -116,8 +128,7 @@ impl std::fmt::Display for PhaseKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             PhaseKind::ApplyExtrinsic(i) => write!(f, "extrinsic {i}"),
-            PhaseKind::PostInherents => f.write_str("post inherents (on_poll)"),
-            other => f.write_str(other.name()),
+            other => f.write_str(Self::label(other.name())),
         }
     }
 }

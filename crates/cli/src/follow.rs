@@ -97,7 +97,11 @@ fn job_outcome(run: impl FnOnce() -> Result<()>) -> Outcome {
                 || error.downcast_ref::<frame_trace_otel::Error>().is_some();
             eprintln!(
                 "replay job failed: {error:#}; {}",
-                if retry { "transient" } else { "terminal" }
+                if retry {
+                    "will retry"
+                } else {
+                    "will not retry"
+                }
             );
             if retry {
                 Outcome::Retryable
@@ -106,7 +110,7 @@ fn job_outcome(run: impl FnOnce() -> Result<()>) -> Outcome {
             }
         }
         Err(_) => {
-            eprintln!("replay job panicked; terminal failure");
+            eprintln!("replay job panicked; will not retry");
             Outcome::Terminal
         }
     }
@@ -286,7 +290,7 @@ pub fn run(args: FollowArgs) -> Result<()> {
                             frame_trace_otel::export_otlp(&block, endpoint, Timing::default())?;
                         }
                         eprintln!(
-                            "traced {}{head_kind} block #{} {}: {} ops in {:.3}s",
+                            "traced {}{head_kind} block #{} {}: {} storage operations in {:.3}s",
                             if job.reverted.load(Ordering::SeqCst) {
                                 "reverted "
                             } else {
@@ -322,7 +326,7 @@ pub fn run(args: FollowArgs) -> Result<()> {
                         finish(entry, outcome);
                         if entry.state == State::Terminal {
                             eprintln!(
-                                "terminal block {hash} after {} attempt(s); no further retries",
+                                "stopped retrying block {hash} after {} attempt(s); no further retries",
                                 entry.attempts
                             );
                         }
@@ -432,7 +436,7 @@ pub fn run(args: FollowArgs) -> Result<()> {
         ]
         .map(|state| entries.values().filter(|e| e.state == state).count());
         eprintln!(
-            "follow: queued={} in-flight={} done={} failed={} terminal={} reverted={} skipped={} cancelled={}",
+            "follow: queued={} in-flight={} done={} retrying={} stopped={} reverted={} skipped={} cancelled={}",
             counts[0], counts[1], counts[2], counts[3], counts[4], counts[5], counts[6], counts[7]
         );
         for _ in 0..20 {

@@ -21,15 +21,30 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Aggregate saved block JSON files or a finalized block range.
+    /// Compare storage use across saved blocks or a range of finalized blocks.
+    #[command(
+        after_help = "Examples:\n  frame-trace report block-1.json block-2.json\n  frame-trace report --rpc URL --last 10"
+    )]
     Report(report::ReportArgs),
-    /// Trace a runtime API call against authenticated state proofs.
+    /// Trace storage use and the result of a runtime API call.
+    #[command(
+        after_help = "Examples:\n  frame-trace call --rpc URL --method Core_version --data 0x --check-state-call\n  frame-trace call --offline fixtures/replay/call-people-nonce --summary"
+    )]
     Call(call::CallArgs),
-    /// Trace one block: export it over OTLP and/or write it as JSON.
+    /// Trace storage use in one block and export it to JSON or a trace viewer.
+    #[command(
+        after_help = "Examples:\n  frame-trace block --rpc URL --block best --otlp\n  frame-trace block --offline fixtures/replay/people-traced --json block.json"
+    )]
     Block(BlockArgs),
-    /// Print tables of storage use per phase and the busiest storage items.
+    /// Show storage use by block phase and storage item.
+    #[command(
+        after_help = "Examples:\n  frame-trace summary --rpc URL --block best\n  frame-trace summary --from-json block.json"
+    )]
     Summary(SummaryArgs),
-    /// Replay new finalized blocks with a bounded queue and shared caches.
+    /// Trace new finalized blocks as they arrive.
+    #[command(
+        after_help = "Examples:\n  frame-trace follow --rpc URL --otlp\n  frame-trace follow --rpc URL --best"
+    )]
     Follow(FollowArgs),
 }
 
@@ -72,7 +87,7 @@ fn main() -> std::process::ExitCode {
 struct OracleMismatch;
 impl std::fmt::Display for OracleMismatch {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("state_call oracle MISMATCH")
+        f.write_str("state_call check: MISMATCH")
     }
 }
 impl std::error::Error for OracleMismatch {}
@@ -97,7 +112,7 @@ fn block(args: BlockArgs) -> Result<()> {
     if args.json.is_none() && args.otlp.is_none() {
         let t = &block.totals;
         println!(
-            "block {}: {} phases, {} storage ops ({} reads, {} writes, {} duplicate reads). \
+            "block {}: {} phases, {} storage operations ({} reads, {} writes, {} duplicate reads). \
              Use --otlp or --json to export it.",
             block.block_hash,
             block.phases.len(),
@@ -189,16 +204,16 @@ struct FollowArgs {
     /// OTLP/HTTP endpoint (bare --otlp uses http://127.0.0.1:4318).
     #[arg(long, value_name = "URL", num_args = 0..=1, default_missing_value = "http://127.0.0.1:4318")]
     otlp: Option<String>,
-    /// Maximum concurrent proof requests; each request batches up to 32 keys.
+    /// Maximum concurrent proof requests (1–64; up to 32 keys per request).
     #[arg(long, default_value_t = 8, value_parser = clap::value_parser!(u8).range(1..=64))]
     proof_concurrency: u8,
     /// Persistent proof-node and compiled Wasm cache directory.
     #[arg(long, value_name = "DIR")]
     cache_dir: Option<PathBuf>,
-    /// Combined disk cache limit in bytes; active runtime modules remain pinned.
+    /// Disk cache limit in bytes; runtime code in use is kept.
     #[arg(long, default_value_t = 1073741824)]
     cache_max_bytes: u64,
-    /// Allow UNAUTHENTICATED metadata: RPC online, stored artifact metadata offline.
+    /// Allow unverified metadata from the node or saved replay.
     #[arg(long = "unauthenticated-metadata", alias = "rpc-metadata-fallback")]
     rpc_metadata_fallback: bool,
 }

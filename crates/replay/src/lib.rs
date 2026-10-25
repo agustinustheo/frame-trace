@@ -394,7 +394,7 @@ fn with_maintenance<T>(session: &ReplaySession, run: impl FnOnce() -> Result<T>)
         }
         Err(error) => {
             if let Err(cache_error) = maintenance {
-                eprintln!("warning: cache eviction: {cache_error}");
+                eprintln!("warning: cache cleanup: {cache_error}");
             }
             Err(error)
         }
@@ -420,7 +420,7 @@ fn replay_inner(
     let db = open_db(&artifact, rpc.clone(), session, &parent)?;
     if rpc.is_some() {
         eprintln!(
-            "replay #{number}: prefetching prior access paths ({} in flight, batched keys)",
+            "replay #{number}: fetching state (up to {} concurrent proof requests)",
             rpc.as_ref().map_or(1, Rpc::parallelism)
         );
         let mut hints = session.predicted_keys();
@@ -436,7 +436,7 @@ fn replay_inner(
     metadata::load(&mut artifact, &db, &wasm, heap_pages, session, &parent)?;
     let executor = session.executor_for(&wasm);
     db.mark_bootstrap();
-    eprintln!("replay #{number}: compiling/loading runtime and discovering state");
+    eprintln!("replay #{number}: loading runtime and preparing state");
     if rpc.is_some() && session.speculative_discovery {
         db.speculative.store(true, Ordering::SeqCst);
         for _ in 0..8 {
@@ -661,7 +661,7 @@ fn without_rpc<T>(rpc: Option<&Rpc>, run: impl FnOnce() -> Result<T>) -> Result<
     let before = rpc.map_or(0, Rpc::count);
     let result = run();
     if rpc.map_or(0, Rpc::count) != before {
-        return Err(Error::Invalid("measured run used RPC".into()));
+        return Err(Error::Invalid("timed replay used RPC".into()));
     }
     result
 }
