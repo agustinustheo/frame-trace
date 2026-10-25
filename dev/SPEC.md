@@ -94,6 +94,6 @@ crates/
   otel/      model → OpenTelemetry spans and OTLP export
   cli/       the frame-trace binary
 fixtures/    recorded state_traceBlock responses + metadata for tests
-experiments/ notes and scripts from experiments
-research/    background research
+docs/        user docs (mdBook)
+dev/         internal notes: this spec, status, research, experiments, upstream drafts
 ```

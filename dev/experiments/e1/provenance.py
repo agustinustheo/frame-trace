@@ -42,8 +42,8 @@ for chain, traced, patched, logname in [
         'chainSpecSha256': sha(spec),
         'nodeVersion': command([str(binary), '--version']),
         'nodeBinarySha256': sha(binary),
-        'proofAwareDevNodePatch': 'experiments/e1/omni-dev-proof-replay.patch' if patched else None,
-        'runtimeFeaturePatch': 'experiments/e1/people-with-tracing.patch' if traced else None,
+        'proofAwareDevNodePatch': 'dev/experiments/e1/omni-dev-proof-replay.patch' if patched else None,
+        'runtimeFeaturePatch': 'dev/experiments/e1/people-with-tracing.patch' if traced else None,
         'nodeCommand': json.loads((scratch / f'{logname}.command.json').read_text()),
         'fixtureResultFormat': 'RPC result; full JSON-RPC envelope on an RPC error',
     }

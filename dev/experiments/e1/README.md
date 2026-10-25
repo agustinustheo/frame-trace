@@ -214,7 +214,7 @@ The response-limit probe runs the proof-aware node with `--rpc-max-response-size
 Run commands in a shell with Rust 1.93.0 and its Wasm target already installed. These paths keep node data, binaries, target files and clones under the authorized scratch directory. `run-node.py` owns each node and stops it in `finally`, including when its client command fails.
 
 ```bash
-export E1=/Users/theo/Projects/parity/frame-trace/experiments/e1
+export E1=/Users/theo/Projects/parity/frame-trace/dev/experiments/e1
 export SCRATCH=/tmp/pm-audit/e1
 export PEOPLE=/tmp/pm-audit/individuality-community
 mkdir -p "$SCRATCH/bin" "$SCRATCH/client"

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Compare every ordered field of every keyed state event; retain small results.
 
-Usage: python3 experiments/e2/verify.py SCRATCH_CAPTURE_DIR RESULTS_DIR
+Usage: python3 dev/experiments/e2/verify.py SCRATCH_CAPTURE_DIR RESULTS_DIR
 """
 import collections
 import json

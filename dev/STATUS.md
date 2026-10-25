@@ -10,7 +10,7 @@ frame-trace replays a Polkadot SDK block, or a runtime API call, outside the nod
 - **Every storage op, in order, timed.** Reads, writes, prefix deletions, child tries and iteration, including the events the node's own `state_traceBlock` drops.
 - **Where each read came from.** Overlay (cache in the block), warm trie read, or cold trie read, and how many proof bytes each op added. Proof bytes add up exactly to the block's execution proof.
 - **Readable.** Keys decode to `System::Account(5Grw…)`, extrinsics to `Balances.transfer_keep_alive`, hooks to `on_initialize: Balances`. Metadata is computed locally from the verified runtime, not trusted from the node.
-- **Runtime spans** (dispatch, `batch` → `transfer_keep_alive`, hooks) when the runtime was built with `with-tracing`. For a live chain, build the same runtime source with tracing and replay real blocks with `--runtime-override`: the root check still passes, and the output is labelled as an override everywhere. See [docs/runtime-spans.md](docs/runtime-spans.md).
+- **Runtime spans** (dispatch, `batch` → `transfer_keep_alive`, hooks) when the runtime was built with `with-tracing`. For a live chain, build the same runtime source with tracing and replay real blocks with `--runtime-override`: the root check still passes, and the output is labelled as an override everywhere. See [See runtime calls inside extrinsics](../docs/guides/see-runtime-calls.md).
 - **Commands:** `block`, `call`, `summary`, `report` (many blocks), `follow` (each finalized block). Traces go to Jaeger/Tempo over OTLP, or to JSON. Replays can be saved and re-run offline.
 
 Try it:

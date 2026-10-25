@@ -125,22 +125,22 @@ From `/Users/theo/Projects/parity/frame-trace`:
 ```sh
 export CARGO_TARGET_DIR=/tmp/pm-audit/e2-target
 export CARGO_BUILD_JOBS=8
-cargo +1.93.0 build --release --locked --manifest-path experiments/e2/Cargo.toml
-cargo +1.93.0 test --locked --manifest-path experiments/e2/Cargo.toml
-cargo +1.93.0 clippy --locked --manifest-path experiments/e2/Cargo.toml --all-targets -- -D warnings
+cargo +1.93.0 build --release --locked --manifest-path dev/experiments/e2/Cargo.toml
+cargo +1.93.0 test --locked --manifest-path dev/experiments/e2/Cargo.toml
+cargo +1.93.0 clippy --locked --manifest-path dev/experiments/e2/Cargo.toml --all-targets -- -D warnings
 
 export NODE_PATH=/tmp/pm-audit/e1/client/node_modules
 export OMNI_NODE=/tmp/pm-audit/e1/target-node/release/polkadot-omni-node
 export E2_BINARY=/tmp/pm-audit/e2-target/release/frame-trace-e2
 RPC_PORT=19954 LOG=/tmp/pm-audit/e2-node-release-traced.log \
-  python3 experiments/e1/run-node.py /tmp/pm-audit/e1/people-traced.json -- \
-  node experiments/e2/local.cjs /tmp/pm-audit/e2-local-traced
-python3 experiments/e2/verify.py /tmp/pm-audit/e2-local-traced experiments/e2/results/traced
+  python3 dev/experiments/e1/run-node.py /tmp/pm-audit/e1/people-traced.json -- \
+  node dev/experiments/e2/local.cjs /tmp/pm-audit/e2-local-traced
+python3 dev/experiments/e2/verify.py /tmp/pm-audit/e2-local-traced dev/experiments/e2/results/traced
 
 RPC_PORT=19955 LOG=/tmp/pm-audit/e2-node-release-untraced-final.log \
-  python3 experiments/e1/run-node.py /tmp/pm-audit/e1/people-untraced.json -- \
-  node experiments/e2/local.cjs /tmp/pm-audit/e2-local-untraced-final
-python3 experiments/e2/verify.py /tmp/pm-audit/e2-local-untraced-final experiments/e2/results/untraced
+  python3 dev/experiments/e1/run-node.py /tmp/pm-audit/e1/people-untraced.json -- \
+  node dev/experiments/e2/local.cjs /tmp/pm-audit/e2-local-untraced-final
+python3 dev/experiments/e2/verify.py /tmp/pm-audit/e2-local-untraced-final dev/experiments/e2/results/untraced
 
 E2_RPC_PROGRESS=1 "$E2_BINARY" https://westend-asset-hub-rpc.polkadot.io head \
   /tmp/pm-audit/e2-public-westend 5

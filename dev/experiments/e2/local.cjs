@@ -1,4 +1,4 @@
-// NODE_PATH=/tmp/pm-audit/e1/client/node_modules node experiments/e2/local.cjs OUT
+// NODE_PATH=/tmp/pm-audit/e1/client/node_modules node dev/experiments/e2/local.cjs OUT
 // Run inside E1 run-node.py; no node lifecycle or unsafe RPC exists in the Rust replay.
 const fs = require('node:fs');
 const path = require('node:path');

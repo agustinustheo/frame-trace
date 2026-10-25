@@ -32,7 +32,7 @@ Tests compare it and execute the real root assertion again. They do not claim a
 public unsafe-oracle match.
 
 E2 provenance, Wasm hashes and acquisition results are in
-[`experiments/e2`](../../experiments/e2/README.md). These fixtures were acquired
+[`dev/experiments/e2`](../../dev/experiments/e2/README.md). These fixtures were acquired
 on 2026-10-25. The production tests use stable2609 host crates to execute both
 E1's stable2606-2 People Wasms and public `westmint` spec 1025002. Root tampering
 is tested after recomputing the header hash, so rejection reaches the runtime's

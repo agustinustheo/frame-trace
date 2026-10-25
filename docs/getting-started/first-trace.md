@@ -1,0 +1,86 @@
+# Your first trace in Jaeger
+
+In five minutes you will trace a live Westend Asset Hub block and open it in Jaeger.
+You need frame-trace [installed](install.md) and Docker running.
+
+## 1. Start Jaeger
+
+Run Jaeger in a terminal:
+
+```sh
+docker run -d --rm --name jaeger -p 16686:16686 -p 4318:4318 jaegertracing/jaeger:latest
+```
+
+Port 16686 is the Jaeger web page.
+Port 4318 receives traces over OTLP/HTTP, which is where frame-trace sends them.
+
+## 2. Trace the latest finalized block
+
+```sh
+frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block finalized --otlp
+```
+
+`--block finalized` picks the newest block the chain has finalized.
+`--block best` picks the newest block the node knows, which may still change.
+A block number or a full block hash also works.
+`--otlp` with no URL sends the trace to `http://127.0.0.1:4318`.
+
+You should see output like this.
+Your block number, byte counts and hashes will differ.
+
+```text
+replay #18597850: fetching state (up to 8 concurrent proof requests)
+replay #18597850: loading runtime and preparing state
+root check: PASS; RPC calls: 92 (timed replay: 0); execution proof: 90250 bytes
+fetching state #18597850: 63 proof request rounds; 92 RPC calls
+state root: computed 0xd38db8182fdc90a095595bb7a57fb30af7770e10effe0b217866132a2032663c; header 0xd38db8182fdc90a095595bb7a57fb30af7770e10effe0b217866132a2032663c
+exported 555 spans to http://127.0.0.1:4318
+```
+
+A run like this took 23 seconds on a laptop with a fresh cache.
+Most of that time is spent fetching state from the node.
+
+What the lines mean:
+
+| Line | Meaning |
+| --- | --- |
+| `fetching state` | frame-trace is asking the node for the storage the block needs, with proofs. |
+| `loading runtime and preparing state` | frame-trace is loading the chain's own runtime, taken from the parent block's state. |
+| `root check: PASS` | The replay produced the same state root as the block header. See [What a replay proves](../concepts/what-a-replay-proves.md). |
+| `RPC calls: 92 (timed replay: 0)` | 92 requests to the node in total. The timed replay, which the trace comes from, made none. |
+| `execution proof: 90250 bytes` | The size of the storage proof for the whole block. See [Proof bytes](../concepts/proof-bytes.md). |
+| `63 proof request rounds` | How many times frame-trace had to go back to the node for more state. |
+| `state root: computed …; header …` | The root your machine computed, next to the root in the block header. They are equal. |
+| `exported 555 spans` | Jaeger received 555 spans: the block, its phases and every storage operation. |
+
+## 3. Open the trace
+
+1. Open <http://127.0.0.1:16686>.
+2. In **Service**, pick `frame-trace`.
+3. Click **Find Traces**.
+4. Click the trace named `frame-trace: block #<number> (0x…)`.
+5. Click the `>>` button above the span list to collapse everything, then click the block row to open one level.
+
+You should see this:
+
+![The block trace in Jaeger with five phases and numbered callouts](../images/first-trace.png)
+
+1. The block span. Its name has the block number and a short hash.
+2. The [phases](../concepts/phases.md) of the block, in the order they ran: initialization, the two required extrinsics, post inherents and finalization.
+3. The badge counts the spans inside each phase. Here those are storage operations.
+4. Each bar shows how long the phase took on your machine.
+5. The total number of spans in the trace.
+
+The block bar starts before the first phase.
+That gap is the runtime starting up on your machine before the block runs.
+
+Westend's runtime is not built with tracing, so storage operations sit directly under each phase.
+[See runtime calls inside extrinsics](../guides/see-runtime-calls.md) shows how to get spans such as `batch` and `transfer_keep_alive`.
+
+## 4. Clean up
+
+```sh
+docker stop jaeger
+```
+
+Next: [Reading a trace](reading-a-trace.md) explains every row and attribute.
