@@ -13,7 +13,7 @@ Storage per phase
 └──────────────────────────────┴─────┴───────┴────────┴─────────┴────────────┴─────────┘
 
 1 block(s); 38 ops; reads 17 = overlay 0 + backend 0 (warm 0, cold 0) + unknown 17
-Duplicates 4 = overlay 0, warm 0, cold 0, unknown 4; proof n/a B (0 ops observed; n/a B unattributed)
+Duplicates 4 = overlay 0, warm 0, cold 0, unknown 4; proof n/a (0 ops observed; n/a unattributed)
 
 Phase shares
 ┌────────────────────┬───────┬───────────┬─────────┬─────────┐
@@ -34,7 +34,7 @@ Top items by proof bytes
 └──────────────────┴───────────────────────┴────┴──────┴────────┴───────────┴─────┴─────────┘
 … 1 more
 
-Extrinsic distributions (ranked by Proof total)
+Extrinsic distributions (ranked by total proof bytes)
 ┌─────────────┬───┬─────────────┬─────────────────┬────────────────────┐
 │ pallet.call ┆ n ┆ ops med/p95 ┆ proof B med/p95 ┆ storage µs med/p95 │
 ╞═════════════╪═══╪═════════════╪═════════════════╪════════════════════╡

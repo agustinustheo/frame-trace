@@ -38,6 +38,8 @@ pub struct CallReplay {
     pub proof_round_trips: usize,
     pub proof_bytes: usize,
     pub artifact: Artifact,
+    /// Set only when the session executed a substitute runtime.
+    pub runtime_override: Option<crate::RuntimeOverride>,
 }
 
 /// Acquire a call context. The selected block's own header/root/code are used, even at upgrades.
@@ -124,6 +126,7 @@ fn replay_inner(
     let root = *state.state_root();
     let db = open_db(&artifact, rpc.clone(), session, &state)?;
     let (wasm, heap_pages) = runtime_code(&db, root)?;
+    let (wasm, runtime_override) = crate::select_runtime(session, wasm);
     metadata::load(&mut artifact, &db, &wasm, heap_pages, session, &state)?;
     db.mark_bootstrap();
     let call = artifact
@@ -195,6 +198,7 @@ fn replay_inner(
         proof_round_trips: db.round_trips.load(Ordering::Relaxed),
         proof_bytes,
         artifact,
+        runtime_override,
     })
 }
 
@@ -209,6 +213,7 @@ pub fn authenticate_metadata(
         let (_, state) = artifact.validate()?;
         let db = open_db(artifact, rpc, session, &state)?;
         let (wasm, heap) = runtime_code(&db, *state.state_root())?;
+        let (wasm, _) = crate::select_runtime(session, wasm);
         metadata::load(artifact, &db, &wasm, heap, session, &state)?;
         persist_export(&db, artifact)
     })

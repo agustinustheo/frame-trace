@@ -17,6 +17,9 @@ pub struct AnnotatedBlock {
     /// Runtime API context, absent for block traces.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub call: Option<AnnotatedCall>,
+    /// A substitute runtime executed instead of the state's `:code`; absent normally.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub runtime_override: Option<RuntimeOverrideInfo>,
     /// Observed span tree, empty for legacy JSON.
     pub runtime_spans: Vec<frame_trace_model::RuntimeSpan>,
     /// Replay duration, absent for synthetic input.
@@ -172,6 +175,7 @@ pub fn annotate_at_block(
         schema_version: 2,
         execution: None,
         call: None,
+        runtime_override: None,
         runtime_spans: block
             .runtime_spans
             .iter()
@@ -385,6 +389,17 @@ fn phase_bounds(block: &TracedBlock, phase: &Phase) -> Option<PhaseTiming> {
         duration_ns: end_ns.saturating_sub(start_ns),
         source: source.into(),
     })
+}
+
+/// The executed Wasm was not the authenticated parent-state `:code`.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RuntimeOverrideInfo {
+    /// The substitute Wasm file.
+    pub path: String,
+    /// Blake2-256 of the executed substitute Wasm.
+    pub code_hash: String,
+    /// Blake2-256 of the authenticated `:code` that was not executed.
+    pub chain_code_hash: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

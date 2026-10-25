@@ -15,6 +15,11 @@ statistics, ordered operations and optional nested `post_inherents`. `wall_time`
 is null without observed bounds; its source distinguishes runtime spans from a
 storage-only envelope.
 
+`runtime_override` is absent unless `--runtime-override` executed a substitute Wasm
+instead of the state's `:code`. It then holds `path`, `code_hash` (the executed Wasm)
+and `chain_code_hash` (the authenticated `:code` that did not run). See
+[runtime spans](runtime-spans.md). The field is additive and keeps schema version 2.
+
 Each operation contains sequence, kind (`op`), raw key/child identity, decoded
 names, optional value length/timing, duplicate status, and these v2 observations:
 
@@ -39,7 +44,12 @@ first observed execution order; JSON object key order carries no phase ordering.
 Tally fields are **sums of observed evidence**. Interpret `proof_bytes` together
 with `proof_ops_observed`: zero observations means not recorded, even if the sum
 is zero. Origin buckets explicitly include unknown reads. Execution proof and
-unattributed proof totals are null without execution evidence; phase proof shares
+unattributed proof totals are null without execution evidence. Per block,
+`unattributed_proof_bytes` adds execution proof minus attributed bytes when that is
+positive, and `over_attributed_proof_bytes` adds attributed minus execution proof
+when that is positive; `over_attributed_blocks` counts those blocks. Neither is
+clamped into the other. Over-attribution can happen after rollback and prints a
+warning, not an error. Phase proof shares
 and extrinsic proof distributions are null without the requisite evidence.
 Extrinsic proof distributions require complete per-op evidence for every sample;
 wall-time distributions require runtime-span bounds for every sample. Cost totals
@@ -50,5 +60,6 @@ Extrinsic distributions are exact through 1,024 samples per metric/type. Thereaf
 Quantiles use bucket lower bounds: value error is at most 1/64 (1.5625%), with no
 rank-error claim. Median averages the two middle ranks; p95 uses nearest rank.
 JSON includes all groups; `--top` truncates terminal tables, which report omitted
-row counts. Extrinsics rank by total proof bytes by default; `--sort-by ops|time`
-selects total operation count or unioned storage time. Ties use call names.
+row counts. Item, extrinsic and hook tables rank by total proof bytes by default;
+`--sort-by ops|time` ranks all three by operation count or unioned storage time.
+Ties use operation count (items, hooks) and then names.

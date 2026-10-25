@@ -209,6 +209,7 @@ fn synthetic_block(ops: usize) -> AnnotatedBlock {
         schema_version: 2,
         execution: None,
         call: None,
+        runtime_override: None,
         runtime_spans: Vec::new(),
         timing: None,
         block_number: Some(7),
@@ -245,6 +246,30 @@ fn exports_thousands_of_ops_without_drops() {
         Timing::default(),
     );
     assert_eq!(exported.unwrap(), 5002);
+}
+
+#[test]
+fn runtime_override_is_labelled_on_the_root_span() {
+    let mut block = synthetic_block(1);
+    block.runtime_override = Some(frame_trace_decode::RuntimeOverrideInfo {
+        path: "traced.wasm".into(),
+        code_hash: "0xaa".into(),
+        chain_code_hash: "0xbb".into(),
+    });
+    let spans = export(&block, Timing::default());
+    let root = by_name(&spans, "block #7 (0x01) [runtime override]");
+    assert_eq!(
+        attr(root, "frame.runtime.override"),
+        Some(Value::Bool(true))
+    );
+    assert_eq!(
+        attr(root, "frame.runtime.override_code_hash"),
+        Some(Value::from("0xaa"))
+    );
+    assert_eq!(
+        attr(root, "frame.runtime.chain_code_hash"),
+        Some(Value::from("0xbb"))
+    );
 }
 
 /// Rejects the first batch, accepts the rest (like a backend answering HTTP 400 once).

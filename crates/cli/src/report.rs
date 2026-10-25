@@ -43,7 +43,7 @@ pub struct ReportArgs {
     /// Maximum rows in each ranked item, extrinsic and hook table (JSON is complete).
     #[arg(long, default_value_t = 15)]
     top: usize,
-    /// Rank extrinsics by total proof bytes, operations or storage time.
+    /// Rank the item, extrinsic and hook tables by total proof bytes, operations or storage time.
     #[arg(long, value_enum, default_value_t = SortKey::Proof)]
     sort_by: SortKey,
     /// Aggregated JSON (- sends tables to stderr).
@@ -57,6 +57,23 @@ pub enum SortKey {
     Proof,
     Ops,
     Time,
+}
+impl SortKey {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Proof => "proof bytes",
+            Self::Ops => "operations",
+            Self::Time => "storage time",
+        }
+    }
+    /// The ranked cost of a tally; storage time is the union of its op intervals.
+    fn cost(self, t: &Tally) -> u128 {
+        match self {
+            Self::Proof => t.proof_bytes as u128,
+            Self::Ops => t.ops as u128,
+            Self::Time => u128::from(t.storage_ns),
+        }
+    }
 }
 
 fn validate_range(from: u64, to: u64, finalized: u64) -> Result<()> {
@@ -333,6 +350,11 @@ pub struct Report {
     pub totals: Tally,
     pub execution_proof_bytes: Option<usize>,
     pub unattributed_proof_bytes: Option<usize>,
+    /// Attributed proof bytes beyond each block's final execution proof, summed over blocks.
+    /// Rollback can re-add paths, so this is visible rather than clamped into `unattributed`.
+    pub over_attributed_proof_bytes: Option<usize>,
+    /// Blocks whose attributed proof bytes exceed their execution proof.
+    pub over_attributed_blocks: usize,
     pub phases: BTreeMap<String, PhaseAggregate>,
     pub items: BTreeMap<String, Tally>,
     pub hooks: BTreeMap<String, HookAggregate>,
@@ -458,6 +480,12 @@ impl Accumulator {
             let unattributed = report.unattributed_proof_bytes.get_or_insert(0);
             *unattributed =
                 unattributed.saturating_add(info.proof_bytes.saturating_sub(total.proof_bytes));
+            let over = total.proof_bytes.saturating_sub(info.proof_bytes);
+            let over_total = report.over_attributed_proof_bytes.get_or_insert(0);
+            *over_total = over_total.saturating_add(over);
+            if over > 0 {
+                report.over_attributed_blocks += 1;
+            }
         }
         let spans: BTreeMap<_, _> = block.runtime_spans.iter().map(|s| (s.id, s)).collect();
         let mut hook_ops = BTreeMap::<u64, Vec<&AnnotatedOp>>::new();
@@ -590,7 +618,7 @@ pub fn render(r: &Report, top: usize) -> String {
 fn render_sorted(r: &Report, top: usize, sort: SortKey) -> String {
     let t = &r.totals;
     let mut out = format!(
-        "{} block(s); {} ops; reads {} = overlay {} + backend {} (warm {}, cold {}) + unknown {}\nDuplicates {} = overlay {}, warm {}, cold {}, unknown {}; proof {} B ({} ops observed; {} B unattributed)\n\n",
+        "{} block(s); {} ops; reads {} = overlay {} + backend {} (warm {}, cold {}) + unknown {}\nDuplicates {} = overlay {}, warm {}, cold {}, unknown {}; proof {} ({} ops observed; {} unattributed{})\n",
         r.blocks,
         t.ops,
         t.reads,
@@ -604,11 +632,22 @@ fn render_sorted(r: &Report, top: usize, sort: SortKey) -> String {
         t.duplicate_backend_warm,
         t.duplicate_backend_cold,
         t.duplicate_origin_unknown,
-        proof_label(t),
+        proof_bytes_text(t),
         t.proof_ops_observed,
         r.unattributed_proof_bytes
-            .map_or_else(|| "n/a".into(), |bytes| bytes.to_string())
+            .map_or_else(|| "n/a".into(), |bytes| format!("{bytes} B")),
+        r.over_attributed_proof_bytes
+            .filter(|&bytes| bytes > 0)
+            .map_or_else(String::new, |bytes| format!("; {bytes} B over-attributed"))
     );
+    if let Some(bytes) = r.over_attributed_proof_bytes.filter(|&bytes| bytes > 0) {
+        out += &format!(
+            "warning: attributed proof bytes exceed the execution proof by {bytes} B in {} block(s); \
+             rollback can re-add proof paths, so per-op sums are not standalone proofs\n",
+            r.over_attributed_blocks
+        );
+    }
+    out += "\n";
     let mut phases =
         crate::summary::table(1, &["phase", "ops %", "storage %", "proof %", "proof B"]);
     for name in &r.phase_order {
@@ -623,8 +662,9 @@ fn render_sorted(r: &Report, top: usize, sort: SortKey) -> String {
         ]);
     }
     out += &format!(
-        "Phase shares\n{phases}\n\nTop items by proof bytes\n{}\n",
-        item_table(&r.items, top)
+        "Phase shares\n{phases}\n\nTop items by {}\n{}\n",
+        sort.label(),
+        item_table(&r.items, top, sort)
     );
     out += &truncated(r.items.len(), top);
     let mut exts = crate::summary::table(
@@ -658,14 +698,20 @@ fn render_sorted(r: &Report, top: usize, sort: SortKey) -> String {
         ]);
     }
     out += &format!(
-        "\nExtrinsic distributions (ranked by {sort:?} total)\n{exts}\n{}",
+        "\nExtrinsic distributions (ranked by total {})\n{exts}\n{}",
+        sort.label(),
         truncated(r.extrinsics.len(), top)
     );
     if !r.hooks.is_empty() {
         let mut hooks =
             crate::summary::table(1, &["hook: pallet", "n", "ops", "proof B", "span µs"]);
         let mut rows: Vec<_> = r.hooks.iter().collect();
-        rows.sort_by_key(|(_, h)| std::cmp::Reverse(h.tally.ops));
+        rows.sort_by(|a, b| {
+            sort.cost(&b.1.tally)
+                .cmp(&sort.cost(&a.1.tally))
+                .then(b.1.tally.ops.cmp(&a.1.tally.ops))
+                .then(a.0.cmp(b.0))
+        });
         for (name, h) in rows.into_iter().take(top) {
             hooks.add_row(vec![
                 name.clone(),
@@ -675,7 +721,10 @@ fn render_sorted(r: &Report, top: usize, sort: SortKey) -> String {
                 format!("{:.1}", h.duration_ns as f64 / 1000.0),
             ]);
         }
-        out += &format!("\nHooks (observed runtime spans)\n{hooks}\n");
+        out += &format!(
+            "\nHooks (observed runtime spans, ranked by {})\n{hooks}\n",
+            sort.label()
+        );
         out += &truncated(r.hooks.len(), top);
     }
     if !r.errors.is_empty() {
@@ -691,6 +740,16 @@ fn truncated(n: usize, top: usize) -> String {
         format!("… {} more\n", n - top)
     } else {
         String::new()
+    }
+}
+/// `proof_label` with its unit; no unit when there is no evidence.
+fn proof_bytes_text(t: &Tally) -> String {
+    if t.proof_ops_observed == 0 {
+        "n/a".into()
+    } else if t.proof_ops_observed < t.ops {
+        format!("{} B (partial)", t.proof_bytes)
+    } else {
+        format!("{} B", t.proof_bytes)
     }
 }
 pub fn proof_label(t: &Tally) -> String {
@@ -714,7 +773,11 @@ pub fn origin_index(origin: Option<&str>) -> usize {
 fn pair(d: &Distribution, scale: f64) -> String {
     format!("{:.1}/{:.1}", d.median / scale, d.p95 / scale)
 }
-pub fn item_table(items: &BTreeMap<String, Tally>, top: usize) -> comfy_table::Table {
+pub fn item_table(
+    items: &BTreeMap<String, Tally>,
+    top: usize,
+    sort: SortKey,
+) -> comfy_table::Table {
     let mut table = crate::summary::table(
         1,
         &[
@@ -730,8 +793,8 @@ pub fn item_table(items: &BTreeMap<String, Tally>, top: usize) -> comfy_table::T
     );
     let mut rows: Vec<_> = items.iter().collect();
     rows.sort_by(|a, b| {
-        b.1.proof_bytes
-            .cmp(&a.1.proof_bytes)
+        sort.cost(b.1)
+            .cmp(&sort.cost(a.1))
             .then(b.1.ops.cmp(&a.1.ops))
             .then(a.0.cmp(b.0))
     });
@@ -979,6 +1042,132 @@ mod round5_tests {
         assert_eq!(report.blocks, 1);
         assert_eq!(report.errors.len(), 2);
         assert!(report.errors[1].error.contains("duplicate block hash"));
+    }
+    #[test]
+    fn missing_proof_evidence_prints_no_unit_and_present_evidence_does() {
+        let block = legacy();
+        let text = render(&aggregate(std::slice::from_ref(&block)), 1);
+        assert!(
+            text.contains("proof n/a (0 ops observed; n/a unattributed)"),
+            "{text}"
+        );
+        assert!(!text.contains("n/a B"));
+        assert!(!crate::summary::render(&block, 1).contains("n/a B"));
+        let mut value = serde_json::to_value(&block).unwrap();
+        for phase in value["phases"].as_array_mut().unwrap() {
+            for op in phase["ops"].as_array_mut().unwrap() {
+                op["proof_bytes_added"] = serde_json::json!(2);
+            }
+        }
+        value["execution"] = serde_json::json!({"root_check":true,"proof_bytes":100,
+            "rpc_calls":0,"measured_rpc_calls":0,"proof_rounds":0});
+        let block: AnnotatedBlock = serde_json::from_value(value).unwrap();
+        let r = aggregate(std::slice::from_ref(&block));
+        let text = render(&r, 1);
+        let attributed = r.totals.proof_bytes;
+        assert!(
+            text.contains(&format!(
+                "proof {attributed} B (partial) ({} ops observed; {} B unattributed)",
+                r.totals.proof_ops_observed,
+                100 - attributed
+            )),
+            "{text}"
+        );
+        assert_eq!(r.over_attributed_proof_bytes, Some(0));
+        assert!(!text.contains("over-attributed"));
+    }
+    #[test]
+    fn over_attribution_is_reported_instead_of_clamped_to_zero() {
+        let mut value = serde_json::to_value(legacy()).unwrap();
+        for phase in value["phases"].as_array_mut().unwrap() {
+            for op in phase["ops"].as_array_mut().unwrap() {
+                op["proof_bytes_added"] = serde_json::json!(10);
+            }
+        }
+        value["execution"] = serde_json::json!({"root_check":true,"proof_bytes":5,
+            "rpc_calls":0,"measured_rpc_calls":0,"proof_rounds":0});
+        let over: AnnotatedBlock = serde_json::from_value(value.clone()).unwrap();
+        value["block_hash"] = serde_json::json!("0x33");
+        value["execution"]["proof_bytes"] = serde_json::json!(1_000_000);
+        let under: AnnotatedBlock = serde_json::from_value(value).unwrap();
+        let attributed = aggregate(std::slice::from_ref(&over)).totals.proof_bytes;
+        let r = aggregate(&[over, under]);
+        assert_eq!(r.over_attributed_proof_bytes, Some(attributed - 5));
+        assert_eq!(r.over_attributed_blocks, 1);
+        assert_eq!(r.unattributed_proof_bytes, Some(1_000_000 - attributed));
+        assert_eq!(r.execution_proof_bytes, Some(1_000_005));
+        let text = render(&r, 1);
+        assert!(
+            text.contains(&format!("; {} B over-attributed)", attributed - 5)),
+            "{text}"
+        );
+        assert!(text.contains("warning: attributed proof bytes exceed the execution proof"));
+        let json = serde_json::to_value(&r).unwrap();
+        assert_eq!(json["over_attributed_proof_bytes"], attributed - 5);
+        assert_eq!(json["over_attributed_blocks"], 1);
+    }
+    #[test]
+    fn sort_key_ranks_items_and_hooks_as_well_as_extrinsics() {
+        let mut value = serde_json::to_value(legacy()).unwrap();
+        value["runtime_spans"] = serde_json::json!([
+            {"id":1,"parent_id":null,"name":"on_initialize: Few","target":"pallet_few","wasm":true,
+             "fields":{},"start_ns":0,"end_ns":1,"duration_ns":1,"enters":1,"proof_start_bytes":0,"proof_end_bytes":0},
+            {"id":2,"parent_id":null,"name":"on_finalize: Many","target":"pallet_many","wasm":true,
+             "fields":{},"start_ns":0,"end_ns":1,"duration_ns":1,"enters":1,"proof_start_bytes":0,"proof_end_bytes":0}
+        ]);
+        let mut n = 0;
+        for phase in value["phases"].as_array_mut().unwrap() {
+            for op in phase["ops"].as_array_mut().unwrap() {
+                let index = op["item"] == ":extrinsic_index";
+                // `:extrinsic_index` has fewer ops but far more proof bytes.
+                op["proof_bytes_added"] = serde_json::json!(if index { 1000 } else { 1 });
+                op["parent_span"] = serde_json::json!(if n == 0 {
+                    1
+                } else if n <= 5 {
+                    2
+                } else {
+                    99
+                });
+                if n == 0 {
+                    op["proof_bytes_added"] = serde_json::json!(5000);
+                }
+                n += 1;
+            }
+        }
+        let block: AnnotatedBlock = serde_json::from_value(value).unwrap();
+        let r = aggregate(&[block]);
+        let section = |text: &str, from: &str, to: &str| {
+            let start = text.find(from).unwrap();
+            let end = text[start..].find(to).map_or(text.len(), |i| start + i);
+            text[start..end].to_owned()
+        };
+        let by_proof = render_sorted(&r, 1, SortKey::Proof);
+        let by_ops = render_sorted(&r, 1, SortKey::Ops);
+        let items = section(&by_proof, "Top items by proof bytes", "Extrinsic");
+        assert!(
+            items.contains(":extrinsic_index") && !items.contains("<unknown>"),
+            "{by_proof}"
+        );
+        let items = section(&by_ops, "Top items by operations", "Extrinsic");
+        assert!(
+            items.contains("<unknown>") && !items.contains(":extrinsic_index"),
+            "{by_ops}"
+        );
+        let hooks = section(
+            &by_proof,
+            "Hooks (observed runtime spans, ranked by proof bytes)",
+            "…",
+        );
+        assert!(
+            hooks.contains("Few") && !hooks.contains("Many"),
+            "{by_proof}"
+        );
+        let hooks = section(
+            &by_ops,
+            "Hooks (observed runtime spans, ranked by operations)",
+            "…",
+        );
+        assert!(hooks.contains("Many") && !hooks.contains("Few"), "{by_ops}");
     }
     #[test]
     fn summary_and_report_tables_match_checked_in_goldens() {

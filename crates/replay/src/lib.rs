@@ -156,6 +156,29 @@ impl Artifact {
     }
 }
 
+/// A substitute runtime executed instead of the state's authenticated `:code`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+pub struct RuntimeOverride {
+    /// Blake2-256 of the authenticated parent-state `:code` that was NOT executed.
+    pub chain_code_hash: H256,
+    /// Blake2-256 of the substitute Wasm that was executed.
+    pub override_code_hash: H256,
+}
+
+/// Returns the code to execute: the authenticated `:code`, or the session's explicit override.
+fn select_runtime(session: &ReplaySession, chain: Vec<u8>) -> (Vec<u8>, Option<RuntimeOverride>) {
+    match &session.runtime_override {
+        None => (chain, None),
+        Some(wasm) => {
+            let info = RuntimeOverride {
+                chain_code_hash: H256::from(sp_io::hashing::blake2_256(&chain)),
+                override_code_hash: H256::from(sp_io::hashing::blake2_256(wasm)),
+            };
+            (wasm.to_vec(), Some(info))
+        }
+    }
+}
+
 /// A successful result always passed Core's real root assertion and a zero-RPC measured run.
 #[derive(Debug, Clone, Serialize)]
 pub struct Replay {
@@ -170,6 +193,8 @@ pub struct Replay {
     pub proof_round_trips: usize,
     pub proof_bytes: usize,
     pub artifact: Artifact,
+    /// Set only when the session executed a substitute runtime.
+    pub runtime_override: Option<RuntimeOverride>,
 }
 
 /// Fetch a number, hash, or `best` block. Context and proofs are pinned to its parent.
@@ -296,6 +321,7 @@ fn replay_inner(
         db.prefetch(&hints.into_iter().take(4096).collect::<Vec<_>>())?;
     }
     let (wasm, heap_pages) = runtime_code(&db, root)?;
+    let (wasm, runtime_override) = select_runtime(session, wasm);
     metadata::load(&mut artifact, &db, &wasm, heap_pages, session, &parent)?;
     let executor = session.executor_for(&wasm);
     db.mark_bootstrap();
@@ -346,6 +372,7 @@ fn replay_inner(
         proof_round_trips: db.round_trips.load(Ordering::Relaxed),
         proof_bytes,
         artifact,
+        runtime_override,
     })
 }
 

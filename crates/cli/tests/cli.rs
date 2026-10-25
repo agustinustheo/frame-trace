@@ -1043,3 +1043,119 @@ fn report_help_and_write_errors_explain_options_and_paths() {
             .contains(&format!("writing report JSON {}", path.display()))
     );
 }
+
+/// The traced People Wasm is the `:code` value node inside the `people-traced` artifact.
+fn traced_people_wasm() -> std::path::PathBuf {
+    let artifact =
+        frame_trace_replay::Artifact::load(std::path::Path::new(&fixture("replay/people-traced")))
+            .unwrap();
+    let wasm = artifact
+        .proof_nodes
+        .iter()
+        .map(|node| frame_trace_replay::rpc::unhex(node).unwrap())
+        .max_by_key(Vec::len)
+        .unwrap();
+    assert!(
+        wasm.len() > 1_000_000,
+        "the largest node is the runtime code"
+    );
+    let path = std::env::temp_dir().join(format!(
+        "frame-trace-traced-people-{}.wasm",
+        std::process::id()
+    ));
+    std::fs::write(&path, wasm).unwrap();
+    path
+}
+
+#[test]
+fn runtime_override_replays_untraced_block_with_traced_wasm_and_labels_it() {
+    let _serial = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    let wasm = traced_people_wasm();
+    let json = wasm.with_extension("json");
+    let out = run(&[
+        "block",
+        "--offline",
+        &fixture("replay/people-transfer"),
+        "--runtime-override",
+        wasm.to_str().unwrap(),
+        "--json",
+        json.to_str().unwrap(),
+    ]);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "{stderr}");
+    assert!(stderr.contains("root check: PASS"), "{stderr}");
+    assert!(
+        stderr.contains("RUNTIME OVERRIDE") && stderr.contains("code-hash check BYPASSED"),
+        "{stderr}"
+    );
+    let block: serde_json::Value = serde_json::from_slice(&std::fs::read(&json).unwrap()).unwrap();
+    let label = &block["runtime_override"];
+    assert_eq!(
+        label["chain_code_hash"],
+        "0xee817a9ecd07f4c0f861dd6f2b5105fd316638b827d4d425ae062add4b651c1c"
+    );
+    assert_eq!(
+        label["code_hash"],
+        "0xba01b1de0c55e48c84c70a59381594c8540eb2482ac8e785908de120ce617074"
+    );
+    assert_eq!(label["path"], wasm.to_str().unwrap());
+    assert_eq!(block["execution"]["root_check"], true);
+    let wasm_spans: Vec<_> = block["runtime_spans"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|s| s["wasm"] == true)
+        .map(|s| s["name"].as_str().unwrap().to_owned())
+        .collect();
+    for expected in [
+        "apply_extrinsic",
+        "on_initialize: System",
+        "transfer_keep_alive",
+    ] {
+        assert!(wasm_spans.iter().any(|n| n == expected), "{wasm_spans:?}");
+    }
+
+    // The chain's own code has no runtime spans and no override label.
+    let out = run(&[
+        "block",
+        "--offline",
+        &fixture("replay/people-transfer"),
+        "--json",
+        json.to_str().unwrap(),
+    ]);
+    assert!(out.status.success());
+    assert!(!String::from_utf8_lossy(&out.stderr).contains("RUNTIME OVERRIDE"));
+    let block: serde_json::Value = serde_json::from_slice(&std::fs::read(&json).unwrap()).unwrap();
+    assert!(block.get("runtime_override").is_none());
+    assert!(
+        block["runtime_spans"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|s| s["wasm"] == false)
+    );
+
+    // Saved artifacts never mix a substitute runtime's discovery with the chain's code.
+    let out = run(&[
+        "block",
+        "--offline",
+        &fixture("replay/people-transfer"),
+        "--runtime-override",
+        wasm.to_str().unwrap(),
+        "--save",
+        json.to_str().unwrap(),
+    ]);
+    assert_eq!(out.status.code(), Some(2));
+    let out = run(&[
+        "call",
+        "--offline",
+        &fixture("replay/call-people-nonce"),
+        "--runtime-override",
+        wasm.to_str().unwrap(),
+    ]);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "{stderr}");
+    assert!(stderr.contains("RUNTIME OVERRIDE"), "{stderr}");
+    let _ = std::fs::remove_file(json);
+    let _ = std::fs::remove_file(wasm);
+}

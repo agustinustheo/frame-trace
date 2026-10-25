@@ -93,6 +93,11 @@ exit. Shutdown does not wait for SDK compilation or collector I/O.
 Times are measured on the replay machine, including tracing overhead. They are
 not the original node's database latency or benchmark weights. Runtime spans
 appear when the Wasm has `with-tracing`. Without them, ops sit under phase spans.
+[Runtime spans](docs/runtime-spans.md) shows the Cargo wiring, the Wasm build, and
+`--runtime-override WASM` for `block`, `summary` and `call`. The override executes a
+substitute Wasm (for example the same runtime built with tracing) instead of the
+authenticated `:code`. It bypasses the code-hash check explicitly, keeps state
+proofs and the block root check, and is labelled in terminal, JSON and OTLP output.
 Backend iteration events describe attempts; the overlay may change the result.
 Named phases retain their statistics and parent runtime dispatch/hook spans and
 storage operations in one tree. The runtime's whole-block wrapper is represented
@@ -298,8 +303,11 @@ Short terminal tables and complete JSON show phase shares of operations, unioned
 storage time and attributed proof bytes; per-item origins, writes, iteration,
 logical bytes, proof bytes and duplicates; observed hook/pallet totals; and
 extrinsic-type count, median and nearest-rank p95 operations, marginal proof bytes,
-and storage time. `--top` limits ranked terminal rows and reports omitted counts;
-extrinsics rank by total proof bytes (`--sort-by ops|time` selects another cost).
+and storage time. `--top` limits ranked terminal rows and reports omitted counts.
+Item, extrinsic and hook tables rank by total proof bytes; `--sort-by ops|time`
+ranks all three by operation count or storage time instead. When attributed proof
+bytes exceed a block's execution proof (possible after rollback), the report shows
+`over-attributed` bytes and a warning instead of clamping unattributed bytes to zero.
 Distributions are exact through 1,024 samples; thereafter a bounded logarithmic
 sketch has at most 1.5625% value error (not a rank-error bound). JSON additionally includes observed extrinsic wall-time
 statistics when runtime span bounds exist. Inherents and signed extrinsics have

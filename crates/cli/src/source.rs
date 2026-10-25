@@ -53,6 +53,46 @@ pub struct SourceArgs {
     /// Allow UNAUTHENTICATED metadata: RPC online, stored artifact metadata offline.
     #[arg(long = "unauthenticated-metadata", alias = "rpc-metadata-fallback")]
     pub rpc_metadata_fallback: bool,
+    /// Execute this Wasm instead of the block's authenticated :code (for example the same
+    /// runtime built with `with-tracing`). Bypasses the code-hash check; labelled in output.
+    #[arg(long, value_name = "WASM", conflicts_with_all = ["from_file", "from_json", "save"])]
+    pub runtime_override: Option<PathBuf>,
+}
+
+/// Read a `--runtime-override` Wasm (plain or SDK-compressed) before any network work.
+pub fn read_runtime_override(path: Option<&Path>) -> Result<Option<Vec<u8>>> {
+    let Some(path) = path else {
+        return Ok(None);
+    };
+    let wasm = std::fs::read(path)
+        .with_context(|| format!("reading --runtime-override {}", path.display()))?;
+    anyhow::ensure!(
+        !wasm.is_empty(),
+        "--runtime-override {} is empty",
+        path.display()
+    );
+    Ok(Some(wasm))
+}
+
+/// Print the override prominently; the executed code is not the chain's own.
+pub fn report_override(o: &frame_trace_replay::RuntimeOverride) {
+    eprintln!(
+        "RUNTIME OVERRIDE: executed {:?} INSTEAD OF the authenticated :code {:?}; \
+         code-hash check BYPASSED (state proofs and any root check still apply)",
+        o.override_code_hash, o.chain_code_hash
+    );
+}
+
+/// The JSON/OTLP label for a substitute runtime.
+pub fn override_info(
+    o: Option<frame_trace_replay::RuntimeOverride>,
+    path: Option<&Path>,
+) -> Option<frame_trace_decode::RuntimeOverrideInfo> {
+    o.map(|o| frame_trace_decode::RuntimeOverrideInfo {
+        path: path.map(|p| p.display().to_string()).unwrap_or_default(),
+        code_hash: format!("{:?}", o.override_code_hash),
+        chain_code_hash: format!("{:?}", o.chain_code_hash),
+    })
 }
 
 /// A block trace and what is needed to decode it.
@@ -61,9 +101,11 @@ pub struct Loaded {
     pub metadata: Option<Metadata>,
     pub block_number: Option<u64>,
     pub execution: Option<frame_trace_decode::ExecutionInfo>,
+    pub runtime_override: Option<frame_trace_replay::RuntimeOverride>,
 }
 
 pub fn load(args: &SourceArgs) -> Result<Loaded> {
+    let runtime_override = read_runtime_override(args.runtime_override.as_deref())?;
     if let Some(dir) = &args.offline {
         let replay = frame_trace_replay::Artifact::load(dir)
             .and_then(|artifact| {
@@ -74,7 +116,8 @@ pub fn load(args: &SourceArgs) -> Result<Loaded> {
                         args.cache_dir.as_deref(),
                         args.cache_max_bytes,
                     )?
-                    .with_rpc_metadata_fallback(args.rpc_metadata_fallback),
+                    .with_rpc_metadata_fallback(args.rpc_metadata_fallback)
+                    .with_runtime_override(runtime_override),
                 )
             })
             .map_err(|e| anyhow::anyhow!("{}: {e}", dir.join("artifact.json.zst").display()))
@@ -102,7 +145,8 @@ pub fn load(args: &SourceArgs) -> Result<Loaded> {
                     args.cache_dir.as_deref(),
                     args.cache_max_bytes,
                 )?
-                .with_rpc_metadata_fallback(args.rpc_metadata_fallback),
+                .with_rpc_metadata_fallback(args.rpc_metadata_fallback)
+                .with_runtime_override(runtime_override),
             )
             .inspect_err(|_| {
                 eprintln!("root check: NOT VERIFIED; RPC calls: {}", rpc.count());
@@ -129,6 +173,7 @@ mod file {
             metadata,
             block_number: None,
             execution: None,
+            runtime_override: None,
         })
     }
 
@@ -160,6 +205,9 @@ mod file {
 
 /// Both block and summary consume the same faithful measured result.
 pub fn replay_loaded(replay: frame_trace_replay::Replay, save: Option<&Path>) -> Result<Loaded> {
+    if let Some(o) = &replay.runtime_override {
+        report_override(o);
+    }
     eprintln!(
         "root check: {}; RPC calls: {} (measured: {}); execution proof: {} bytes",
         if replay.root_check { "PASS" } else { "FAIL" },
@@ -202,5 +250,6 @@ pub fn replay_loaded(replay: frame_trace_replay::Replay, save: Option<&Path>) ->
             measured_rpc_calls: replay.measured_rpc_count,
             proof_rounds: replay.proof_round_trips,
         }),
+        runtime_override: replay.runtime_override,
     })
 }

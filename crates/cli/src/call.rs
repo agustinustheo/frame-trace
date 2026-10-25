@@ -56,6 +56,10 @@ pub struct CallArgs {
     /// Allow UNAUTHENTICATED metadata: RPC online, stored artifact metadata offline.
     #[arg(long = "unauthenticated-metadata", alias = "rpc-metadata-fallback")]
     rpc_metadata_fallback: bool,
+    /// Execute this Wasm instead of the state's authenticated :code (for example the same
+    /// runtime built with `with-tracing`). Bypasses the code-hash check; labelled in output.
+    #[arg(long, value_name = "WASM", conflicts_with = "save")]
+    runtime_override: Option<PathBuf>,
 }
 
 pub fn run(args: CallArgs) -> Result<()> {
@@ -70,9 +74,11 @@ pub fn run(args: CallArgs) -> Result<()> {
         .as_deref()
         .map(|s| serde_json::from_str::<serde_json::Value>(s).context("--args: malformed JSON"))
         .transpose()?;
+    let runtime_override = super::source::read_runtime_override(args.runtime_override.as_deref())?;
     let session =
         ReplaySession::with_cache_max_bytes(args.cache_dir.as_deref(), args.cache_max_bytes)?
-            .with_rpc_metadata_fallback(args.rpc_metadata_fallback);
+            .with_rpc_metadata_fallback(args.rpc_metadata_fallback)
+            .with_runtime_override(runtime_override);
     let (artifact, rpc) = if let Some(dir) = &args.offline {
         (Artifact::load(dir)?, None)
     } else {
@@ -112,6 +118,9 @@ pub fn run(args: CallArgs) -> Result<()> {
         (artifact, Some(rpc))
     };
     let replay = call::replay(artifact, rpc, &session, args.oracle)?;
+    if let Some(o) = &replay.runtime_override {
+        super::source::report_override(o);
+    }
     if let Some(dir) = &args.save {
         replay.artifact.save(dir)?;
     }
@@ -144,6 +153,8 @@ pub fn run(args: CallArgs) -> Result<()> {
         metadata.as_ref(),
     );
     trace.block_number = Some(replay.block_number);
+    trace.runtime_override =
+        super::source::override_info(replay.runtime_override, args.runtime_override.as_deref());
     trace.call = Some(AnnotatedCall {
         method: context.method.clone(),
         data: context.data.clone(),

@@ -136,6 +136,8 @@ fn load(args: &source::SourceArgs) -> Result<AnnotatedBlock> {
         );
     }
     block.execution = loaded.execution;
+    block.runtime_override =
+        source::override_info(loaded.runtime_override, args.runtime_override.as_deref());
     Ok(block)
 }
 

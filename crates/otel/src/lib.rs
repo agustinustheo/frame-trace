@@ -205,6 +205,7 @@ pub fn record_block(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) 
     if let Some(number) = block.block_number {
         attrs.push(KeyValue::new("frame.block.number", count(number)));
     }
+    override_attributes(block, &mut attrs);
     if let Some(call) = &block.call {
         attrs.push(KeyValue::new("frame.trace.kind", "call"));
         attrs.push(KeyValue::new("frame.call.method", call.method.clone()));
@@ -258,6 +259,7 @@ fn record_measured(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) -
     if let Some(number) = block.block_number {
         attrs.push(KeyValue::new("frame.block.number", count(number)));
     }
+    override_attributes(block, &mut attrs);
     if let Some(call) = &block.call {
         attrs.push(KeyValue::new("frame.trace.kind", "call"));
         attrs.push(KeyValue::new("frame.call.method", call.method.clone()));
@@ -612,7 +614,32 @@ fn stats_attributes(stats: &Stats) -> [KeyValue; 8] {
     ]
 }
 
+/// A substitute runtime is labelled on the root span: it is not the chain's own code.
+fn override_attributes(block: &AnnotatedBlock, attrs: &mut Vec<KeyValue>) {
+    if let Some(o) = &block.runtime_override {
+        attrs.push(KeyValue::new("frame.runtime.override", true));
+        attrs.push(KeyValue::new("frame.runtime.override_path", o.path.clone()));
+        attrs.push(KeyValue::new(
+            "frame.runtime.override_code_hash",
+            o.code_hash.clone(),
+        ));
+        attrs.push(KeyValue::new(
+            "frame.runtime.chain_code_hash",
+            o.chain_code_hash.clone(),
+        ));
+    }
+}
+
 fn block_name(block: &AnnotatedBlock) -> String {
+    let name = base_block_name(block);
+    if block.runtime_override.is_some() {
+        format!("{name} [runtime override]")
+    } else {
+        name
+    }
+}
+
+fn base_block_name(block: &AnnotatedBlock) -> String {
     if let Some(call) = &block.call {
         return format!(
             "call {} at #{}",

@@ -52,6 +52,7 @@ pub struct ReplaySession {
     pub(crate) speculative_discovery: bool,
     pub(crate) metadata: Arc<Mutex<MetadataCache>>,
     pub(crate) rpc_metadata_fallback: bool,
+    pub(crate) runtime_override: Option<Arc<Vec<u8>>>,
     #[cfg(test)]
     pub(crate) metadata_runs: Arc<std::sync::atomic::AtomicUsize>,
     cache_base: PathBuf,
@@ -92,6 +93,7 @@ impl ReplaySession {
             speculative_discovery: true,
             metadata: Default::default(),
             rpc_metadata_fallback: false,
+            runtime_override: None,
             #[cfg(test)]
             metadata_runs: Default::default(),
             #[cfg(test)]
@@ -130,6 +132,13 @@ impl ReplaySession {
     /// Explicitly permit unauthenticated RPC/stored metadata only if local execution fails.
     pub fn with_rpc_metadata_fallback(mut self, enabled: bool) -> Self {
         self.rpc_metadata_fallback = enabled;
+        self
+    }
+    /// Execute this Wasm instead of the state's authenticated `:code`. This deliberately
+    /// bypasses the code-hash binding to the parent state; every replay reports both hashes.
+    /// State proofs and the block's storage-root assertion still apply.
+    pub fn with_runtime_override(mut self, wasm: Option<Vec<u8>>) -> Self {
+        self.runtime_override = wasm.map(Arc::new);
         self
     }
     /// Disable throw-away speculative passes when debugging strict execution-driven paging.
