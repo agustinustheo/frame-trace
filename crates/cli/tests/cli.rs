@@ -1045,7 +1045,7 @@ fn report_help_and_write_errors_explain_options_and_paths() {
 }
 
 /// The traced People Wasm is the `:code` value node inside the `people-traced` artifact.
-fn traced_people_wasm() -> std::path::PathBuf {
+fn traced_people_wasm(tag: &str) -> std::path::PathBuf {
     let artifact =
         frame_trace_replay::Artifact::load(std::path::Path::new(&fixture("replay/people-traced")))
             .unwrap();
@@ -1060,7 +1060,7 @@ fn traced_people_wasm() -> std::path::PathBuf {
         "the largest node is the runtime code"
     );
     let path = std::env::temp_dir().join(format!(
-        "frame-trace-traced-people-{}.wasm",
+        "frame-trace-traced-people-{tag}-{}.wasm",
         std::process::id()
     ));
     std::fs::write(&path, wasm).unwrap();
@@ -1070,7 +1070,7 @@ fn traced_people_wasm() -> std::path::PathBuf {
 #[test]
 fn runtime_override_replays_untraced_block_with_traced_wasm_and_labels_it() {
     let _serial = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
-    let wasm = traced_people_wasm();
+    let wasm = traced_people_wasm("replay");
     let json = wasm.with_extension("json");
     let out = run(&[
         "block",
@@ -1089,6 +1089,8 @@ fn runtime_override_replays_untraced_block_with_traced_wasm_and_labels_it() {
         "{stderr}"
     );
     let block: serde_json::Value = serde_json::from_slice(&std::fs::read(&json).unwrap()).unwrap();
+    let block_hash = block["block_hash"].clone();
+    let label_code_hash = block["runtime_override"]["code_hash"].clone();
     let label = &block["runtime_override"];
     assert_eq!(
         label["chain_code_hash"],
@@ -1116,16 +1118,17 @@ fn runtime_override_replays_untraced_block_with_traced_wasm_and_labels_it() {
     }
 
     // The chain's own code has no runtime spans and no override label.
+    let plain = wasm.with_extension("plain.json");
     let out = run(&[
         "block",
         "--offline",
-        &fixture("replay/people-transfer"),
+        &fixture("replay/people-kill-prefix"),
         "--json",
-        json.to_str().unwrap(),
+        plain.to_str().unwrap(),
     ]);
     assert!(out.status.success());
     assert!(!String::from_utf8_lossy(&out.stderr).contains("RUNTIME OVERRIDE"));
-    let block: serde_json::Value = serde_json::from_slice(&std::fs::read(&json).unwrap()).unwrap();
+    let block: serde_json::Value = serde_json::from_slice(&std::fs::read(&plain).unwrap()).unwrap();
     assert!(block.get("runtime_override").is_none());
     assert!(
         block["runtime_spans"]
@@ -1135,11 +1138,62 @@ fn runtime_override_replays_untraced_block_with_traced_wasm_and_labels_it() {
             .all(|s| s["wasm"] == false)
     );
 
-    // Saved artifacts never mix a substitute runtime's discovery with the chain's code.
+    // Saved JSON keeps the provenance: summary and (mixed) reports name the override first.
+    let out = run(&["summary", "--from-json", json.to_str().unwrap()]);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(out.status.success());
+    assert!(
+        stdout.starts_with("RUNTIME OVERRIDE: 1 of 1 block(s) used a runtime override"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("0xba01b1de0c55e48c84c70a59381594c8540eb2482ac8e785908de120ce617074"));
+    let report = wasm.with_extension("report.json");
     let out = run(&[
-        "block",
+        "report",
+        json.to_str().unwrap(),
+        plain.to_str().unwrap(),
+        "--sort-by",
+        "time",
+        "--json",
+        report.to_str().unwrap(),
+    ]);
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(
+        stdout.starts_with("RUNTIME OVERRIDE: 1 of 2 block(s) used a runtime override"),
+        "{stdout}"
+    );
+    assert!(stdout.contains("Top items by storage time"), "{stdout}");
+    let aggregate: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(&report).unwrap()).unwrap();
+    let overrides = aggregate["runtime_overrides"].as_array().unwrap();
+    assert_eq!(overrides.len(), 1);
+    assert_eq!(overrides[0]["block_hash"], block_hash);
+    assert_eq!(overrides[0]["code_hash"], label_code_hash);
+    assert_eq!(overrides[0]["path"], wasm.to_str().unwrap());
+    assert_eq!(aggregate["blocks"], 2);
+
+    // Saved artifacts never mix a substitute runtime's discovery with the chain's code.
+    for command in ["block", "summary"] {
+        let out = run(&[
+            command,
+            "--offline",
+            &fixture("replay/people-transfer"),
+            "--runtime-override",
+            wasm.to_str().unwrap(),
+            "--save",
+            json.to_str().unwrap(),
+        ]);
+        assert_eq!(out.status.code(), Some(2), "{command}");
+    }
+    let out = run(&[
+        "call",
         "--offline",
-        &fixture("replay/people-transfer"),
+        &fixture("replay/call-people-nonce"),
         "--runtime-override",
         wasm.to_str().unwrap(),
         "--save",
@@ -1156,6 +1210,79 @@ fn runtime_override_replays_untraced_block_with_traced_wasm_and_labels_it() {
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert!(out.status.success(), "{stderr}");
     assert!(stderr.contains("RUNTIME OVERRIDE"), "{stderr}");
-    let _ = std::fs::remove_file(json);
+    assert!(stderr.contains("RuntimeVersion matches"), "{stderr}");
+
+    // Online replay through safe RPC accepts the same override.
+    let artifact = frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
+        "replay/people-transfer",
+    )))
+    .unwrap();
+    let node = MockNode::new(move |request| artifact_rpc(&artifact, request));
+    let out = run(&[
+        "block",
+        "--rpc",
+        &node.url,
+        "--block",
+        "2",
+        "--runtime-override",
+        wasm.to_str().unwrap(),
+        "--json",
+        json.to_str().unwrap(),
+    ]);
+    drop(node);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "{stderr}");
+    assert!(
+        stderr.contains("root check: PASS with RUNTIME OVERRIDE"),
+        "{stderr}"
+    );
+    let block: serde_json::Value = serde_json::from_slice(&std::fs::read(&json).unwrap()).unwrap();
+    assert_eq!(block["runtime_override"]["code_hash"], label_code_hash);
+    assert!(
+        block["runtime_spans"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|s| s["wasm"] == true)
+    );
+    for path in [json, plain, report] {
+        let _ = std::fs::remove_file(path);
+    }
     let _ = std::fs::remove_file(wasm);
+}
+
+#[test]
+fn bad_runtime_override_files_are_rejected_by_name_before_replay() {
+    let wasm = traced_people_wasm("bad");
+    let bytes = std::fs::read(&wasm).unwrap();
+    let mut corrupt = b"\0asm\x01\0\0\0".to_vec();
+    corrupt.extend([0xff; 64]);
+    for (name, content) in [
+        ("text", b"this is a text file\n".to_vec()),
+        ("truncated", bytes[..bytes.len() / 2].to_vec()),
+        ("corrupt", corrupt),
+    ] {
+        let path = wasm.with_extension(format!("{name}.wasm"));
+        std::fs::write(&path, content).unwrap();
+        for args in [
+            vec!["block", "--offline", "unused-artifact"],
+            vec!["call", "--offline", "unused-artifact"],
+        ] {
+            let mut args = args;
+            args.extend(["--runtime-override", path.to_str().unwrap()]);
+            let out = run(&args);
+            let stderr = String::from_utf8_lossy(&out.stderr);
+            assert_eq!(out.status.code(), Some(1), "{name}: {stderr}");
+            assert!(
+                stderr.contains(&format!("--runtime-override {}", path.display())),
+                "{name}: {stderr}"
+            );
+            assert!(
+                !stderr.contains("unused-artifact") && !stderr.contains("root"),
+                "{name}: {stderr}"
+            );
+        }
+        std::fs::remove_file(path).unwrap();
+    }
+    std::fs::remove_file(wasm).unwrap();
 }

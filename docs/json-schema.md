@@ -16,8 +16,9 @@ is null without observed bounds; its source distinguishes runtime spans from a
 storage-only envelope.
 
 `runtime_override` is absent unless `--runtime-override` executed a substitute Wasm
-instead of the state's `:code`. It then holds `path`, `code_hash` (the executed Wasm)
-and `chain_code_hash` (the authenticated `:code` that did not run). See
+instead of the state's `:code`. It then holds `path`, `code_hash` (the executed Wasm),
+`chain_code_hash` (the authenticated `:code` that did not run) and
+`version_differences` (RuntimeVersion differences or unreadable-version notes). See
 [runtime spans](runtime-spans.md). The field is additive and keeps schema version 2.
 
 Each operation contains sequence, kind (`op`), raw key/child identity, decoded
@@ -49,7 +50,9 @@ unattributed proof totals are null without execution evidence. Per block,
 positive, and `over_attributed_proof_bytes` adds attributed minus execution proof
 when that is positive; `over_attributed_blocks` counts those blocks. Neither is
 clamped into the other. Over-attribution can happen after rollback and prints a
-warning, not an error. Phase proof shares
+warning, not an error. `runtime_overrides` lists each input block that ran a
+substitute runtime (`block_hash` plus the block's `runtime_override` fields); the
+terminal output starts with "N of M block(s) used a runtime override". Phase proof shares
 and extrinsic proof distributions are null without the requisite evidence.
 Extrinsic proof distributions require complete per-op evidence for every sample;
 wall-time distributions require runtime-span bounds for every sample. Cost totals

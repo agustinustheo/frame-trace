@@ -93,17 +93,20 @@ exit. Shutdown does not wait for SDK compilation or collector I/O.
 Times are measured on the replay machine, including tracing overhead. They are
 not the original node's database latency or benchmark weights. Runtime spans
 appear when the Wasm has `with-tracing`. Without them, ops sit under phase spans.
-[Runtime spans](docs/runtime-spans.md) shows the Cargo wiring, the Wasm build, and
-`--runtime-override WASM` for `block`, `summary` and `call`. The override executes a
-substitute Wasm (for example the same runtime built with tracing) instead of the
-authenticated `:code`. It bypasses the code-hash check explicitly, keeps state
-proofs and the block root check, and is labelled in terminal, JSON and OTLP output.
 Backend iteration events describe attempts; the overlay may change the result.
 Named phases retain their statistics and parent runtime dispatch/hook spans and
 storage operations in one tree. The runtime's whole-block wrapper is represented
 by the block span. Only traced `apply_extrinsic` spans carry
 `frame.proof.marginal_bytes`, the recorder's growth during that span. These are
 not standalone extrinsic proof sizes.
+
+[Runtime spans](docs/runtime-spans.md) explains how to build a runtime with
+`with-tracing`. `block`, `summary` and `call` accept `--runtime-override WASM`.
+It runs that Wasm instead of the authenticated `:code`, for example the same
+runtime built with tracing. The code-hash check is bypassed on purpose. State
+proofs and the block root check still apply. frame-trace compares both runtime
+versions and warns on differences. The override is labelled on stderr, in JSON,
+in OTLP, and in later `summary --from-json` and `report` output.
 
 Names require metadata V14 or newer. Metadata for calls **and block names** comes
 from local execution of the authenticated runtime against the selected state:

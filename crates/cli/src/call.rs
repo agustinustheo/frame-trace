@@ -56,8 +56,9 @@ pub struct CallArgs {
     /// Allow UNAUTHENTICATED metadata: RPC online, stored artifact metadata offline.
     #[arg(long = "unauthenticated-metadata", alias = "rpc-metadata-fallback")]
     rpc_metadata_fallback: bool,
-    /// Execute this Wasm instead of the state's authenticated :code (for example the same
-    /// runtime built with `with-tracing`). Bypasses the code-hash check; labelled in output.
+    /// Execute this Wasm instead of the authenticated :code, for example the same runtime
+    /// built with `with-tracing`. Bypasses the code-hash check. Labelled on stderr, in JSON
+    /// and in OTLP. Cannot be combined with --save.
     #[arg(long, value_name = "WASM", conflicts_with = "save")]
     runtime_override: Option<PathBuf>,
 }
@@ -118,9 +119,6 @@ pub fn run(args: CallArgs) -> Result<()> {
         (artifact, Some(rpc))
     };
     let replay = call::replay(artifact, rpc, &session, args.oracle)?;
-    if let Some(o) = &replay.runtime_override {
-        super::source::report_override(o);
-    }
     if let Some(dir) = &args.save {
         replay.artifact.save(dir)?;
     }

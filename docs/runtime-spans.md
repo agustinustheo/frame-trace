@@ -25,20 +25,21 @@ Add one feature to the runtime crate's `Cargo.toml`:
 
 ```toml
 [features]
-with-tracing = ["frame-executive/with-tracing", "sp-io/with-tracing"]
+with-tracing = ["sp-io/with-tracing", "frame-executive/with-tracing"]
 ```
 
-Both features forward to `sp-tracing/with-tracing`. Cargo unifies that feature
-for every crate in the Wasm build, so the span macros that FRAME generates for hooks
-and calls are enabled as well. If your runtime depends on `sp-tracing` directly,
-you may add `"sp-tracing/with-tracing"` too; it is not required.
+Both features turn on `sp-tracing/with-tracing`. Cargo enables a feature once for
+the whole Wasm build. So the spans that FRAME generates for hooks and calls turn on
+too. If your runtime uses `sp-tracing` directly, you can also add
+`"sp-tracing/with-tracing"`. It is not required.
 
-This was checked against the stable2609 crates (`frame-executive` 49.0.0,
-`sp-io` 49.0.0, `sp-tracing` 19.0.0). Each of the first two declares
-`with-tracing = ["sp-tracing/with-tracing"]`. `frame-support` and `sp-runtime` have no
-`with-tracing` feature of their own. The E1 patch for Individuality's
-`next-people-paseo` runtime adds exactly this line
-([`experiments/e1/people-with-tracing.patch`](../experiments/e1/people-with-tracing.patch)):
+We checked this against the stable2609 crates: `sp-io` 49.0.0,
+`frame-executive` 49.0.0 and `sp-tracing` 19.0.0. The first two each declare
+`with-tracing = ["sp-tracing/with-tracing"]`. `frame-support` and `sp-runtime`
+have no such feature.
+
+The Individuality `next-people-paseo` runtime needs only this line
+([patch](../experiments/e1/people-with-tracing.patch)):
 
 ```diff
  [features]
@@ -49,10 +50,10 @@ This was checked against the stable2609 crates (`frame-executive` 49.0.0,
 ## Build the Wasm
 
 Build the runtime crate with the feature. `substrate-wasm-builder` passes it on to
-the Wasm build. This is the E1 command for the People runtime:
+the Wasm build. For the People runtime:
 
 ```sh
-cd individuality   # commit e69b079 in E1
+cd individuality   # commit e69b079
 git apply /path/to/frame-trace/experiments/e1/people-with-tracing.patch
 SKIP_PALLET_REVIVE_FIXTURES=1 \
   cargo +1.93.0 build --release --locked -p next-people-paseo-runtime --features with-tracing
@@ -66,40 +67,53 @@ resolve a different lock file.
 
 ## Using the traced Wasm
 
-The traced Wasm has a different code hash from the chain's `:code`. It is a
-different runtime as far as the chain is concerned. There are two ways to use it.
+The traced Wasm has a different code hash from the chain's `:code`. To the chain,
+it is a different runtime. There are two ways to use it.
 
-**A local or dev chain.** Start the chain with the traced Wasm in its genesis, as E1 did
-with `chain-spec-builder ... --runtime people-traced.wasm`. Every block then carries
-runtime spans and replays with no special option. The `people-traced` fixture comes
-from such a chain.
+**A local or dev chain.** Put the traced Wasm in the chain's genesis, for example
+with `chain-spec-builder ... --runtime people-traced.wasm`. Every block then has
+runtime spans. No special option is needed.
 
 **A local override.** `block`, `summary` and `call` accept `--runtime-override WASM`.
-frame-trace still fetches and authenticates the parent state, including `:code`.
-It then executes the given Wasm instead of `:code`. This bypasses the code-hash check
-on purpose, and frame-trace says so:
+frame-trace still fetches and checks the parent state, including `:code`. Then it
+runs the given Wasm instead of `:code`. This skips the code-hash check on purpose.
 
 ```sh
 target/release/frame-trace block --offline fixtures/replay/people-transfer \
   --runtime-override people-traced.wasm --json transfer.json
-# RUNTIME OVERRIDE: executed 0xba01b1de… INSTEAD OF the authenticated :code 0xee817a9e…;
-# code-hash check BYPASSED (state proofs and any root check still apply)
-# root check: PASS; ...
+# RUNTIME OVERRIDE: people-traced.wasm will execute instead of the chain's authenticated :code
+# RUNTIME OVERRIDE: executing 0xba01b1de… INSTEAD OF the authenticated :code 0xee817a9e…; ...
+# runtime override: RuntimeVersion matches the chain's :code
+# root check: PASS with RUNTIME OVERRIDE; ...
 ```
 
-`people-transfer` was recorded on the untraced People chain. With the override it
-has 106 runtime spans; without it, none. The block's storage-root check still
-runs. When the override is the same source built with `with-tracing`, it passes.
-When it is a different runtime, it normally fails with a root mismatch.
+This block comes from a chain without tracing. With the override it has 106
+runtime spans. Without it, it has none.
 
-A pass only shows that the substitute produced the same final state. The spans and
-timings describe the substitute's execution. Metadata also comes from the substitute.
+Before running, frame-trace reads both runtime versions. It warns if `spec_name`,
+`spec_version`, `transaction_version`, `system_version` or the API list differ. It
+also says when it could not read a version.
+
+The block's storage-root check still runs. It passes when the override is the same
+source built with `with-tracing`. A different runtime normally fails it. Any failure
+then says that the override may be the cause. Calls have no root check, so read the
+version warnings carefully.
+
+A pass only shows that the substitute wrote the same final state. The spans and
+timings describe the substitute. Metadata also comes from the substitute.
 
 The override is labelled everywhere:
 
-- JSON has `runtime_override` with `path`, `code_hash` and `chain_code_hash`;
-- the OTLP root span name ends in `[runtime override]` and has `frame.runtime.override = true`
-  plus both code hashes.
+- stderr names the file and both code hashes before anything runs;
+- JSON has `runtime_override` with `path`, `code_hash`, `chain_code_hash` and
+  `version_differences`;
+- `summary --from-json` and `report` print the override first, as
+  "N of M block(s) used a runtime override", and report JSON lists those blocks;
+- the OTLP root span name ends in `[runtime override]`. It has
+  `frame.runtime.override = true` and both code hashes.
 
-`--runtime-override` cannot be combined with `--save`. A saved artifact holds the
-chain's state and is replayed with the chain's own code.
+The file must be a Wasm module, plain or SDK-compressed. Other files are rejected
+by name before any replay.
+
+`--runtime-override` cannot be combined with `--save`. A saved artifact is always
+replayed with the chain's own code.

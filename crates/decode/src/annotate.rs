@@ -400,6 +400,9 @@ pub struct RuntimeOverrideInfo {
     pub code_hash: String,
     /// Blake2-256 of the authenticated `:code` that was not executed.
     pub chain_code_hash: String,
+    /// RuntimeVersion fields that differ, or notes that a version could not be read.
+    #[serde(default)]
+    pub version_differences: Vec<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

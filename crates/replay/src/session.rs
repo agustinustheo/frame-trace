@@ -53,6 +53,8 @@ pub struct ReplaySession {
     pub(crate) metadata: Arc<Mutex<MetadataCache>>,
     pub(crate) rpc_metadata_fallback: bool,
     pub(crate) runtime_override: Option<Arc<Vec<u8>>>,
+    /// The last announced override, so repeated loads of one context print once.
+    pub(crate) announced_override: Arc<Mutex<Option<crate::RuntimeOverride>>>,
     #[cfg(test)]
     pub(crate) metadata_runs: Arc<std::sync::atomic::AtomicUsize>,
     cache_base: PathBuf,
@@ -94,6 +96,7 @@ impl ReplaySession {
             metadata: Default::default(),
             rpc_metadata_fallback: false,
             runtime_override: None,
+            announced_override: Default::default(),
             #[cfg(test)]
             metadata_runs: Default::default(),
             #[cfg(test)]

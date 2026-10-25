@@ -8,7 +8,9 @@ use frame_trace_model::Stats;
 
 /// Renders the phase table, the top storage items, and the duplicate reads of each phase.
 pub fn render(block: &AnnotatedBlock, top: usize) -> String {
-    let mut out = if let Some(call) = &block.call {
+    let report = crate::report::aggregate(std::slice::from_ref(block));
+    let mut out = crate::report::override_lines(&report, top);
+    out += &if let Some(call) = &block.call {
         format!(
             "call {} at #{} ({})\n\n",
             call.method,
@@ -22,7 +24,7 @@ pub fn render(block: &AnnotatedBlock, top: usize) -> String {
         )
     };
     out += &format!("Storage per phase\n{}\n\n", phases(block));
-    out += &crate::report::render(&crate::report::aggregate(std::slice::from_ref(block)), top);
+    out += &crate::report::render_body(&report, top, crate::report::SortKey::Proof);
     out += &format!(
         "Duplicate reads per phase (top {top} each)\n{}\n",
         duplicates(block, top)

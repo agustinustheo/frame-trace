@@ -340,6 +340,13 @@ pub struct ExtrinsicAggregate {
     pub storage_ns: Distribution,
     pub wall_ns: Option<Distribution>,
 }
+/// Provenance kept for every input block that ran a substitute runtime.
+#[derive(Serialize)]
+pub struct OverriddenBlock {
+    pub block_hash: String,
+    #[serde(flatten)]
+    pub runtime: frame_trace_decode::RuntimeOverrideInfo,
+}
 #[derive(Serialize, Default)]
 pub struct Report {
     pub schema_version: u32,
@@ -355,6 +362,8 @@ pub struct Report {
     pub over_attributed_proof_bytes: Option<usize>,
     /// Blocks whose attributed proof bytes exceed their execution proof.
     pub over_attributed_blocks: usize,
+    /// Blocks executed with a substitute runtime instead of their own `:code`.
+    pub runtime_overrides: Vec<OverriddenBlock>,
     pub phases: BTreeMap<String, PhaseAggregate>,
     pub items: BTreeMap<String, Tally>,
     pub hooks: BTreeMap<String, HookAggregate>,
@@ -474,6 +483,12 @@ impl Accumulator {
         report.block_hashes.insert(block.block_hash.clone());
         let total = Tally::of(block.all_phases().flat_map(|p| &p.ops));
         report.totals.add(&total);
+        if let Some(runtime) = &block.runtime_override {
+            report.runtime_overrides.push(OverriddenBlock {
+                block_hash: block.block_hash.clone(),
+                runtime: runtime.clone(),
+            });
+        }
         if let Some(info) = &block.execution {
             let execution = report.execution_proof_bytes.get_or_insert(0);
             *execution = execution.saturating_add(info.proof_bytes);
@@ -612,10 +627,15 @@ pub fn aggregate(blocks: &[AnnotatedBlock]) -> Report {
     }
     accumulator.finish()
 }
+#[cfg(test)]
 pub fn render(r: &Report, top: usize) -> String {
     render_sorted(r, top, SortKey::Proof)
 }
 fn render_sorted(r: &Report, top: usize, sort: SortKey) -> String {
+    override_lines(r, top) + &render_body(r, top, sort)
+}
+/// The report tables without the leading override provenance.
+pub fn render_body(r: &Report, top: usize, sort: SortKey) -> String {
     let t = &r.totals;
     let mut out = format!(
         "{} block(s); {} ops; reads {} = overlay {} + backend {} (warm {}, cold {}) + unknown {}\nDuplicates {} = overlay {}, warm {}, cold {}, unknown {}; proof {} ({} ops observed; {} unattributed{})\n",
@@ -734,6 +754,30 @@ fn render_sorted(r: &Report, top: usize, sort: SortKey) -> String {
         }
     }
     out
+}
+/// Substitute runtimes are named before any number they produced.
+pub fn override_lines(r: &Report, top: usize) -> String {
+    if r.runtime_overrides.is_empty() {
+        return String::new();
+    }
+    let mut out = format!(
+        "RUNTIME OVERRIDE: {} of {} block(s) used a runtime override; their spans and timings \
+         describe the substitute Wasm, not the chain's own code\n",
+        r.runtime_overrides.len(),
+        r.blocks
+    );
+    for o in r.runtime_overrides.iter().take(top) {
+        let runtime = &o.runtime;
+        out += &format!(
+            "  {}: executed {} ({}) instead of :code {}",
+            o.block_hash, runtime.code_hash, runtime.path, runtime.chain_code_hash
+        );
+        if !runtime.version_differences.is_empty() {
+            out += &format!("; version: {}", runtime.version_differences.join("; "));
+        }
+        out += "\n";
+    }
+    out + &truncated(r.runtime_overrides.len(), top)
 }
 fn truncated(n: usize, top: usize) -> String {
     if n > top {
@@ -1116,8 +1160,15 @@ mod round5_tests {
              "fields":{},"start_ns":0,"end_ns":1,"duration_ns":1,"enters":1,"proof_start_bytes":0,"proof_end_bytes":0}
         ]);
         let mut n = 0;
+        let mut slowest = String::new();
         for phase in value["phases"].as_array_mut().unwrap() {
             for op in phase["ops"].as_array_mut().unwrap() {
+                // Op 0 alone is slow: it decides the storage-time ranking of items and hooks.
+                op["timing"] = serde_json::json!({"start_ns": n * 1_000_000,
+                    "duration_ns": if n == 0 { 900_000 } else { 1 }});
+                if n == 0 {
+                    slowest = op["item"].as_str().unwrap().to_owned();
+                }
                 let index = op["item"] == ":extrinsic_index";
                 // `:extrinsic_index` has fewer ops but far more proof bytes.
                 op["proof_bytes_added"] = serde_json::json!(if index { 1000 } else { 1 });
@@ -1168,6 +1219,18 @@ mod round5_tests {
             "…",
         );
         assert!(hooks.contains("Many") && !hooks.contains("Few"), "{by_ops}");
+        let by_time = render_sorted(&r, 1, SortKey::Time);
+        let items = section(&by_time, "Top items by storage time", "Extrinsic");
+        assert!(items.contains(&slowest), "{by_time}");
+        let hooks = section(
+            &by_time,
+            "Hooks (observed runtime spans, ranked by storage time)",
+            "…",
+        );
+        assert!(
+            hooks.contains("Few") && !hooks.contains("Many"),
+            "{by_time}"
+        );
     }
     #[test]
     fn summary_and_report_tables_match_checked_in_goldens() {

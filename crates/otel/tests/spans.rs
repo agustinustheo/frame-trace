@@ -255,6 +255,7 @@ fn runtime_override_is_labelled_on_the_root_span() {
         path: "traced.wasm".into(),
         code_hash: "0xaa".into(),
         chain_code_hash: "0xbb".into(),
+        version_differences: vec!["spec_version 1 -> 2".into()],
     });
     let spans = export(&block, Timing::default());
     let root = by_name(&spans, "block #7 (0x01) [runtime override]");
@@ -269,6 +270,10 @@ fn runtime_override_is_labelled_on_the_root_span() {
     assert_eq!(
         attr(root, "frame.runtime.chain_code_hash"),
         Some(Value::from("0xbb"))
+    );
+    assert_eq!(
+        attr(root, "frame.runtime.override_version_differences"),
+        Some(Value::from("spec_version 1 -> 2"))
     );
 }
 

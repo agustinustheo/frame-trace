@@ -108,6 +108,7 @@ pub fn replay(
     oracle: bool,
 ) -> Result<CallReplay> {
     with_maintenance(session, || replay_inner(artifact, rpc, session, oracle))
+        .map_err(|e| crate::override_hint(session, e))
 }
 
 fn replay_inner(
@@ -217,4 +218,5 @@ pub fn authenticate_metadata(
         metadata::load(artifact, &db, &wasm, heap, session, &state)?;
         persist_export(&db, artifact)
     })
+    .map_err(|e| crate::override_hint(session, e))
 }

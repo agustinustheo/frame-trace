@@ -53,8 +53,9 @@ pub struct SourceArgs {
     /// Allow UNAUTHENTICATED metadata: RPC online, stored artifact metadata offline.
     #[arg(long = "unauthenticated-metadata", alias = "rpc-metadata-fallback")]
     pub rpc_metadata_fallback: bool,
-    /// Execute this Wasm instead of the block's authenticated :code (for example the same
-    /// runtime built with `with-tracing`). Bypasses the code-hash check; labelled in output.
+    /// Execute this Wasm instead of the authenticated :code, for example the same runtime
+    /// built with `with-tracing`. Bypasses the code-hash check. Labelled on stderr, in JSON
+    /// and in OTLP. Cannot be combined with --save.
     #[arg(long, value_name = "WASM", conflicts_with_all = ["from_file", "from_json", "save"])]
     pub runtime_override: Option<PathBuf>,
 }
@@ -71,16 +72,13 @@ pub fn read_runtime_override(path: Option<&Path>) -> Result<Option<Vec<u8>>> {
         "--runtime-override {} is empty",
         path.display()
     );
-    Ok(Some(wasm))
-}
-
-/// Print the override prominently; the executed code is not the chain's own.
-pub fn report_override(o: &frame_trace_replay::RuntimeOverride) {
+    frame_trace_replay::check_runtime_wasm(&wasm)
+        .with_context(|| format!("--runtime-override {}", path.display()))?;
     eprintln!(
-        "RUNTIME OVERRIDE: executed {:?} INSTEAD OF the authenticated :code {:?}; \
-         code-hash check BYPASSED (state proofs and any root check still apply)",
-        o.override_code_hash, o.chain_code_hash
+        "RUNTIME OVERRIDE: {} will execute instead of the chain's authenticated :code",
+        path.display()
     );
+    Ok(Some(wasm))
 }
 
 /// The JSON/OTLP label for a substitute runtime.
@@ -92,6 +90,7 @@ pub fn override_info(
         path: path.map(|p| p.display().to_string()).unwrap_or_default(),
         code_hash: format!("{:?}", o.override_code_hash),
         chain_code_hash: format!("{:?}", o.chain_code_hash),
+        version_differences: o.version_differences,
     })
 }
 
@@ -205,12 +204,14 @@ mod file {
 
 /// Both block and summary consume the same faithful measured result.
 pub fn replay_loaded(replay: frame_trace_replay::Replay, save: Option<&Path>) -> Result<Loaded> {
-    if let Some(o) = &replay.runtime_override {
-        report_override(o);
-    }
     eprintln!(
-        "root check: {}; RPC calls: {} (measured: {}); execution proof: {} bytes",
+        "root check: {}{}; RPC calls: {} (measured: {}); execution proof: {} bytes",
         if replay.root_check { "PASS" } else { "FAIL" },
+        if replay.runtime_override.is_some() {
+            " with RUNTIME OVERRIDE"
+        } else {
+            ""
+        },
         replay.rpc_count,
         replay.measured_rpc_count,
         replay.proof_bytes

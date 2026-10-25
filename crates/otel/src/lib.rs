@@ -627,6 +627,12 @@ fn override_attributes(block: &AnnotatedBlock, attrs: &mut Vec<KeyValue>) {
             "frame.runtime.chain_code_hash",
             o.chain_code_hash.clone(),
         ));
+        if !o.version_differences.is_empty() {
+            attrs.push(KeyValue::new(
+                "frame.runtime.override_version_differences",
+                o.version_differences.join("; "),
+            ));
+        }
     }
 }
 

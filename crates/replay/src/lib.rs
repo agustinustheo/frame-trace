@@ -16,7 +16,7 @@ use codec::{Decode, Encode};
 use frame_trace_model::ReplayCapture;
 use proof::ProofDb;
 use rpc::{Rpc, unhex};
-use sc_executor::WasmExecutor;
+use sc_executor::{RuntimeVersion, WasmExecutor};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sp_core::{
@@ -157,25 +157,135 @@ impl Artifact {
 }
 
 /// A substitute runtime executed instead of the state's authenticated `:code`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct RuntimeOverride {
     /// Blake2-256 of the authenticated parent-state `:code` that was NOT executed.
     pub chain_code_hash: H256,
     /// Blake2-256 of the substitute Wasm that was executed.
     pub override_code_hash: H256,
+    /// RuntimeVersion fields that differ, or a note that a version could not be read.
+    pub version_differences: Vec<String>,
+}
+
+/// Check that `code` is a runtime Wasm module, plain or SDK-compressed, before any replay.
+pub fn check_runtime_wasm(code: &[u8]) -> Result<()> {
+    use sp_maybe_compressed_blob::{CODE_BLOB_BOMB_LIMIT, decompress};
+    let plain = decompress(code, CODE_BLOB_BOMB_LIMIT)
+        .map_err(|e| Error::Invalid(format!("cannot decompress the SDK-compressed blob: {e}")))?;
+    if !plain.starts_with(b"\0asm") {
+        return Err(Error::Invalid(
+            "not a Wasm module: expected the \\0asm magic, plain or inside an SDK-compressed blob"
+                .into(),
+        ));
+    }
+    sc_executor_common::runtime_blob::RuntimeBlob::new(&plain)
+        .map_err(|e| Error::Invalid(format!("invalid Wasm module: {e}")))?;
+    Ok(())
+}
+
+/// Read a runtime's version from its embedded section, or by calling `Core_version`.
+fn read_version(executor: &Executor, code: &[u8]) -> std::result::Result<RuntimeVersion, String> {
+    use sp_core::traits::ReadRuntimeVersion;
+    let mut ext = sp_state_machine::BasicExternalities::default();
+    let encoded = executor.read_runtime_version(code, &mut ext)?;
+    RuntimeVersion::decode(&mut &encoded[..]).map_err(|e| e.to_string())
+}
+
+/// Human-readable differences between the chain's and the substitute's RuntimeVersion.
+fn version_differences(
+    chain: std::result::Result<RuntimeVersion, String>,
+    substitute: std::result::Result<RuntimeVersion, String>,
+) -> Vec<String> {
+    let (chain, substitute) = match (chain, substitute) {
+        (Ok(chain), Ok(substitute)) => (chain, substitute),
+        (chain, substitute) => {
+            let mut notes = Vec::new();
+            if let Err(e) = chain {
+                notes.push(format!("could not read the chain runtime version: {e}"));
+            }
+            if let Err(e) = substitute {
+                notes.push(format!("could not read the override runtime version: {e}"));
+            }
+            return notes;
+        }
+    };
+    let mut out = Vec::new();
+    macro_rules! differ {
+        ($($field:ident),*) => {$(
+            if chain.$field != substitute.$field {
+                out.push(format!(
+                    "{} {} -> {}",
+                    stringify!($field),
+                    chain.$field,
+                    substitute.$field
+                ));
+            }
+        )*};
+    }
+    differ!(spec_name, spec_version, transaction_version, system_version);
+    let apis = |v: &RuntimeVersion| {
+        let mut apis = v.apis.to_vec();
+        apis.sort_unstable();
+        apis
+    };
+    let (a, b) = (apis(&chain), apis(&substitute));
+    if a != b {
+        let changed = b.iter().filter(|api| !a.contains(api)).count();
+        let missing = a.iter().filter(|api| !b.contains(api)).count();
+        out.push(format!(
+            "runtime APIs differ ({changed} added or changed, {missing} removed or changed)"
+        ));
+    }
+    out
 }
 
 /// Returns the code to execute: the authenticated `:code`, or the session's explicit override.
+/// An override is announced, with any RuntimeVersion differences, before it runs.
 fn select_runtime(session: &ReplaySession, chain: Vec<u8>) -> (Vec<u8>, Option<RuntimeOverride>) {
-    match &session.runtime_override {
-        None => (chain, None),
-        Some(wasm) => {
-            let info = RuntimeOverride {
-                chain_code_hash: H256::from(sp_io::hashing::blake2_256(&chain)),
-                override_code_hash: H256::from(sp_io::hashing::blake2_256(wasm)),
-            };
-            (wasm.to_vec(), Some(info))
+    let Some(wasm) = &session.runtime_override else {
+        return (chain, None);
+    };
+    let chain_code_hash = H256::from(sp_io::hashing::blake2_256(&chain));
+    let override_code_hash = H256::from(sp_io::hashing::blake2_256(wasm.as_slice()));
+    let version_differences = version_differences(
+        read_version(&session.executor_for(&chain), &chain),
+        read_version(&session.executor_for(wasm), wasm),
+    );
+    let info = RuntimeOverride {
+        chain_code_hash,
+        override_code_hash,
+        version_differences,
+    };
+    let mut announced = session.announced_override.lock();
+    if announced.as_ref() != Some(&info) {
+        eprintln!(
+            "RUNTIME OVERRIDE: executing {override_code_hash:?} INSTEAD OF the authenticated \
+             :code {chain_code_hash:?}; code-hash check BYPASSED (state proofs and any root \
+             check still apply)"
+        );
+        if info.version_differences.is_empty() {
+            eprintln!("runtime override: RuntimeVersion matches the chain's :code");
         }
+        for difference in &info.version_differences {
+            eprintln!("warning: runtime override RuntimeVersion: {difference}");
+        }
+        *announced = Some(info.clone());
+    }
+    (wasm.to_vec(), Some(info))
+}
+
+/// Failures under a substitute runtime say so: it may be the cause.
+pub(crate) fn override_hint(session: &ReplaySession, error: Error) -> Error {
+    if session.runtime_override.is_none() {
+        return error;
+    }
+    const HINT: &str = "a runtime override was executed instead of the authenticated :code; \
+                        the runtime override may be the cause";
+    match error {
+        Error::Execution(text) => Error::Execution(format!("{text}; {HINT}")),
+        Error::CallExecution(text) => Error::CallExecution(format!("{text}; {HINT}")),
+        Error::Invalid(text) => Error::Invalid(format!("{text}; {HINT}")),
+        other => other,
     }
 }
 
@@ -271,6 +381,7 @@ pub fn replay_with_session(
     session: &ReplaySession,
 ) -> Result<Replay> {
     with_maintenance(session, || replay_inner(artifact, rpc, session))
+        .map_err(|e| override_hint(session, e))
 }
 
 fn with_maintenance<T>(session: &ReplaySession, run: impl FnOnce() -> Result<T>) -> Result<T> {
