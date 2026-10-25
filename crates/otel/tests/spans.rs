@@ -71,7 +71,7 @@ fn builds_block_phase_op_tree() {
     assert!(
         spans
             .iter()
-            .all(|s| attr(s, "frame.timing") == Some("synthetic".into()))
+            .all(|s| attr(s, "frame.timing") == Some("no timing".into()))
     );
 
     let root = by_name(&spans, "block 0x11111111…1111");
@@ -100,7 +100,7 @@ fn builds_block_phase_op_tree() {
     );
 
     let ext1 = by_name(&spans, "extrinsic 1: Balances.transfer_keep_alive");
-    assert_eq!(attr(ext1, "frame.phase"), Some("apply_extrinsic".into()));
+    assert_eq!(attr(ext1, "frame.phase"), Some("extrinsic".into()));
     assert_eq!(attr(ext1, "frame.extrinsic.index"), Some(Value::I64(1)));
     assert_eq!(
         attr(ext1, "frame.storage.duplicate_reads"),
@@ -181,6 +181,7 @@ fn builds_block_phase_op_tree() {
         .find(|s| attr(s, "frame.storage.child_trie").is_some())
         .unwrap();
     assert_eq!(child.name, "get child:0xbeef[0x01]");
+    assert_eq!(attr(child, "db.collection.name"), Some("child trie".into()));
 }
 
 fn synthetic_block(ops: usize) -> AnnotatedBlock {
@@ -383,7 +384,7 @@ fn measured_intervals_and_runtime_parent_tree() {
     assert!(
         spans
             .iter()
-            .all(|s| attr(s, "frame.timing") == Some("measured".into()))
+            .all(|s| attr(s, "frame.timing") == Some("timed replay".into()))
     );
     let dispatch = by_name(&spans, "dispatch");
     assert_eq!(
@@ -462,7 +463,7 @@ fn traced_batch_keeps_named_extrinsic_runtime_and_ops_in_one_tree() {
         }
         if span.name == "apply_extrinsic" {
             let parent = ids[&span.parent_span_id];
-            assert_eq!(attr(parent, "frame.phase"), Some("apply_extrinsic".into()));
+            assert_eq!(attr(parent, "frame.phase"), Some("extrinsic".into()));
             assert!(
                 spans
                     .iter()
@@ -607,8 +608,10 @@ fn measured_phases_without_ops_use_only_real_runtime_bounds() {
             attr(phase, "frame.phase.timing_available"),
             Some(true.into())
         );
+        assert_eq!(attr(phase, "frame.timing"), Some("timed replay".into()));
     }
     let untimed = by_name(&spans, "untimed finalization");
+    assert_eq!(attr(untimed, "frame.timing"), Some("no timing".into()));
     assert_eq!(
         (untimed.start_time, untimed.end_time),
         (start, start + Duration::from_nanos(100))
@@ -778,9 +781,9 @@ fn every_storage_op_has_a_collection_including_well_known_roots_and_iteration() 
     assert_eq!(
         collections,
         [
-            "well_known",
-            "well_known",
-            "well_known",
+            "well known keys",
+            "well known keys",
+            "well known keys",
             "state",
             "System",
             "state"
@@ -790,9 +793,9 @@ fn every_storage_op_has_a_collection_including_well_known_roots_and_iteration() 
 
 #[test]
 fn runtime_call_root_and_empty_calls_export_one_trace_with_explicit_semantics() {
-    for ops in [0, 2] {
+    for (ops, measured) in [(0, false), (2, false), (0, true), (2, true)] {
         let mut trace = synthetic_block(ops);
-        trace.timing = Some(frame_trace_model::MeasuredTiming {
+        trace.timing = measured.then_some(frame_trace_model::MeasuredTiming {
             start_ns: 0,
             duration_ns: 1_000_000,
         });
@@ -811,8 +814,19 @@ fn runtime_call_root_and_empty_calls_export_one_trace_with_explicit_semantics() 
         assert_eq!(root.parent_span_id, SpanId::INVALID);
         assert_eq!(attr(root, "frame.trace.kind"), Some("call".into()));
         assert_eq!(
+            attr(root, "frame.timing"),
+            Some(
+                if measured {
+                    "timed replay"
+                } else {
+                    "no timing"
+                }
+                .into()
+            )
+        );
+        assert_eq!(
             attr(root, "frame.root_check"),
-            Some("not_applicable".into())
+            Some("not applicable".into())
         );
         assert_eq!(attr(root, "frame.call.oracle_match"), Some(true.into()));
         assert_eq!(attr(root, "frame.call.oracle_source"), Some("live".into()));
@@ -839,11 +853,24 @@ fn observed_read_origins_and_proof_bytes_are_otlp_attributes() {
         op.proof_bytes_added = Some(if origin == "backend_cold" { 100 } else { 0 });
     }
     let spans = export(&block, Timing::default());
-    for origin in ["overlay", "backend_warm", "backend_cold"] {
+    // The annotated fields serialized to JSON retain their original identifiers.
+    for (op, raw) in block.phases[0]
+        .ops
+        .iter()
+        .zip(["overlay", "backend_warm", "backend_cold"])
+    {
+        assert_eq!(op.origin.as_deref(), Some(raw));
+    }
+    for (origin, label) in [
+        ("overlay", "cache"),
+        ("backend_warm", "trie (already in proof)"),
+        ("backend_cold", "trie (new)"),
+    ] {
         let span = spans
             .iter()
-            .find(|s| attr(s, "frame.storage.origin") == Some(origin.into()))
+            .find(|s| attr(s, "frame.storage.origin_raw") == Some(origin.into()))
             .unwrap();
+        assert_eq!(attr(span, "frame.storage.origin"), Some(label.into()));
         assert_eq!(
             attr(span, "frame.storage.proof_bytes"),
             Some(
@@ -855,5 +882,82 @@ fn observed_read_origins_and_proof_bytes_are_otlp_attributes() {
                 .into()
             )
         );
+    }
+}
+
+#[test]
+fn absent_and_unrecognized_origins_export_unknown_and_preserve_raw_values() {
+    let mut block = synthetic_block(3);
+    block.phases[0].ops[1].origin = Some("unknown".into());
+    block.phases[0].ops[2].origin = Some("legacy_origin".into());
+    for measured in [false, true] {
+        block.timing = measured.then_some(frame_trace_model::MeasuredTiming {
+            start_ns: 0,
+            duration_ns: 100,
+        });
+        let spans = export(&block, Timing::default());
+        for (seq, raw) in [None, Some("unknown"), Some("legacy_origin")]
+            .into_iter()
+            .enumerate()
+        {
+            let span = spans
+                .iter()
+                .find(|s| attr(s, "frame.storage.seq") == Some((seq as i64).into()))
+                .unwrap();
+            assert_eq!(attr(span, "frame.storage.origin"), Some("unknown".into()));
+            assert_eq!(attr(span, "frame.storage.origin_raw"), raw.map(Value::from));
+            // Missing operation timing stays explicit even within a timed replay.
+            assert_eq!(attr(span, "frame.timing"), Some("no timing".into()));
+        }
+    }
+}
+
+#[test]
+fn phase_attributes_use_readable_labels_without_changing_json() {
+    let labels = [
+        ("initialization", "initialization"),
+        ("apply_extrinsic", "extrinsic"),
+        ("post_inherents", "post inherents (on_poll)"),
+        ("finalization", "finalization"),
+        ("unsegmented", "no phase markers"),
+        ("call", "call"),
+        ("signed_extrinsics", "signed extrinsics"),
+        ("extrinsics_unknown", "extrinsics (signature unknown)"),
+        ("inherents", "inherents (required extrinsics)"),
+    ];
+    for measured in [false, true] {
+        let mut block = synthetic_block(1);
+        block.timing = measured.then_some(frame_trace_model::MeasuredTiming {
+            start_ns: 0,
+            duration_ns: 100,
+        });
+        let original = block.phases[0].clone();
+        block.phases = labels
+            .iter()
+            .map(|(raw, _)| {
+                let mut phase = original.clone();
+                phase.kind = (*raw).into();
+                phase.label = (*raw).into();
+                phase.ops[0].timing = block.timing;
+                phase
+            })
+            .collect();
+        let spans = export(&block, Timing::default());
+        for (i, (raw, label)) in labels.iter().enumerate() {
+            let span = by_name(&spans, raw);
+            assert_eq!(attr(span, "frame.phase"), Some((*label).into()));
+            assert_eq!(
+                attr(span, "frame.timing"),
+                Some(
+                    if measured {
+                        "timed replay"
+                    } else {
+                        "no timing"
+                    }
+                    .into()
+                )
+            );
+            assert_eq!(block.phases[i].kind, *raw);
+        }
     }
 }

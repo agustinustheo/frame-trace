@@ -1,6 +1,6 @@
 //! OpenTelemetry export for frame-trace.
 //!
-//! One trace per block, following the trace model in `SPEC.md`:
+//! One trace per block, following the trace model in `dev/SPEC.md`:
 //!
 //! ```text
 //! block 0xabc…                                     root span, block totals
@@ -14,7 +14,7 @@
 //! ```
 //!
 //! `state_traceBlock` gives order but no timing, so ops get synthetic, evenly spaced timestamps
-//! and every span carries `frame.timing = "synthetic"`. Spans are built with the OpenTelemetry
+//! and every span carries `frame.timing = "no timing"`. Spans are built with the OpenTelemetry
 //! SDK directly (not through `tracing-opentelemetry`).
 
 use std::time::{Duration, SystemTime};
@@ -187,7 +187,7 @@ pub fn record_block(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) 
         .unwrap_or(0);
 
     let mut attrs = vec![
-        KeyValue::new("frame.timing", "synthetic"),
+        KeyValue::new("frame.timing", "no timing"),
         KeyValue::new("frame.block.hash", block.block_hash.clone()),
         KeyValue::new("frame.block.parent_hash", block.parent_hash.clone()),
         KeyValue::new(
@@ -209,7 +209,7 @@ pub fn record_block(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) 
     if let Some(call) = &block.call {
         attrs.push(KeyValue::new("frame.trace.kind", "call"));
         attrs.push(KeyValue::new("frame.call.method", call.method.clone()));
-        attrs.push(KeyValue::new("frame.root_check", "not_applicable"));
+        attrs.push(KeyValue::new("frame.root_check", "not applicable"));
         attrs.push(KeyValue::new("frame.state.root", call.state_root.clone()));
         attrs.push(KeyValue::new("frame.proof.bytes", count(call.proof_bytes)));
         if let Some(matched) = call.oracle_match {
@@ -241,7 +241,7 @@ fn record_measured(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) -
     use std::collections::HashMap;
     let at = |ns| timing.start + Duration::from_nanos(ns);
     let mut attrs = vec![
-        KeyValue::new("frame.timing", "measured"),
+        KeyValue::new("frame.timing", "timed replay"),
         KeyValue::new("frame.block.hash", block.block_hash.clone()),
         KeyValue::new("frame.block.parent_hash", block.parent_hash.clone()),
         KeyValue::new("frame.trace.skipped_events", count(block.skipped_events)),
@@ -263,7 +263,7 @@ fn record_measured(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) -
     if let Some(call) = &block.call {
         attrs.push(KeyValue::new("frame.trace.kind", "call"));
         attrs.push(KeyValue::new("frame.call.method", call.method.clone()));
-        attrs.push(KeyValue::new("frame.root_check", "not_applicable"));
+        attrs.push(KeyValue::new("frame.root_check", "not applicable"));
         attrs.push(KeyValue::new("frame.state.root", call.state_root.clone()));
         attrs.push(KeyValue::new("frame.proof.bytes", count(call.proof_bytes)));
         if let Some(matched) = call.oracle_match {
@@ -391,8 +391,15 @@ fn record_measured(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) -
                 &root
             };
         let mut attrs = vec![
-            KeyValue::new("frame.timing", "measured"),
-            KeyValue::new("frame.phase", phase.kind.clone()),
+            KeyValue::new(
+                "frame.timing",
+                if phase_timed[i] {
+                    "timed replay"
+                } else {
+                    "no timing"
+                },
+            ),
+            KeyValue::new("frame.phase", phase_label(&phase.kind).to_owned()),
         ];
         attrs.push(KeyValue::new(
             "frame.phase.timing_available",
@@ -428,7 +435,7 @@ fn record_measured(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) -
             .and_then(|id| contexts.get(&id))
             .unwrap_or(phase_cx);
         let mut attrs = vec![
-            KeyValue::new("frame.timing", "measured"),
+            KeyValue::new("frame.timing", "timed replay"),
             KeyValue::new("frame.runtime.target", observed.target.clone()),
         ];
         if observed.name == "apply_extrinsic" {
@@ -496,8 +503,8 @@ fn record_phase(
 ) -> usize {
     let slots = phase.seq_span().unwrap_or(0..0);
     let mut attrs = vec![
-        KeyValue::new("frame.timing", "synthetic"),
-        KeyValue::new("frame.phase", phase.kind.clone()),
+        KeyValue::new("frame.timing", "no timing"),
+        KeyValue::new("frame.phase", phase_label(&phase.kind).to_owned()),
     ];
     if let Some(index) = phase.extrinsic_index {
         attrs.push(KeyValue::new("frame.extrinsic.index", i64::from(index)));
@@ -532,14 +539,23 @@ fn record_phase(
     spans
 }
 
+// Presentation labels belong to OTLP; the annotated JSON keeps its stable identifiers.
+fn phase_label(kind: &str) -> &str {
+    match kind {
+        "apply_extrinsic" => "extrinsic",
+        "unsegmented" => "no phase markers",
+        other => frame_trace_model::PhaseKind::label(other),
+    }
+}
+
 fn op_attributes(op: &AnnotatedOp, extrinsic_index: Option<u32>) -> Vec<KeyValue> {
     let mut attrs = vec![
         KeyValue::new(
             "frame.timing",
             if op.timing.is_some() {
-                "measured"
+                "timed replay"
             } else {
-                "synthetic"
+                "no timing"
             },
         ),
         KeyValue::new("db.system.name", DB_SYSTEM),
@@ -550,17 +566,24 @@ fn op_attributes(op: &AnnotatedOp, extrinsic_index: Option<u32>) -> Vec<KeyValue
         KeyValue::new("frame.storage.duplicate_read", op.duplicate_read),
         KeyValue::new("frame.storage.key_complete", op.key_complete),
     ];
-    if let Some(origin) = &op.origin {
-        attrs.push(KeyValue::new("frame.storage.origin", origin.clone()));
+    let origin = match op.origin.as_deref() {
+        Some("overlay") => "cache",
+        Some("backend_warm") => "trie (already in proof)",
+        Some("backend_cold") => "trie (new)",
+        _ => "unknown",
+    };
+    attrs.push(KeyValue::new("frame.storage.origin", origin));
+    if let Some(raw) = &op.origin {
+        attrs.push(KeyValue::new("frame.storage.origin_raw", raw.clone()));
     }
     if let Some(bytes) = op.proof_bytes_added {
         attrs.push(KeyValue::new("frame.storage.proof_bytes", count(bytes)));
     }
     let collection = op.pallet.as_deref().unwrap_or_else(|| {
         if op.child_trie.is_some() {
-            "child_trie"
+            "child trie"
         } else if op.item.starts_with(':') {
-            "well_known"
+            "well known keys"
         } else if matches!(op.op.as_str(), "storage_root" | "iteration" | "next_key")
             || op.key == "0x"
         {

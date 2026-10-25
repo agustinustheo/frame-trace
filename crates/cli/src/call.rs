@@ -19,7 +19,12 @@ pub struct CallArgs {
     #[arg(long, value_name = "URL", requires_all = ["method", "call_input"])]
     rpc: Option<String>,
     /// State block number, hash, best (default), or finalized.
-    #[arg(long, requires = "rpc", conflicts_with = "offline")]
+    #[arg(
+        long,
+        value_name = "NUMBER|HASH|best|finalized",
+        requires = "rpc",
+        conflicts_with = "offline"
+    )]
     at: Option<String>,
     /// Runtime API export, for example AccountNonceApi_account_nonce.
     #[arg(long, conflicts_with = "offline")]

@@ -307,7 +307,7 @@ pub struct Replay {
     pub runtime_override: Option<RuntimeOverride>,
 }
 
-/// Fetch a number, hash, or `best` block. Context and proofs are pinned to its parent.
+/// Fetch a number, hash, `best`, or `finalized` block. Context and proofs are pinned to its parent.
 pub fn online(rpc: &Rpc, selector: &str) -> Result<Replay> {
     online_with_session(rpc, selector, ReplaySession::shared()?)
 }
@@ -316,6 +316,16 @@ pub fn online_with_session(rpc: &Rpc, selector: &str, session: &ReplaySession) -
     let initial_calls = rpc.count();
     let hash = if selector == "best" {
         None
+    } else if selector == "finalized" {
+        let value = rpc.call("chain_getFinalizedHead", json!([]))?;
+        if value.is_null() {
+            return Err(Error::Invalid(format!("block {selector} not found")));
+        }
+        Some(
+            serde_json::from_value::<H256>(value).map_err(|e| {
+                Error::Rpc(format!("chain_getFinalizedHead: malformed response: {e}"))
+            })?,
+        )
     } else if selector.starts_with("0x") {
         Some(
             selector

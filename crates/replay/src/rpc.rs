@@ -482,6 +482,7 @@ mod tests {
             "1000",
             "0x1111111111111111111111111111111111111111111111111111111111111111",
             "best",
+            "finalized",
         ] {
             let (rpc, worker) =
                 responses(vec![(200, r#"{"jsonrpc":"2.0","id":$ID,"result":null}"#)]);

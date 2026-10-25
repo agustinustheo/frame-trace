@@ -32,8 +32,8 @@ pub struct SourceArgs {
         conflicts_with = "offline"
     )]
     pub rpc: Option<String>,
-    /// Block number, hash or `best` to trace with --rpc.
-    #[arg(long, value_name = "NUMBER|HASH|best")]
+    /// Block number, hash, `best` or `finalized` to trace with --rpc.
+    #[arg(long, value_name = "NUMBER|HASH|best|finalized")]
     pub block: Option<String>,
     /// Replay a saved artifact with no network.
     #[arg(long, value_name = "DIR", conflicts_with = "block")]

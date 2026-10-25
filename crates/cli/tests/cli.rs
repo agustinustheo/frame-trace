@@ -119,6 +119,11 @@ fn command_help_has_plain_descriptions_examples_and_hidden_compatible_aliases() 
         if command == "call" {
             assert!(help.contains("--check-state-call"), "{help}");
         }
+        if matches!(command, "block" | "summary" | "call") {
+            let flag = if command == "call" { "--at" } else { "--block" };
+            assert!(help.contains(&format!("{flag} finalized")), "{help}");
+            assert!(help.contains("NUMBER|HASH|best|finalized"), "{help}");
+        }
         if command != "report" {
             assert!(help.contains("1–64"), "{help}");
         }
@@ -551,6 +556,107 @@ fn artifact_rpc(
         "state_getReadProof" => json!({"at":artifact.block["header"]["parentHash"],"proof":artifact.proof_nodes}),
         method => panic!("unexpected method {method}"),
     }})
+}
+
+#[test]
+fn block_and_summary_pin_the_finalized_head_before_replay() {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+    let _guard = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    for command in ["block", "summary"] {
+        let artifact = frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
+            "replay/people-transfer",
+        )))
+        .unwrap();
+        let hash = serde_json::json!(artifact.block_hash);
+        let heads = Arc::new(AtomicUsize::new(0));
+        let requests = heads.clone();
+        let node = MockNode::new(move |request| {
+            match request["method"].as_str().unwrap() {
+                "chain_getFinalizedHead" => {
+                    assert_eq!(request["params"], serde_json::json!([]));
+                    requests.fetch_add(1, Ordering::SeqCst);
+                }
+                "chain_getBlock" => assert_eq!(request["params"], serde_json::json!([hash])),
+                "chain_getBlockHash" => panic!("finalized must use its pinned hash"),
+                _ => {}
+            }
+            artifact_rpc(&artifact, request)
+        });
+        let out = run(&[command, "--rpc", &node.url, "--block", "finalized"]);
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(out.status.success(), "{stderr}");
+        assert!(stderr.contains("root check: PASS"), "{stderr}");
+        assert_eq!(heads.load(Ordering::SeqCst), 1);
+    }
+}
+
+#[test]
+fn call_pins_finalized_state_for_replay_and_state_call_check() {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+    let _guard = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    let artifact = frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
+        "replay/call-westend-nonce",
+    )))
+    .unwrap();
+    let context = artifact.call.clone().unwrap();
+    let hash = serde_json::json!(artifact.block_hash);
+    let expected_hash = hash.clone();
+    let heads = Arc::new(AtomicUsize::new(0));
+    let requests = heads.clone();
+    let node = MockNode::new(move |request| {
+        use serde_json::json;
+        let result = match request["method"].as_str().unwrap() {
+            "chain_getFinalizedHead" => {
+                assert_eq!(request["params"], json!([]));
+                requests.fetch_add(1, Ordering::SeqCst);
+                hash.clone()
+            }
+            "chain_getHeader" => {
+                assert_eq!(request["params"], json!([hash]));
+                artifact.parent_header.clone()
+            }
+            "state_getRuntimeVersion" => {
+                assert_eq!(request["params"], json!([hash]));
+                artifact.runtime_version.clone()
+            }
+            "state_getReadProof" => {
+                assert_eq!(request["params"][1], hash);
+                json!({"at":hash,"proof":artifact.proof_nodes})
+            }
+            "state_call" => {
+                assert_eq!(request["params"][2], hash);
+                json!("0x08020000")
+            }
+            method => panic!("unexpected method {method}"),
+        };
+        json!({"result":result})
+    });
+    let out = run(&[
+        "call",
+        "--rpc",
+        &node.url,
+        "--at",
+        "finalized",
+        "--method",
+        &context.method,
+        "--data",
+        &context.data,
+        "--check-state-call",
+        "--json",
+        "-",
+    ]);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "{stderr}");
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["block_hash"], expected_hash);
+    assert_eq!(json["call"]["oracle_match"], true);
+    assert_eq!(heads.load(Ordering::SeqCst), 1);
 }
 
 #[test]

@@ -28,17 +28,17 @@ enum Command {
     Report(report::ReportArgs),
     /// Trace storage use and the result of a runtime API call.
     #[command(
-        after_help = "Examples:\n  frame-trace call --rpc URL --method Core_version --data 0x --check-state-call\n  frame-trace call --offline fixtures/replay/call-people-nonce --summary"
+        after_help = "Examples:\n  frame-trace call --rpc URL --at finalized --method Core_version --data 0x --check-state-call\n  frame-trace call --offline fixtures/replay/call-people-nonce --summary"
     )]
     Call(call::CallArgs),
     /// Trace storage use in one block and export it to JSON or a trace viewer.
     #[command(
-        after_help = "Examples:\n  frame-trace block --rpc URL --block best --otlp\n  frame-trace block --offline fixtures/replay/people-traced --json block.json"
+        after_help = "Examples:\n  frame-trace block --rpc URL --block finalized --otlp\n  frame-trace block --offline fixtures/replay/people-traced --json block.json"
     )]
     Block(BlockArgs),
     /// Show storage use by block phase and storage item.
     #[command(
-        after_help = "Examples:\n  frame-trace summary --rpc URL --block best\n  frame-trace summary --from-json block.json"
+        after_help = "Examples:\n  frame-trace summary --rpc URL --block finalized\n  frame-trace summary --from-json block.json"
     )]
     Summary(SummaryArgs),
     /// Trace new finalized blocks as they arrive.
