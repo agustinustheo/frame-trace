@@ -10,7 +10,7 @@ frame-trace replays a Polkadot SDK block, or a runtime API call, outside the nod
 - **Every storage op, in order, timed.** Reads, writes, prefix deletions, child tries and iteration, including the events the node's own `state_traceBlock` drops.
 - **Where each read came from.** Overlay (cache in the block), warm trie read, or cold trie read, and how many proof bytes each op added. Proof bytes add up exactly to the block's execution proof.
 - **Readable.** Keys decode to `System::Account(5Grw…)`, extrinsics to `Balances.transfer_keep_alive`, hooks to `on_initialize: Balances`. Metadata is computed locally from the verified runtime, not trusted from the node.
-- **Runtime spans** (dispatch, `batch` → `transfer_keep_alive`, hooks) when the runtime was built with `with-tracing`.
+- **Runtime spans** (dispatch, `batch` → `transfer_keep_alive`, hooks) when the runtime was built with `with-tracing`. For a live chain, build the same runtime source with tracing and replay real blocks with `--runtime-override`: the root check still passes, and the output is labelled as an override everywhere. See [docs/runtime-spans.md](docs/runtime-spans.md).
 - **Commands:** `block`, `call`, `summary`, `report` (many blocks), `follow` (each finalized block). Traces go to Jaeger/Tempo over OTLP, or to JSON. Replays can be saved and re-run offline.
 
 Try it:
@@ -31,7 +31,7 @@ Then open http://127.0.0.1:16686.
 | Research (`research/01`–`04`) | Nobody exports Substrate storage traces to OpenTelemetry. `state_traceBlock` is the closest piece. |
 | E1 (`experiments/e1`) | `state_traceBlock` is not enough: unsafe RPC only, drops keyless events, no timing or nesting, and omni-node dev mode can't replay signed blocks. Two upstream bug reports drafted in `upstream/` (not filed). |
 | E2 (`experiments/e2`) | Self-replay from safe RPC works, with the real root check. Became the main path. |
-| Code | 5 crates, ~150 tests, five review rounds (GPT 6.1 Sol High + Haiku 5.5 High), each verified by Opus 5.5 Medium. |
+| Code | 5 crates, 165 tests, seven review rounds (GPT 6.1 Sol High + Haiku 5.5 High), each verified by Opus 5.5 Medium. |
 | First findings (`research/05-first-findings.md`) | 65 blocks traced. Most storage work is block initialization and finalization, not user extrinsics. `System::BlockWeight` is touched 100–143 times per block. In a 3-transfer batch, Alice's account is read 48 times: 42 from the overlay, 5 warm, 1 cold. |
 
 ## Limits
