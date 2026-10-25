@@ -41,18 +41,21 @@ jobs:
       - name: Build documentation
         run: mdbook build
 
+      # Deploying needs GitHub Pages enabled for the repository. Set the repository
+      # variable DOCS_DEPLOY to "true" once it is; until then the book is only built.
       - name: Configure GitHub Pages
-        if: github.event_name != 'pull_request'
+        if: github.event_name != 'pull_request' && vars.DOCS_DEPLOY == 'true'
         uses: actions/configure-pages@v5
 
       - name: Upload GitHub Pages artifact
+        if: vars.DOCS_DEPLOY == 'true'
         uses: actions/upload-pages-artifact@v3
         with:
           path: book
 
   deploy:
     name: Deploy GitHub Pages
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.DOCS_DEPLOY == 'true'
     needs: build
     runs-on: ubuntu-latest
     permissions:
