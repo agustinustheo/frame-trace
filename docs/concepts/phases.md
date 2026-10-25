@@ -12,7 +12,7 @@ In the tables each phase is a row.
 | `initialization` | Block setup and every pallet's `on_initialize` hook. |
 | `extrinsic N: Pallet.call` | One extrinsic, numbered from 0 in block order, for example `extrinsic 2: Utility.batch`. |
 | `post inherents (on_poll)` | Hooks that run after the required extrinsics, such as `on_poll`. |
-| `finalization` | Every pallet's `on_idle` and `on_finalize` hook, then the final checks. |
+| `finalization` | `on_idle` hooks, when weight remains and no multi-block migration is running, then every pallet's `on_finalize` hook, then the final checks. |
 
 Here is block #4 of the People fixture as `summary` prints it:
 
@@ -33,20 +33,23 @@ Here is block #4 of the People fixture as `summary` prints it:
 ## Why post inherents sit inside an extrinsic
 
 The runtime runs the post-inherent hooks lazily.
-They start when the first signed extrinsic is applied, inside that extrinsic.
-frame-trace shows them nested under that extrinsic, with `└`, and counts them separately.
+They start when the first extrinsic that is not an inherent is applied, inside that extrinsic.
+That extrinsic is usually signed, but it can be an unsigned one.
+frame-trace shows the hooks nested under it, with `└`, and counts them separately.
 The extrinsic's own row does not include them.
-If a block has no signed extrinsic, post inherents is a phase of its own, as in most Westend Asset Hub blocks.
+If a block has only inherents, post inherents is a phase of its own, as in most Westend Asset Hub blocks.
 
 ## Phase groups
 
 When frame-trace adds up many blocks, it groups the extrinsic phases.
+It sorts them by whether the extrinsic is signed, read from the extrinsic's bytes.
+That is an approximation of inherents and user transactions: an unsigned extrinsic that is not an inherent lands in the inherents group.
 The group names appear in the **Phase shares** table:
 
 | Group | Contains |
 | --- | --- |
 | `initialization` | The initialization phase. |
-| `inherents (required extrinsics)` | Unsigned extrinsics the block must contain, such as `Timestamp.set` and `ParachainSystem.set_validation_data`. |
+| `inherents (required extrinsics)` | Unsigned extrinsics, such as the inherents `Timestamp.set` and `ParachainSystem.set_validation_data`. |
 | `signed extrinsics` | Extrinsics a user signed. |
 | `extrinsics (signature unknown)` | Extrinsics whose bytes did not say whether they are signed. |
 | `post inherents (on_poll)` | The post-inherent hooks. |

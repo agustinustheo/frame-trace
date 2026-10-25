@@ -56,7 +56,7 @@ Top-level fields:
 | `kind` | `initialization`, `apply_extrinsic`, `post_inherents` or `finalization`. |
 | `label` | The name in tables and Jaeger, such as `extrinsic 2: Utility.batch`. |
 | `extrinsic_index`, `call`, `signed` | For extrinsics: the index, `Pallet.call`, and whether it was signed. |
-| `call_error` | The dispatch error if the extrinsic failed, otherwise `null`. |
+| `call_error` | Why frame-trace could not decode the extrinsic's call name, otherwise `null`. It says nothing about whether the extrinsic succeeded. |
 | `stats` | Counts for this phase, see [Stats](#stats). |
 | `wall_time` | `start_ns`, `end_ns`, `duration_ns` and `source`. `source` is `runtime_span` when the runtime reported the phase, or `storage_envelope` when the times run from the first to the last storage call. `null` without times. |
 | `ops` | The storage operations, in order. |
@@ -107,10 +107,19 @@ The first read of Alice's account in block #4:
 | `child_trie`, `child_trie_truncated` | The child trie, for child trie operations. |
 | `value_len`, `value_truncated` | Length of the value in bytes, and whether it was cut. |
 | `duplicate_read` | `true` if the key was already read in this phase. |
-| `origin` | Reads only. `overlay` is **cache**, `backend_warm` is **trie (already in proof)**, `backend_cold` is **trie (new)**. `null` or missing means not recorded. See [Cache or trie](../concepts/cache-or-trie.md). |
+| `origin` | Reads only. `null` or missing means not recorded. See the table below and [Cache or trie](../concepts/cache-or-trie.md). |
 | `proof_bytes_added` | Bytes this operation added to the proof. `0` is a measured zero. `null` or missing means not recorded. See [Proof bytes](../concepts/proof-bytes.md). |
 | `timing` | `start_ns` and `duration_ns` on your machine. |
 | `parent_span` | The `id` of the runtime span this operation ran in. |
+
+The `origin` values, which Jaeger also shows as `frame.storage.origin_raw`:
+
+| JSON `origin` | Jaeger `frame.storage.origin` and tables |
+| --- | --- |
+| `overlay` | `cache` |
+| `backend_warm` | `trie (already in proof)` |
+| `backend_cold` | `trie (new)` |
+| `null` or missing | `unknown` |
 
 ### Stats
 

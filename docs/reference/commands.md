@@ -47,6 +47,8 @@ frame-trace block --offline fixtures/replay/people-traced --json block.json
 
 Without `--otlp` or `--json`, `block` prints a one-line count of phases and operations.
 
+Flags that do not apply to the chosen source are refused, with exit code 2: `--block` and `--proof-concurrency` need `--rpc`, `--metadata` needs `--from-file`, and the cache and metadata flags do not work with `--from-file` or `--from-json`.
+
 Without `--cache-dir`, compiled runtimes are still kept in `$XDG_CACHE_HOME/frame-trace/wasm` (or `~/.cache/frame-trace/wasm`), and fetched state stays in memory only.
 
 ## summary
@@ -117,6 +119,7 @@ frame-trace report --rpc URL --last 10
 | `--json <FILE>` | | Write the report as JSON. `-` writes it to stdout and the tables to stderr. |
 
 A range holds at most 10,000 blocks.
+`--concurrency`, `--proof-concurrency`, `--cache-dir` and `--cache-max-bytes` need `--rpc`; with saved files they are refused.
 
 ## follow
 

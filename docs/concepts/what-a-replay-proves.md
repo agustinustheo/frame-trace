@@ -27,9 +27,9 @@ flowchart LR
    frame-trace compares it with the root in the block header and prints both.
 5. **Export.** Only after a pass does frame-trace send the trace to OTLP or write JSON.
 
-frame-trace runs the block twice.
-The first run fetches the state the block needs.
-The second run, the **timed replay**, uses only what the first run fetched and makes no network calls.
+frame-trace first fetches and prepares the state the block needs.
+That preparation can run the block more than once, to find which state it reads.
+Then it runs a final **timed replay** that uses only the prepared state and makes no network calls.
 The trace and its timings come from the timed replay.
 That is why the output says `RPC calls: 92 (timed replay: 0)`.
 

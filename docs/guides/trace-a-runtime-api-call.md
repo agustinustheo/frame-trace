@@ -12,12 +12,12 @@ This asks Westend Asset Hub for Alice's nonce at the latest final block:
 frame-trace call --rpc wss://westend-asset-hub-rpc.polkadot.io --at finalized \
   --method AccountNonceApi_account_nonce \
   --data 0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d \
-  --check-state-call --otlp
+  --check-state-call --otlp --save saved-call
 ```
 
 ```text
-call AccountNonceApi_account_nonce at #18596955: loading runtime and preparing state
-call AccountNonceApi_account_nonce at #18596955: 1 storage operations; result: 520
+call AccountNonceApi_account_nonce at #18598779: loading runtime and preparing state
+call AccountNonceApi_account_nonce at #18598779: 1 storage operations; result: 520
 root check: NOT APPLICABLE (runtime API call); authenticated state proofs; RPC calls: 11 (timed replay: 0); execution proof: 3713 bytes; proof request rounds: 1
 state_call check: MATCH
 exported 3 spans to http://127.0.0.1:4318
@@ -32,7 +32,8 @@ What the lines mean:
 | `execution proof: 3713 bytes` | The storage proof this call needed. |
 | `state_call check: MATCH` | The node's own `state_call` at the same block returned the same bytes. |
 
-In Jaeger the trace is named `call AccountNonceApi_account_nonce at #18596955`.
+`--save saved-call` also keeps the call for [offline replay](#replay-a-call-offline).
+In Jaeger the trace is named `call AccountNonceApi_account_nonce at #18598779`.
 
 ## 2. Choose the state
 
@@ -58,8 +59,8 @@ frame-trace call --rpc wss://westend-asset-hub-rpc.polkadot.io --at finalized \
 ```
 
 ```text
-call TransactionPaymentApi_query_weight_to_fee at #18596958: loading runtime and preparing state
-call TransactionPaymentApi_query_weight_to_fee at #18596958: 0 storage operations; result: 800000
+call TransactionPaymentApi_query_weight_to_fee at #18598782: loading runtime and preparing state
+call TransactionPaymentApi_query_weight_to_fee at #18598782: 0 storage operations; result: 800000
 root check: NOT APPLICABLE (runtime API call); authenticated state proofs; RPC calls: 9 (timed replay: 0); execution proof: 0 bytes; proof request rounds: 0
 ```
 
@@ -83,16 +84,16 @@ It still writes the JSON, saves and exports first.
 
 ## Replay a call offline
 
-`--save <dir>` keeps the call and its proofs.
-`--offline <dir>` runs it again with no network:
+The command in step 1 used `--save saved-call`, which keeps the call and its proofs.
+`--offline` runs it again with no network:
 
 ```sh
 frame-trace call --offline saved-call
 ```
 
 ```text
-call AccountNonceApi_account_nonce at #18596955: loading runtime and preparing state
-call AccountNonceApi_account_nonce at #18596955: 1 storage operations; result: 520
+call AccountNonceApi_account_nonce at #18598779: loading runtime and preparing state
+call AccountNonceApi_account_nonce at #18598779: 1 storage operations; result: 520
 root check: NOT APPLICABLE (runtime API call); authenticated state proofs; RPC calls: 0 (timed replay: 0); execution proof: 3713 bytes; proof request rounds: 0
 state_call check: MATCH (recorded; unverified)
 ```

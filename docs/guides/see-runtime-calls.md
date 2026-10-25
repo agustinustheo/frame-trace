@@ -49,8 +49,29 @@ Build it from the same source and version as the runtime on chain.
 It works with `block`, `summary` and `call`.
 frame-trace still fetches and checks all state, including the chain's runtime code, then runs your file instead.
 
-The block below comes from a People chain whose runtime has no tracing.
-`people-traced.wasm` is the same runtime built with `with-tracing`:
+For your own chain:
+
+```sh
+frame-trace block --rpc <url> --block finalized \
+  --runtime-override <path-to-your-traced-runtime.wasm> --otlp
+```
+
+### Try it with the shipped People runtime
+
+The repository ships a block from a People chain whose runtime has no tracing, `fixtures/replay/people-transfer`.
+It also ships the same runtime built with `with-tracing`, inside the saved block `fixtures/replay/people-traced`.
+It is the largest proof node in that file, so you can extract it with `zstd`, `jq` and `xxd`.
+Run this from the `frame-trace` directory:
+
+```sh
+zstd -dc fixtures/replay/people-traced/artifact.json.zst \
+  | jq -r '.proof_nodes | max_by(length) | ltrimstr("0x")' \
+  | xxd -r -p > people-traced.wasm
+```
+
+That runtime was built from the Individuality `next-people-paseo` runtime with one extra feature line, [`dev/experiments/e1/people-with-tracing.patch`](https://github.com/agustinustheo/frame-trace/blob/main/dev/experiments/e1/people-with-tracing.patch).
+
+Now replay the untraced block with it:
 
 ```sh
 frame-trace block --offline fixtures/replay/people-transfer \

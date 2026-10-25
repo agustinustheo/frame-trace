@@ -105,7 +105,7 @@ frame-trace checks the file before it replays anything.
 Drop `--save` when you use an override.
 See [See runtime calls inside extrinsics](guides/see-runtime-calls.md).
 
-## `<N> of <N> spans were not exported`
+## `<N> of <M> spans were not exported`
 
 ```text
 Error: exporting to http://127.0.0.1:4999: 428 of 428 spans were not exported (first error: Operation failed: HTTP export failed: network error)
@@ -118,6 +118,22 @@ Error: exporting to http://127.0.0.1:4999: 428 of 428 spans were not exported (f
 - Check that Jaeger or your collector is running: `docker ps`.
 - Check the port. OTLP/HTTP is usually 4318. The Jaeger web page, 16686, does not accept traces.
 - Map the port when you start Jaeger: `-p 4318:4318`.
+
+## `<N> of <M> spans rejected by the receiver`
+
+```text
+Error: exporting to http://127.0.0.1:4319: 5 of 428 spans rejected by the receiver: span attribute limit exceeded
+```
+
+This run used a test receiver that rejects five spans.
+
+**What it means.** The receiver answered, but refused some spans.
+The text after the last colon is the receiver's own reason.
+frame-trace exits with code 1, because the trace in your viewer is incomplete.
+
+**Fix.** Read the receiver's reason and its logs.
+Common causes are limits on attributes per span, span size or spans per request.
+Raise the limit in the receiver's configuration, or send to a receiver without it, such as a local Jaeger.
 
 ## No traces in Jaeger, but no error
 
@@ -160,13 +176,13 @@ For a call, use `--data` instead of `--args`.
 ## The first run is slow
 
 ```text
-replay #18597850: fetching state (up to 8 concurrent proof requests)
+replay #18598757: fetching state (up to 8 concurrent proof requests)
 ```
 
 This line can stay on screen for 20 seconds or more.
 
 **What it means.** frame-trace is fetching, with proofs, every piece of state the block reads.
-A Westend Asset Hub block needed 63 rounds of requests in [Your first trace](getting-started/first-trace.md).
+A Westend Asset Hub block needed 64 rounds of requests in [Your first trace](getting-started/first-trace.md).
 The first run also compiles the runtime.
 
 **Fix.**
@@ -180,12 +196,30 @@ The first run also compiles the runtime.
 
 ```text
 root check: NOT VERIFIED; RPC calls: 4
-Error: RPC error: chain_getBlockHash: connect wss://asset-hub-westend-rpc.dwellir.com: IO error: failed to lookup address information: nodename nor servname provided, or not known
+Error: RPC error: chain_getFinalizedHead: connect wss://asset-hub-westend-rpc.dwellir.com: IO error: failed to lookup address information: nodename nor servname provided, or not known
 ```
+
+This run used `--block finalized`, so the first request was `chain_getFinalizedHead`.
+With a block number it would be `chain_getBlockHash`.
 
 **What it means.** The RPC host name does not resolve.
 
 **Fix.** Check the URL for typos and check your network.
+
+## `the argument '…' cannot be used with '…'`
+
+```text
+error: the argument '--rpc <URL>' cannot be used with '--metadata <FILE>'
+
+Usage: frame-trace block --block <NUMBER|HASH|best|finalized> <--rpc <URL>|--offline <DIR>|--from-file <FILE>|--from-json <FILE>>
+```
+
+**What it means.** Two flags do not work together, so frame-trace refuses to run instead of ignoring one.
+For example, `--metadata` only applies to `--from-file`, `--block` only to `--rpc`, and `report --cache-dir` only to `report --rpc`.
+The exit code is 2.
+
+**Fix.** Drop the flag that does not apply to your source.
+[Commands and flags](reference/commands.md) says which flags go with which source.
 
 ## `range limit is 10000 blocks`
 

@@ -53,14 +53,24 @@ Search by span name, such as `extrinsic 2: Utility.batch`, or by attribute, such
 | `call` | One trace per call, rooted at `call <method> at #<number>`. |
 | `follow` | One trace per block, as each block is traced. |
 
-frame-trace waits until the receiver confirms every span.
-If some are lost, it fails:
+frame-trace waits for the receiver to answer and fails if it rejects any span.
+A receiver may still drop data later, for example through sampling or retention.
+
+If the receiver cannot be reached:
 
 ```text
 Error: exporting to http://127.0.0.1:4999: 428 of 428 spans were not exported (first error: Operation failed: HTTP export failed: network error)
 ```
 
-See [Troubleshooting](../troubleshooting.md#n-of-n-spans-were-not-exported).
+If it answers but rejects some spans:
+
+```text
+Error: exporting to http://127.0.0.1:4319: 5 of 428 spans rejected by the receiver: span attribute limit exceeded
+```
+
+Both exit with code 1.
+
+See [Troubleshooting](../troubleshooting.md#n-of-m-spans-were-not-exported).
 
 ## JSON
 
@@ -88,3 +98,9 @@ Use JSON to:
 frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block finalized \
   --otlp --json block.json --save saved-block
 ```
+
+## Before you share
+
+Traces and JSON hold raw storage keys and decoded names, including account addresses such as `5Grw…`.
+With `--runtime-override`, they also hold the local path of your Wasm file.
+Storage keys are not secrets on a public chain, but review traces before you upload them to a shared or hosted backend.

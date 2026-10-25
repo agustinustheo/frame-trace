@@ -38,9 +38,6 @@ jobs:
           cargo install mdbook --locked --version 0.4.52
           cargo install mdbook-mermaid --locked --version 0.16.0
 
-      - name: Add Mermaid assets
-        run: mdbook-mermaid install .
-
       - name: Build documentation
         run: mdbook build
 

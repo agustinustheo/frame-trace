@@ -49,7 +49,16 @@ frame-trace summary --rpc wss://westend-asset-hub-rpc.polkadot.io --block finali
 
 ## Choose an endpoint
 
-Any `ws://`, `wss://`, `http://` or `https://` RPC URL works.
+The URL can be `ws://`, `wss://`, `http://` or `https://`.
+The node must serve the standard methods, including `state_getReadProof`, which frame-trace uses for every piece of state.
+
+One block takes about 90 requests on Westend Asset Hub, and `report` and `follow` send that for every block.
+Before you trace ranges or follow a chain, check the endpoint's:
+
+- request limits: public endpoints can rate-limit you, and frame-trace then retries and slows down;
+- pricing, for paid providers that charge per request;
+- historical state, if you need old blocks.
+
 For an old block, the node must still have that block's parent state.
 
 > **Warning:** Most nodes keep only recent state. For older blocks, use an archive node. Otherwise the replay fails with `parent state may be pruned (use an archive endpoint)`.

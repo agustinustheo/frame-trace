@@ -40,11 +40,11 @@ frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block finalize
 You should see this. Your block number and sizes will differ.
 
 ```text
-replay #18597850: fetching state (up to 8 concurrent proof requests)
-replay #18597850: loading runtime and preparing state
-root check: PASS; RPC calls: 92 (timed replay: 0); execution proof: 90250 bytes
-fetching state #18597850: 63 proof request rounds; 92 RPC calls
-state root: computed 0xd38db8182fdc90a095595bb7a57fb30af7770e10effe0b217866132a2032663c; header 0xd38db8182fdc90a095595bb7a57fb30af7770e10effe0b217866132a2032663c
+replay #18598757: fetching state (up to 8 concurrent proof requests)
+replay #18598757: loading runtime and preparing state
+root check: PASS; RPC calls: 93 (timed replay: 0); execution proof: 90712 bytes
+fetching state #18598757: 64 proof request rounds; 93 RPC calls
+state root: computed 0x4f7fcffe3f0f1aa008fb3b26fd6130215382ff42372400e0dec39c78476164ba; header 0x4f7fcffe3f0f1aa008fb3b26fd6130215382ff42372400e0dec39c78476164ba
 exported 555 spans to http://127.0.0.1:4318
 ```
 
@@ -52,7 +52,7 @@ exported 555 spans to http://127.0.0.1:4318
 So the trace shows what the block really did.
 
 Open <http://127.0.0.1:16686>, pick the service `frame-trace` and click **Find Traces**.
-Open the trace `frame-trace: block #<number>`.
+Open the trace named `frame-trace: block #<number> (0x…)`.
 You will see the block's phases: initialization, the required extrinsics, post inherents and finalization.
 Each phase holds its storage reads and writes.
 Click any read to see where it was answered and its proof bytes.
@@ -78,7 +78,7 @@ The [documentation](docs/README.md) has:
 
 Internal notes, research and design documents are in [`dev/`](dev/README.md).
 Run `cargo test --workspace` before sending a change.
-Docs follow [docs/STYLE.md](docs/STYLE.md). Build them with `mdbook build`, which needs `mdbook` and `mdbook-mermaid`.
+Docs follow [docs/STYLE.md](docs/STYLE.md). Build them with `mdbook build`, using `mdbook` 0.4.52 and `mdbook-mermaid` 0.16.0.
 
 ## License
 

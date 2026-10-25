@@ -1,12 +1,14 @@
 # Measure proof size
 
-On a parachain, every block ships a storage proof to the relay chain.
-frame-trace tells you how big that proof is and which phases, items and extrinsics made it grow.
+A parachain block's proof of validity carries the trie nodes the block touched.
+frame-trace estimates the size of that storage proof and shows which phases, items and extrinsics made it grow.
+The number is an estimate of the recorded proof, not the exact PoV: the PoV also holds the block, and the proof is compacted and compressed.
+Use it to compare blocks and find what dominates.
 [Proof bytes](../concepts/proof-bytes.md) explains how the bytes are counted.
 
 ## 1. The whole block
 
-Every replay prints the size of the block's storage proof:
+Every replay prints the estimated size of the block's storage proof:
 
 ```sh
 frame-trace block --offline fixtures/replay/people-traced
@@ -19,7 +21,7 @@ root check: PASS; RPC calls: 0 (timed replay: 0); execution proof: 6586 bytes
 ```
 
 `execution proof: 6586 bytes` is the total for block #4.
-A live Westend Asset Hub block in [Your first trace](../getting-started/first-trace.md) needed 90,250 bytes.
+A live Westend Asset Hub block in [Your first trace](../getting-started/first-trace.md) needed 90,712 bytes.
 
 ## 2. Per phase
 

@@ -15,17 +15,17 @@ There are three origins.
 These three reads come from the first `transfer_keep_alive` in block #4 of the People fixture.
 Alice sends to Bob.
 
-![Three span detail panels: cache, trie already in proof, trie new](../images/cache-vs-trie.png)
+![Three numbered span detail panels: 1 cache, 2 trie (new), 3 trie (already in proof)](../images/cache-vs-trie.png)
 
-- **cache.** Alice's account was written earlier in the block, when her fee was taken.
-  Every later read of her account comes from that write in memory.
-  It costs no proof bytes.
-- **trie (new).** This is the first time the block reads Bob's account.
-  The runtime walks the trie from the state root down to Bob's entry.
-  Some nodes on that path were new to the block, so the read added 166 proof bytes.
-- **trie (already in proof).** The runtime reads Bob's account again, before anything writes it.
-  It walks the trie again, but every node is already in the proof.
-  It adds 0 proof bytes.
+1. **cache.** Alice's account was written earlier in the block, when her fee was taken.
+   Every later read of her account comes from that write in memory.
+   It costs no proof bytes.
+2. **trie (new).** This is the first time the block reads Bob's account.
+   The runtime walks the trie from the state root down to Bob's entry.
+   Some nodes on that path were new to the block, so the read added 166 proof bytes.
+3. **trie (already in proof).** The runtime reads Bob's account again, before anything writes it.
+   It walks the trie again, but every node is already in the proof.
+   It adds 0 proof bytes.
 
 ## Reading does not fill the cache
 

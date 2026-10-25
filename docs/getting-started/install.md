@@ -4,7 +4,7 @@ You need:
 
 - Rust. The repository pins version 1.93.0 in `rust-toolchain.toml`, and `rustup` installs it for you.
 - Docker, to run Jaeger. Any other trace viewer that accepts OTLP over HTTP also works.
-- The RPC URL of a node of the chain you want to trace. Any public endpoint works.
+- The RPC URL of a node of the chain you want to trace. It must serve `state_getReadProof`. See [Choose an endpoint](../guides/trace-a-block.md#choose-an-endpoint) before tracing many blocks.
 
 ## Build and install
 

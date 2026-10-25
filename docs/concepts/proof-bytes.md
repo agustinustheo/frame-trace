@@ -1,8 +1,8 @@
 # Proof bytes
 
-A block's **storage proof** is the set of trie nodes a verifier needs to re-run the block without the full state.
-On a parachain, this proof is part of what the relay chain validators receive.
-Its size is the `execution proof` that frame-trace prints after each replay:
+A block's **storage proof** is the set of trie nodes needed to re-run the block without the full state.
+frame-trace records those nodes while it replays the block.
+The `execution proof` it prints after each replay is an estimate of their encoded size:
 
 ```text
 root check: PASS; RPC calls: 0 (timed replay: 0); execution proof: 6586 bytes
@@ -39,6 +39,11 @@ Duplicate reads 203 = cache 177, trie (already in proof) 26, trie (new) 0, unkno
 | JSON | `proof_bytes_added` on each operation, `execution.proof_bytes` for the block | bytes |
 
 ## What proof bytes do not mean
+
+- The execution proof is not the block's proof of validity (PoV).
+  A parachain's PoV also holds the block itself, and collators send a compacted, compressed form of the proof.
+  frame-trace's number is an estimate of the recorded proof before that.
+  Use it to compare blocks and to find which phases and items dominate, not as the exact PoV size.
 
 - They are not the size of a proof for one item or one extrinsic on its own.
   An item that reads a node first pays for it, even if a later item needs it too.

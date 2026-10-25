@@ -38,3 +38,7 @@ The model is Sentry's docs: the README is a shop window, the first page ends wit
 11. **Screenshots have callouts.** Every image is annotated with numbered labels that the text refers to. Terminal output is text, not images.
 12. **No filler.** No "simply", "just", "easily", "note that", "it is important to", "in this guide we will". Headings in sentence case.
 13. **Only document what exists.** Every flag and output in the docs must match `frame-trace <command> --help` and a real run.
+
+## Building
+
+Run `mdbook build` from the repository root. It needs `mdbook` 0.4.52 and `mdbook-mermaid` 0.16.0. The Mermaid assets `mermaid.min.js` and `mermaid-init.js` are committed, so do not run `mdbook-mermaid install` again unless you upgrade it.

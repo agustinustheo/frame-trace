@@ -118,7 +118,7 @@ With `--runtime-override`, also:
 | `frame.storage.key_truncated` | bool | Present and `true` if the key was cut. |
 | `frame.storage.seq` | int | Position of this operation in the block, from 0. |
 | `frame.storage.origin` | string | Where a read was answered: `cache`, `trie (already in proof)` or `trie (new)`. `unknown` for writes and other operations, or when not recorded. See [Cache or trie](../concepts/cache-or-trie.md). |
-| `frame.storage.origin_raw` | string | The same origin with the JSON value: `overlay`, `backend_warm` or `backend_cold`. Absent when not recorded. |
+| `frame.storage.origin_raw` | string | The same origin as the JSON `origin` field. See [JSON output](json.md#a-storage-operation). Absent when not recorded. |
 | `frame.storage.proof_bytes` | int | Bytes this operation added to the block's proof. |
 | `frame.storage.duplicate_read` | bool | `true` if this key was already read in the same phase. |
 | `frame.storage.value_len` | int | Length of the value read or written, in bytes. |

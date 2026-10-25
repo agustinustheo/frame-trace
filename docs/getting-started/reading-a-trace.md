@@ -22,11 +22,11 @@ Open the trace `frame-trace: block #4 (0x06618995…0637)` in Jaeger.
 Collapse everything with `>>`, then open `block #4`, `extrinsic 1: Timestamp.set`, `apply_extrinsic` and `set`.
 Click the row `get Timestamp::Now`.
 
-![Jaeger trace page with eight numbered regions and attributes](../images/reading-a-trace.png)
+![Jaeger trace page with five numbered regions](../images/reading-a-trace.png)
 
 ## The regions
 
-1. **Trace summary.** Duration is the whole replay on your machine, 4.6 ms here. Total Spans counts every row in the trace.
+1. **Trace summary.** Duration is the whole replay on your machine, 4.7 ms here. Total Spans counts every row in the trace.
 2. **Mini map.** A small copy of the whole timeline. Drag across it to zoom in. The screenshot is zoomed to the part where the block runs.
 3. **Span tree.** One row per span, nested by parent. The badge on a parent counts its children.
 4. **Timeline.** One bar per span. The bar starts when the span started and its length is the time it took.
@@ -64,7 +64,11 @@ It is the same on every storage row.
 
 ## The attributes of a storage read
 
+Here is the details panel of `get Timestamp::Now` up close.
 Callouts 6 to 8 point at the numbers you use most:
+
+![The span details panel with callouts on origin, proof bytes and value length](../images/reading-a-trace-details.png)
+
 
 | Attribute | In the picture | Meaning |
 | --- | --- | --- |
@@ -106,3 +110,13 @@ Click the block row or a phase row to see its totals:
 
 - [Find repeated reads](../guides/find-repeated-reads.md) uses the same block to explain a read made 48 times.
 - [Cache or trie](../concepts/cache-or-trie.md) explains the three origins with three real reads.
+
+## Clean up
+
+When you've finished exploring, stop Jaeger:
+
+```sh
+docker stop jaeger
+```
+
+Jaeger keeps traces in memory, so stopping it deletes them.

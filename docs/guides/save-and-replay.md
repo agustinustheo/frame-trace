@@ -3,20 +3,21 @@
 `--save` keeps everything frame-trace needs to replay a block later: the block, its parent header, the runtime and the checked state.
 `--offline` replays it with no network at all.
 Use it to share a block with a colleague, attach it to a bug report or test the same block again and again.
+Read [Before you share](#before-you-share) first.
 
 ## 1. Save a block
 
 ```sh
-frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block best \
+frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block finalized \
   --save saved-block --json block.json
 ```
 
 ```text
-replay #18597005: fetching state (up to 8 concurrent proof requests)
-replay #18597005: loading runtime and preparing state
-root check: PASS; RPC calls: 91 (timed replay: 0); execution proof: 89714 bytes
-fetching state #18597005: 63 proof request rounds; 91 RPC calls
-state root: computed 0x02dd5dc7f6d94f1b4669f0449c31fc2a4831b24c89f52db00e24488994299fcf; header 0x02dd5dc7f6d94f1b4669f0449c31fc2a4831b24c89f52db00e24488994299fcf
+replay #18598772: fetching state (up to 8 concurrent proof requests)
+replay #18598772: loading runtime and preparing state
+root check: PASS; RPC calls: 92 (timed replay: 0); execution proof: 91062 bytes
+fetching state #18598772: 63 proof request rounds; 92 RPC calls
+state root: computed 0xfb9758620031f5227e6b1367d4deb04cab717c33605bc96b17f11227d7279b7a; header 0xfb9758620031f5227e6b1367d4deb04cab717c33605bc96b17f11227d7279b7a
 ```
 
 `saved-block/` now holds one file, `artifact.json.zst`, of 3.0 MB.
@@ -30,11 +31,11 @@ frame-trace block --offline saved-block --otlp
 ```
 
 ```text
-replay #18597005: loading runtime and preparing state
-root check: PASS; RPC calls: 0 (timed replay: 0); execution proof: 89714 bytes
-fetching state #18597005: 0 proof request rounds; 0 RPC calls
-state root: computed 0x02dd5dc7f6d94f1b4669f0449c31fc2a4831b24c89f52db00e24488994299fcf; header 0x02dd5dc7f6d94f1b4669f0449c31fc2a4831b24c89f52db00e24488994299fcf
-exported 558 spans to http://127.0.0.1:4318
+replay #18598772: loading runtime and preparing state
+root check: PASS; RPC calls: 0 (timed replay: 0); execution proof: 91062 bytes
+fetching state #18598772: 0 proof request rounds; 0 RPC calls
+state root: computed 0xfb9758620031f5227e6b1367d4deb04cab717c33605bc96b17f11227d7279b7a; header 0xfb9758620031f5227e6b1367d4deb04cab717c33605bc96b17f11227d7279b7a
+exported 555 spans to http://127.0.0.1:4318
 ```
 
 `RPC calls: 0`: the offline replay never opens a connection.
@@ -52,11 +53,13 @@ frame-trace summary --from-json block.json --top 3
 ```
 
 ```text
-block 0x9dbf343c8f64b694c206ad56414526b4e463a647326da3cd6aa3e809f4d757d4 (parent 0xa3a3cbeca31df76a3677f21c103a5c6552c24897973bbc965e611b59bb2003ce)
+block 0x92938c3ead0669e3ced75145374031d429653c6b2589245517d5c56ae9adbaab (parent 0xf551098c224fa6e973e4214523c9b78c951848beca00d44c1a4b618688ff42cb)
 
 Storage per phase
 ...
 ```
+
+`0x92938c3e…baab` is the hash of block #18598772, the block saved in step 1.
 
 This is instant, but it trusts the JSON file.
 The saved block directory is the one that is checked again.
@@ -87,3 +90,10 @@ frame-trace looks for that folder next to the block's directory, so copy both to
 Blocks you save yourself always hold everything in one file.
 
 [Saved block format](../reference/saved-block-format.md) describes what is inside.
+
+## Before you share
+
+A saved block holds real chain data: the block, its extrinsics and the state values it read.
+`--json` output and traces hold raw storage keys and decoded account addresses.
+With `--runtime-override`, traces and JSON also hold the local path of your Wasm file.
+None of this is secret on a public chain, but review it before you share or upload it, especially for a private or test network.

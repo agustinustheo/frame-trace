@@ -63,6 +63,16 @@ If replays are slower than the chain, older blocks are skipped.
 So `follow` samples the chain at the speed your machine can replay; it does not promise every block.
 For a complete range, use [`report`](analyse-many-blocks.md) instead.
 
+Two log lines tell you this is happening:
+
+| Line | Meaning |
+| --- | --- |
+| `follow queue full; sampling near the tip at replay speed` | Eight blocks are already waiting. frame-trace stops queueing older blocks and keeps up with the newest. |
+| `replay job skipped: queued block expired behind tip` | A waiting block is no longer among the eight newest heights, so frame-trace dropped it without replaying it. It counts as `skipped`. |
+| `skipped block <hash>: retry expired behind tip` | The same, for a block that was waiting to be retried. |
+
+Neither is an error. They mean your machine replays more slowly than the chain produces blocks.
+
 To go faster:
 
 - keep `--cache-dir`, so each block fetches only what changed;

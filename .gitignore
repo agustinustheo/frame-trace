@@ -1,5 +1,3 @@
 target/
 /fixtures/next-people-paseo*/
 book/
-/mermaid.min.js
-/mermaid-init.js
