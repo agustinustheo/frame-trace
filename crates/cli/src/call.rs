@@ -58,7 +58,8 @@ pub struct CallArgs {
     rpc_metadata_fallback: bool,
     /// Execute this Wasm instead of the authenticated :code, for example the same runtime
     /// built with `with-tracing`. Bypasses the code-hash check. Labelled on stderr, in JSON
-    /// and in OTLP. Cannot be combined with --save.
+    /// and in OTLP. Warns when its runtime version differs from the chain's. Cannot be
+    /// combined with --save.
     #[arg(long, value_name = "WASM", conflicts_with = "save")]
     runtime_override: Option<PathBuf>,
 }

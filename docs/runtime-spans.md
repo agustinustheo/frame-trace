@@ -110,7 +110,8 @@ The override is labelled everywhere:
 - `summary --from-json` and `report` print the override first, as
   "N of M block(s) used a runtime override", and report JSON lists those blocks;
 - the OTLP root span name ends in `[runtime override]`. It has
-  `frame.runtime.override = true` and both code hashes.
+  `frame.runtime.override = true`, both code hashes and
+  `frame.runtime.override_version_differences`.
 
 The file must be a Wasm module, plain or SDK-compressed. Other files are rejected
 by name before any replay.
