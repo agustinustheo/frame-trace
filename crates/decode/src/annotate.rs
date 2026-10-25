@@ -9,6 +9,9 @@ use crate::{KeyName, Metadata, key::well_known};
 /// A [`TracedBlock`] with every key and extrinsic named. Serialises to the `--json` output.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnnotatedBlock {
+    /// Public JSON format version; absent versions are legacy v1.
+    #[serde(default = "legacy_schema_version")]
+    pub schema_version: u32,
     #[serde(default)]
     pub execution: Option<ExecutionInfo>,
     /// Runtime API context, absent for block traces.
@@ -142,11 +145,31 @@ pub struct AnnotatedOp {
     pub duplicate_read: bool,
 }
 
-/// Names the keys and extrinsics of `block`. Without metadata, keys outside the well-known set
-/// are `<unknown>` and extrinsics are unnamed.
+fn legacy_schema_version() -> u32 {
+    1
+}
+
+/// Name keys and extrinsics; without metadata, only well-known keys are named.
 pub fn annotate(block: &TracedBlock, metadata: Option<&Metadata>) -> AnnotatedBlock {
+    annotate_at_block(block, metadata, None)
+}
+
+/// Name hooks with an authenticated block number for OnIdle rotation.
+pub fn annotate_at_block(
+    block: &TracedBlock,
+    metadata: Option<&Metadata>,
+    number: Option<u64>,
+) -> AnnotatedBlock {
+    let mut observed = std::collections::BTreeMap::<(String, String), usize>::new();
+    for span in &block.runtime_spans {
+        let krate = span.target.split("::").next().unwrap_or(&span.target);
+        *observed
+            .entry((span.name.clone(), krate.into()))
+            .or_default() += 1;
+    }
     let mut hooks = std::collections::BTreeMap::<(String, String), usize>::new();
     AnnotatedBlock {
+        schema_version: 2,
         execution: None,
         call: None,
         runtime_spans: block
@@ -160,8 +183,17 @@ pub fn annotate(block: &TracedBlock, metadata: Option<&Metadata>) -> AnnotatedBl
                 ) {
                     let krate = span.target.split("::").next().unwrap_or(&span.target);
                     let occurrence = hooks.entry((span.name.clone(), krate.into())).or_default();
-                    let pallet = metadata
-                        .and_then(|md| md.pallets_for_crate(krate).get(*occurrence).cloned())
+                    let candidates = metadata
+                        .map(|md| md.pallets_for_crate(krate))
+                        .unwrap_or_default();
+                    let ordered =
+                        metadata.and_then(|md| md.hook_instances(krate, &span.name, number));
+                    let pallet = ordered
+                        .filter(|names| {
+                            observed.get(&(span.name.clone(), krate.into())) == Some(&names.len())
+                        })
+                        .and_then(|names| names.get(*occurrence).cloned())
+                        .or_else(|| (!candidates.is_empty()).then(|| candidates.join(" | ")))
                         .unwrap_or_else(|| crate_label(krate));
                     *occurrence += 1;
                     if krate != "runtime" && !krate.is_empty() {
@@ -172,7 +204,7 @@ pub fn annotate(block: &TracedBlock, metadata: Option<&Metadata>) -> AnnotatedBl
             })
             .collect(),
         timing: block.timing,
-        block_number: None,
+        block_number: number,
         block_hash: block.block_hash.clone(),
         parent_hash: block.parent_hash.clone(),
         skipped_events: block.skipped_events,

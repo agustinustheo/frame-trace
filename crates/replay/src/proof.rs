@@ -331,6 +331,14 @@ impl ProofDb {
         }
         Ok(())
     }
+    pub fn retain_nodes(&self, nodes: &[Vec<u8>]) {
+        self.insert_nodes(nodes.iter().cloned());
+        self.used.lock().extend(
+            nodes
+                .iter()
+                .map(|n| H256::from(sp_io::hashing::blake2_256(n))),
+        );
+    }
     pub fn export(&self) -> Vec<String> {
         let used = self.used.lock();
         self.nodes

@@ -136,17 +136,16 @@ impl Metadata {
         if names.is_empty() {
             None
         } else {
-            Some(names.join(" / "))
+            Some(names.join(" | "))
         }
     }
 
-    /// Matching instances in AllPalletsWithSystem (pallet index) order.
+    /// Matching instances in SDK tuple construction order, preserved by metadata V14–V16.
+    /// Legacy construct_runtime! preserves declaration order; newer macros may pre-sort both.
     pub fn pallets_for_crate(&self, krate: &str) -> Vec<String> {
         let mut names = Vec::new();
         with_runtime!(&self.runtime, md => {
-            let mut pallets: Vec<_> = md.pallets.iter().collect();
-            pallets.sort_by_key(|p| p.index);
-            for pallet in pallets {
+            for pallet in &md.pallets {
                 let ids = pallet.calls.iter().map(|c| c.ty.id)
                     .chain(pallet.event.iter().map(|e| e.ty.id))
                     .chain(pallet.error.iter().map(|e| e.ty.id));
@@ -157,6 +156,29 @@ impl Metadata {
             }
         });
         names
+    }
+
+    /// OnIdle rotates the complete AllPalletsWithSystem tuple before filtering by crate.
+    pub fn hook_instances(
+        &self,
+        krate: &str,
+        hook: &str,
+        number: Option<u64>,
+    ) -> Option<Vec<String>> {
+        let mut names = self.pallets_for_crate(krate);
+        if hook == "on_idle" && names.len() > 1 {
+            let n = number?;
+            let mut order = with_runtime!(&self.runtime, md => md.pallets.iter().map(|p| p.name.clone()).collect::<Vec<_>>());
+            if !order.is_empty() {
+                let start = (n % order.len() as u64) as usize;
+                order.rotate_left(start);
+            }
+            names = order
+                .into_iter()
+                .filter(|name| names.contains(name))
+                .collect();
+        }
+        Some(names)
     }
 
     /// Metadata version (14, 15 or 16).
@@ -597,5 +619,110 @@ mod argument_tests {
         assert_eq!(encoded, [0, 16, 0, 0, 0]);
         let invalid = json_value(&serde_json::json!({"$variant":2,"$values":[]}));
         assert!(invalid.is_err());
+    }
+}
+
+#[cfg(test)]
+mod hook_order_tests {
+    use super::*;
+    use parity_scale_codec::Encode;
+    #[test]
+    fn metadata_preserves_tuple_order_and_idle_rotates_before_filtering_instances() {
+        let source = Metadata::from_bytes(include_bytes!(
+            "../../../fixtures/metadata/westend-v16.scale"
+        ))
+        .expect("metadata");
+        let Runtime::V16(mut raw) = source.runtime else {
+            panic!("v16 fixture")
+        };
+        let mut first = raw
+            .pallets
+            .iter()
+            .find(|p| p.name == "Balances")
+            .expect("Balances")
+            .clone();
+        first.name = "DeclaredFirst".into();
+        first.index = 90;
+        first.storage = None;
+        let mut second = first.clone();
+        second.name = "DeclaredSecond".into();
+        second.index = 1;
+        let system = raw
+            .pallets
+            .iter()
+            .find(|p| p.name == "System")
+            .expect("System")
+            .clone();
+        raw.pallets = vec![first, system, second];
+        let bytes =
+            RuntimeMetadataPrefixed(frame_metadata::META_RESERVED, RuntimeMetadata::V16(raw))
+                .encode();
+        let md = Metadata::from_bytes(&bytes).expect("synthetic metadata");
+        assert_eq!(
+            md.pallets_for_crate("pallet_balances"),
+            ["DeclaredFirst", "DeclaredSecond"]
+        );
+        assert_eq!(
+            md.hook_instances("pallet_balances", "on_idle", Some(2)),
+            Some(vec!["DeclaredSecond".into(), "DeclaredFirst".into()])
+        );
+        assert!(
+            md.hook_instances("pallet_balances", "on_idle", None)
+                .is_none()
+        );
+        let raw = frame_trace_model::rpc::parse_trace_block(include_str!(
+            "../../../fixtures/model/two-extrinsics.json"
+        ))
+        .expect("trace");
+        let mut block = frame_trace_model::TracedBlock::from_trace(&raw).expect("block");
+        block.runtime_spans = (1..=2)
+            .map(|id| frame_trace_model::RuntimeSpan {
+                id,
+                parent_id: None,
+                name: "on_initialize".into(),
+                target: "pallet_balances::pallet".into(),
+                wasm: true,
+                fields: Default::default(),
+                start_ns: id,
+                end_ns: Some(id + 1),
+                duration_ns: 1,
+                enters: 1,
+                proof_start_bytes: 0,
+                proof_end_bytes: 0,
+            })
+            .collect();
+        let names = |b: crate::AnnotatedBlock| {
+            b.runtime_spans
+                .into_iter()
+                .map(|s| s.name)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            names(crate::annotate(&block, Some(&md))),
+            [
+                "on_initialize: DeclaredFirst",
+                "on_initialize: DeclaredSecond"
+            ]
+        );
+        for span in &mut block.runtime_spans {
+            span.name = "on_idle".into();
+        }
+        assert_eq!(
+            names(crate::annotate_at_block(&block, Some(&md), Some(2))),
+            ["on_idle: DeclaredSecond", "on_idle: DeclaredFirst"]
+        );
+        assert_eq!(
+            names(crate::annotate(&block, Some(&md))),
+            [
+                "on_idle: DeclaredFirst | DeclaredSecond",
+                "on_idle: DeclaredFirst | DeclaredSecond"
+            ]
+        );
+        block.runtime_spans.truncate(1);
+        block.runtime_spans[0].name = "on_initialize".into();
+        assert_eq!(
+            names(crate::annotate(&block, Some(&md))),
+            ["on_initialize: DeclaredFirst | DeclaredSecond"]
+        );
     }
 }

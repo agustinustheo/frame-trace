@@ -1,6 +1,6 @@
 //! Aggregation of the public JSON format. No replay is needed for saved traces.
 use anyhow::{Context, Result, ensure};
-use clap::Args;
+use clap::{Args, ValueEnum};
 use frame_trace_decode::{AnnotatedBlock, AnnotatedOp};
 use serde::Serialize;
 use std::{
@@ -19,8 +19,10 @@ pub struct ReportArgs {
     /// Replay finalized blocks using shared proof/runtime/metadata caches.
     #[arg(long, conflicts_with_all=["files", "from_json"])]
     rpc: Option<String>,
+    /// First block number in the inclusive finalized range (non-genesis).
     #[arg(long, requires = "rpc", conflicts_with = "last")]
     from: Option<u64>,
+    /// Last block number in the inclusive range; cannot exceed finalized head.
     #[arg(long, requires = "from", conflicts_with = "last")]
     to: Option<u64>,
     /// Most recent K blocks anchored to one finalized head.
@@ -29,24 +31,54 @@ pub struct ReportArgs {
     /// Concurrent block replays (proof request concurrency is separate).
     #[arg(long, default_value_t=2, value_parser=clap::value_parser!(u8).range(1..=4))]
     concurrency: u8,
+    /// Shared maximum simultaneous proof RPC requests (1–64).
     #[arg(long, default_value_t=8, value_parser=clap::value_parser!(u8).range(1..=64))]
     proof_concurrency: u8,
+    /// Persist authenticated proof nodes and compiled Wasm in this directory.
     #[arg(long)]
     cache_dir: Option<PathBuf>,
+    /// Combined proof-node/compiled-Wasm disk cache limit in bytes (default 1 GiB).
     #[arg(long, default_value_t = 1073741824)]
     cache_max_bytes: u64,
+    /// Maximum rows in each ranked item, extrinsic and hook table (JSON is complete).
     #[arg(long, default_value_t = 15)]
     top: usize,
+    /// Rank extrinsics by total proof bytes, operations or storage time.
+    #[arg(long, value_enum, default_value_t = SortKey::Proof)]
+    sort_by: SortKey,
     /// Aggregated JSON (- sends tables to stderr).
     #[arg(long)]
     json: Option<PathBuf>,
 }
 
+#[derive(Clone, Copy, Debug, Default, ValueEnum)]
+pub enum SortKey {
+    #[default]
+    Proof,
+    Ops,
+    Time,
+}
+
+fn validate_range(from: u64, to: u64, finalized: u64) -> Result<()> {
+    ensure!(
+        from >= 1 && from <= to && to <= finalized,
+        "range must be ordered, non-genesis and finalized (head #{finalized})"
+    );
+    ensure!(to - from < 10000, "range limit is 10000 blocks");
+    Ok(())
+}
+
 pub fn read_trace(path: &Path) -> Result<AnnotatedBlock> {
-    let block: AnnotatedBlock = serde_json::from_reader(
+    let block: AnnotatedBlock = serde_json::from_reader(std::io::BufReader::new(
         std::fs::File::open(path).with_context(|| format!("reading {}", path.display()))?,
-    )
+    ))
     .with_context(|| format!("parsing block JSON {}", path.display()))?;
+    ensure!(
+        (1..=2).contains(&block.schema_version),
+        "unsupported block JSON schema version {} in {}",
+        block.schema_version,
+        path.display()
+    );
     ensure!(
         block.call.is_none(),
         "{} is a call trace; expected block --json",
@@ -56,7 +88,7 @@ pub fn read_trace(path: &Path) -> Result<AnnotatedBlock> {
 }
 
 pub fn run(args: ReportArgs) -> Result<()> {
-    let mut blocks = Vec::new();
+    let mut accumulator = Accumulator::default();
     if let Some(url) = &args.rpc {
         use frame_trace_replay::{ReplaySession, rpc::Rpc};
         let rpc = Rpc::with_options(
@@ -87,73 +119,73 @@ pub fn run(args: ReportArgs) -> Result<()> {
                 args.to.context("--from needs --to")?,
             )
         };
-        ensure!(
-            from >= 1 && from <= to && to <= finalized,
-            "range must be ordered, non-genesis and finalized (head #{finalized})"
-        );
-        ensure!(to - from < 10000, "range limit is 10000 blocks");
-        // Finalized number lookups are immutable. Pin each hash before scheduling replay.
-        let hashes: Vec<_> = (from..=to)
-            .map(|n| {
-                let hash = rpc.call("chain_getBlockHash", serde_json::json!([n]))?;
-                Ok(hash.as_str().context("block hash unavailable")?.to_owned())
-            })
-            .collect::<Result<_>>()?;
-        for chunk in hashes.chunks(args.concurrency as usize) {
-            let results = std::thread::scope(|scope| {
-                let jobs: Vec<_> = chunk
-                    .iter()
-                    .map(|hash| {
-                        // Share transport/pool limits, isolate acquisition counters from
-                        // the other worker's strict zero-RPC measured execution.
-                        let rpc = rpc.fork();
-                        let session = &session;
-                        scope.spawn(move || {
-                            frame_trace_replay::online_with_session(&rpc, hash, session)
-                        })
-                    })
-                    .collect();
-                jobs.into_iter()
-                    .map(|j| -> Result<_> {
-                        Ok(j.join()
-                            .map_err(|_| anyhow::anyhow!("report replay worker panicked"))??)
-                    })
-                    .collect::<Result<Vec<_>>>()
-            })?;
-            for replay in results {
-                let loaded = crate::source::replay_loaded(replay, None)?;
-                let mut block =
-                    frame_trace_decode::annotate(&loaded.traced, loaded.metadata.as_ref());
-                block.block_number = loaded.block_number;
-                block.execution = loaded.execution;
-                blocks.push(block);
-            }
+        validate_range(from, to, finalized)?;
+        // Finalized number lookups are immutable. Resolve each hash once before replay.
+        let numbers: Vec<_> = (from..=to).collect();
+        for chunk in numbers.chunks(args.concurrency as usize) {
+            std::thread::scope(|scope| {
+                let (sender, receiver) = std::sync::mpsc::sync_channel(chunk.len());
+                for &number in chunk {
+                    let sender = sender.clone();
+                    let rpc = rpc.fork();
+                    let session = &session;
+                    scope.spawn(move || {
+                        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(
+                            || -> Result<AnnotatedBlock> {
+                                let hash =
+                                    rpc.call("chain_getBlockHash", serde_json::json!([number]))?;
+                                let hash = hash.as_str().context("block hash unavailable")?;
+                                let replay =
+                                    frame_trace_replay::online_with_session(&rpc, hash, session)?;
+                                let loaded = crate::source::replay_loaded(replay, None)?;
+                                let mut block = frame_trace_decode::annotate_at_block(
+                                    &loaded.traced,
+                                    loaded.metadata.as_ref(),
+                                    loaded.block_number,
+                                );
+                                block.execution = loaded.execution;
+                                Ok(block)
+                            },
+                        ))
+                        .unwrap_or_else(|_| Err(anyhow::anyhow!("report replay worker panicked")));
+                        let _ = sender.send((number, result));
+                    });
+                }
+                drop(sender);
+                // Fold as workers finish, releasing each trace even if another worker stalls.
+                for (number, result) in receiver {
+                    accumulator.record(format!("block #{number}"), result);
+                }
+            });
         }
     } else {
         for path in args.files.iter().chain(&args.from_json) {
-            blocks.push(read_trace(path)?);
+            accumulator.record(path.display().to_string(), read_trace(path));
         }
     }
-    ensure!(!blocks.is_empty(), "provide at least one block JSON file");
-    let mut seen = BTreeSet::new();
-    ensure!(
-        blocks.iter().all(|b| seen.insert(&b.block_hash)),
-        "duplicate block hash in report input"
-    );
-    let report = aggregate(&blocks);
+    let report = accumulator.finish();
     if let Some(path) = &args.json {
         let json = serde_json::to_string_pretty(&report)?;
         if path.as_os_str() == "-" {
             println!("{json}");
         } else {
-            std::fs::write(path, json)?;
+            std::fs::write(path, json)
+                .with_context(|| format!("writing report JSON {}", path.display()))?;
         }
     }
-    let tables = render(&report, args.top);
+    let tables = render_sorted(&report, args.top, args.sort_by);
     if args.json.is_some_and(|p| p.as_os_str() == "-") {
         eprint!("{tables}");
     } else {
         print!("{tables}");
+    }
+    if let Some(error) = report.errors.first() {
+        anyhow::bail!(
+            "{} block input(s) failed; {}: {}",
+            report.errors.len(),
+            error.input,
+            error.error
+        );
     }
     Ok(())
 }
@@ -186,7 +218,7 @@ impl Tally {
         for op in ops {
             tally.ops += 1;
             if let Some(bytes) = op.proof_bytes_added {
-                tally.proof_bytes += bytes;
+                tally.proof_bytes = tally.proof_bytes.saturating_add(bytes);
                 tally.proof_ops_observed += 1;
             }
             if let Some(t) = op.timing {
@@ -194,19 +226,19 @@ impl Tally {
             }
             if is_read(op) {
                 tally.reads += 1;
-                tally.bytes_read += op.value_len.unwrap_or(0);
-                match op.origin.as_deref() {
-                    Some("overlay") => tally.overlay += 1,
-                    Some("backend_warm") => tally.backend_warm += 1,
-                    Some("backend_cold") => tally.backend_cold += 1,
+                tally.bytes_read = tally.bytes_read.saturating_add(op.value_len.unwrap_or(0));
+                match origin_index(op.origin.as_deref()) {
+                    0 => tally.overlay += 1,
+                    1 => tally.backend_warm += 1,
+                    2 => tally.backend_cold += 1,
                     _ => tally.origin_unknown += 1,
                 }
                 if op.duplicate_read {
                     tally.duplicates += 1;
-                    match op.origin.as_deref() {
-                        Some("overlay") => tally.duplicate_overlay += 1,
-                        Some("backend_warm") => tally.duplicate_backend_warm += 1,
-                        Some("backend_cold") => tally.duplicate_backend_cold += 1,
+                    match origin_index(op.origin.as_deref()) {
+                        0 => tally.duplicate_overlay += 1,
+                        1 => tally.duplicate_backend_warm += 1,
+                        2 => tally.duplicate_backend_cold += 1,
                         _ => tally.duplicate_origin_unknown += 1,
                     }
                 }
@@ -215,7 +247,9 @@ impl Tally {
                 "put" | "clear" | "append" | "clear_prefix" | "kill_child"
             ) {
                 tally.writes += 1;
-                tally.bytes_written += op.value_len.unwrap_or(0);
+                tally.bytes_written = tally
+                    .bytes_written
+                    .saturating_add(op.value_len.unwrap_or(0));
             } else if matches!(op.op.as_str(), "next_key" | "iteration") {
                 tally.iterations += 1;
             }
@@ -224,7 +258,7 @@ impl Tally {
         tally
     }
     fn add(&mut self, other: &Self) {
-        macro_rules! add { ($($field:ident),*) => { $(self.$field += other.$field;)* }; }
+        macro_rules! add { ($($field:ident),*) => { $(self.$field = self.$field.saturating_add(other.$field);)* }; }
         add!(
             ops,
             reads,
@@ -253,9 +287,9 @@ pub fn is_read(op: &AnnotatedOp) -> bool {
 pub fn union_ns(mut intervals: Vec<(u64, u64)>) -> u64 {
     intervals.sort_unstable();
     let mut end = 0;
-    let mut total = 0;
+    let mut total = 0u64;
     for (lo, hi) in intervals {
-        total += hi.saturating_sub(lo.max(end));
+        total = total.saturating_add(hi.saturating_sub(lo.max(end)));
         end = end.max(hi);
     }
     total
@@ -265,7 +299,7 @@ pub struct PhaseAggregate {
     pub tally: Tally,
     pub ops_share: f64,
     pub storage_time_share: f64,
-    pub proof_bytes_share: f64,
+    pub proof_bytes_share: Option<f64>,
 }
 #[derive(Serialize, Default)]
 pub struct HookAggregate {
@@ -282,17 +316,23 @@ pub struct Distribution {
 pub struct ExtrinsicAggregate {
     pub count: usize,
     pub ops: Distribution,
-    pub proof_bytes: Distribution,
+    pub proof_bytes: Option<Distribution>,
+    pub total_proof_bytes: usize,
+    pub total_ops: usize,
+    pub total_storage_ns: u64,
     pub storage_ns: Distribution,
     pub wall_ns: Option<Distribution>,
 }
 #[derive(Serialize, Default)]
 pub struct Report {
+    pub schema_version: u32,
+    pub errors: Vec<BlockError>,
+    pub phase_order: Vec<String>,
     pub blocks: usize,
-    pub block_hashes: Vec<String>,
+    pub block_hashes: BTreeSet<String>,
     pub totals: Tally,
-    pub execution_proof_bytes: usize,
-    pub unattributed_proof_bytes: usize,
+    pub execution_proof_bytes: Option<usize>,
+    pub unattributed_proof_bytes: Option<usize>,
     pub phases: BTreeMap<String, PhaseAggregate>,
     pub items: BTreeMap<String, Tally>,
     pub hooks: BTreeMap<String, HookAggregate>,
@@ -310,19 +350,114 @@ fn distribution(mut values: Vec<u64>) -> Distribution {
         p95: values[(95 * n).div_ceil(100) - 1] as f64,
     }
 }
-pub fn aggregate(blocks: &[AnnotatedBlock]) -> Report {
-    let mut report = Report {
-        blocks: blocks.len(),
-        ..Default::default()
-    };
-    let mut samples = BTreeMap::<String, Vec<(Tally, Option<u64>)>>::new();
-    for block in blocks {
-        report.block_hashes.push(block.block_hash.clone());
+/// Exact through 1024 samples; then fixed logarithmic buckets (64 per power of two).
+/// Quantiles use bucket lower bounds, with value error <= 1/64 (1.5625%).
+#[derive(Default)]
+struct Samples {
+    exact: Vec<u64>,
+    buckets: BTreeMap<u16, usize>,
+    count: usize,
+}
+impl Samples {
+    fn bucket(v: u64) -> u16 {
+        if v == 0 {
+            return 0;
+        }
+        let exponent = 63 - v.leading_zeros();
+        let fraction = (((v as u128 - (1u128 << exponent)) * 64) >> exponent) as u16;
+        1 + exponent as u16 * 64 + fraction
+    }
+    fn lower(bucket: u16) -> u64 {
+        if bucket == 0 {
+            return 0;
+        }
+        let b = bucket - 1;
+        (((64 + u128::from(b % 64)) << (b / 64)) / 64) as u64
+    }
+    fn push(&mut self, value: u64) {
+        self.count += 1;
+        if self.count <= 1024 {
+            self.exact.push(value);
+            return;
+        }
+        for v in self.exact.drain(..) {
+            *self.buckets.entry(Self::bucket(v)).or_default() += 1;
+        }
+        *self.buckets.entry(Self::bucket(value)).or_default() += 1;
+    }
+    fn finish(self) -> Option<Distribution> {
+        if self.count == 0 {
+            return None;
+        }
+        if self.buckets.is_empty() {
+            return Some(distribution(self.exact));
+        }
+        let rank = |r: usize| {
+            let mut seen = 0;
+            for (bucket, count) in &self.buckets {
+                seen += count;
+                if seen >= r {
+                    return Self::lower(*bucket) as f64;
+                }
+            }
+            unreachable!("nonempty quantile buckets")
+        };
+        Some(Distribution {
+            median: (rank(self.count.div_ceil(2)) + rank(self.count / 2 + 1)) / 2.0,
+            p95: rank((95 * self.count).div_ceil(100)),
+        })
+    }
+}
+#[derive(Default)]
+struct ExtrinsicSamples {
+    count: usize,
+    ops: Samples,
+    proof: Samples,
+    storage: Samples,
+    wall: Samples,
+    total: Tally,
+}
+#[derive(Serialize)]
+pub struct BlockError {
+    pub input: String,
+    pub error: String,
+}
+#[derive(Default)]
+pub struct Accumulator {
+    report: Report,
+    samples: BTreeMap<String, ExtrinsicSamples>,
+}
+impl Accumulator {
+    fn record(&mut self, input: String, block: Result<AnnotatedBlock>) {
+        let result = block.and_then(|block| self.add(&block));
+        if let Err(error) = result {
+            self.report.errors.push(BlockError {
+                input,
+                error: format!("{error:#}"),
+            });
+        }
+    }
+    pub fn add(&mut self, block: &AnnotatedBlock) -> Result<()> {
+        ensure!(
+            self.report.block_hashes.insert(block.block_hash.clone()),
+            "duplicate block hash in report input: {}",
+            block.block_hash
+        );
+        self.fold(block);
+        Ok(())
+    }
+    fn fold(&mut self, block: &AnnotatedBlock) {
+        self.report.blocks += 1;
+        let report = &mut self.report;
+        report.block_hashes.insert(block.block_hash.clone());
         let total = Tally::of(block.all_phases().flat_map(|p| &p.ops));
         report.totals.add(&total);
         if let Some(info) = &block.execution {
-            report.execution_proof_bytes += info.proof_bytes;
-            report.unattributed_proof_bytes += info.proof_bytes.saturating_sub(total.proof_bytes);
+            let execution = report.execution_proof_bytes.get_or_insert(0);
+            *execution = execution.saturating_add(info.proof_bytes);
+            let unattributed = report.unattributed_proof_bytes.get_or_insert(0);
+            *unattributed =
+                unattributed.saturating_add(info.proof_bytes.saturating_sub(total.proof_bytes));
         }
         let spans: BTreeMap<_, _> = block.runtime_spans.iter().map(|s| (s.id, s)).collect();
         let mut hook_ops = BTreeMap::<u64, Vec<&AnnotatedOp>>::new();
@@ -330,7 +465,7 @@ pub fn aggregate(blocks: &[AnnotatedBlock]) -> Report {
             if span.name.starts_with("on_") {
                 let hook = report.hooks.entry(span.name.clone()).or_default();
                 hook.count += 1;
-                hook.duration_ns += span.duration_ns;
+                hook.duration_ns = hook.duration_ns.saturating_add(span.duration_ns);
             }
         }
         for phase in block.all_phases() {
@@ -344,6 +479,9 @@ pub fn aggregate(blocks: &[AnnotatedBlock]) -> Report {
             } else {
                 &phase.kind
             };
+            if !report.phases.contains_key(phase_name) {
+                report.phase_order.push(phase_name.to_owned());
+            }
             report
                 .phases
                 .entry(phase_name.to_owned())
@@ -351,17 +489,24 @@ pub fn aggregate(blocks: &[AnnotatedBlock]) -> Report {
                 .tally
                 .add(&tally);
             if phase.kind == "apply_extrinsic" {
-                samples
+                let sample = self
+                    .samples
                     .entry(phase.call.clone().unwrap_or_else(|| "<unknown>".into()))
-                    .or_default()
-                    .push((
-                        tally,
-                        phase
-                            .wall_time
-                            .as_ref()
-                            .filter(|t| t.source == "runtime_span")
-                            .map(|t| t.duration_ns),
-                    ));
+                    .or_default();
+                sample.count += 1;
+                sample.ops.push(tally.ops as u64);
+                if tally.ops > 0 && tally.proof_ops_observed == tally.ops {
+                    sample.proof.push(tally.proof_bytes as u64);
+                }
+                sample.storage.push(tally.storage_ns);
+                if let Some(t) = phase
+                    .wall_time
+                    .as_ref()
+                    .filter(|t| t.source == "runtime_span")
+                {
+                    sample.wall.push(t.duration_ns);
+                }
+                sample.total.add(&tally);
             }
             let mut item_ops = BTreeMap::<&str, Vec<&AnnotatedOp>>::new();
             for op in &phase.ops {
@@ -392,36 +537,57 @@ pub fn aggregate(blocks: &[AnnotatedBlock]) -> Report {
                 .add(&Tally::of(ops));
         }
     }
-    for phase in report.phases.values_mut() {
-        let share = |n, d| if d == 0 { 0.0 } else { n as f64 / d as f64 };
-        phase.ops_share = share(phase.tally.ops, report.totals.ops);
-        phase.storage_time_share = share(
-            phase.tally.storage_ns as usize,
-            report.totals.storage_ns as usize,
-        );
-        phase.proof_bytes_share = share(phase.tally.proof_bytes, report.totals.proof_bytes);
+    pub fn finish(self) -> Report {
+        let mut report = self.report;
+        report.schema_version = 2;
+        for phase in report.phases.values_mut() {
+            let share = |n, d| if d == 0 { 0.0 } else { n as f64 / d as f64 };
+            phase.ops_share = share(phase.tally.ops, report.totals.ops);
+            phase.storage_time_share = share(
+                phase.tally.storage_ns as usize,
+                report.totals.storage_ns as usize,
+            );
+            phase.proof_bytes_share = (phase.tally.proof_ops_observed > 0)
+                .then(|| share(phase.tally.proof_bytes, report.totals.proof_bytes));
+        }
+        for (name, values) in self.samples {
+            report.extrinsics.insert(
+                name,
+                ExtrinsicAggregate {
+                    count: values.count,
+                    ops: values.ops.finish().expect("extrinsic samples"),
+                    proof_bytes: if values.proof.count == values.count {
+                        values.proof.finish()
+                    } else {
+                        None
+                    },
+                    storage_ns: values.storage.finish().expect("extrinsic samples"),
+                    wall_ns: if values.wall.count == values.count {
+                        values.wall.finish()
+                    } else {
+                        None
+                    },
+                    total_proof_bytes: values.total.proof_bytes,
+                    total_ops: values.total.ops,
+                    total_storage_ns: values.total.storage_ns,
+                },
+            );
+        }
+        report
     }
-    for (name, values) in samples {
-        report.extrinsics.insert(
-            name,
-            ExtrinsicAggregate {
-                count: values.len(),
-                ops: distribution(values.iter().map(|(t, _)| t.ops as u64).collect()),
-                proof_bytes: distribution(
-                    values.iter().map(|(t, _)| t.proof_bytes as u64).collect(),
-                ),
-                storage_ns: distribution(values.iter().map(|(t, _)| t.storage_ns).collect()),
-                wall_ns: values
-                    .iter()
-                    .map(|(_, t)| *t)
-                    .collect::<Option<Vec<_>>>()
-                    .map(distribution),
-            },
-        );
+}
+pub fn aggregate(blocks: &[AnnotatedBlock]) -> Report {
+    let mut accumulator = Accumulator::default();
+    // Also used for a single call summary, where duplicate validation is immaterial.
+    for block in blocks {
+        accumulator.fold(block);
     }
-    report
+    accumulator.finish()
 }
 pub fn render(r: &Report, top: usize) -> String {
+    render_sorted(r, top, SortKey::Proof)
+}
+fn render_sorted(r: &Report, top: usize, sort: SortKey) -> String {
     let t = &r.totals;
     let mut out = format!(
         "{} block(s); {} ops; reads {} = overlay {} + backend {} (warm {}, cold {}) + unknown {}\nDuplicates {} = overlay {}, warm {}, cold {}, unknown {}; proof {} B ({} ops observed; {} B unattributed)\n\n",
@@ -429,7 +595,7 @@ pub fn render(r: &Report, top: usize) -> String {
         t.ops,
         t.reads,
         t.overlay,
-        t.backend_warm + t.backend_cold,
+        t.backend_warm.saturating_add(t.backend_cold),
         t.backend_warm,
         t.backend_cold,
         t.origin_unknown,
@@ -438,25 +604,29 @@ pub fn render(r: &Report, top: usize) -> String {
         t.duplicate_backend_warm,
         t.duplicate_backend_cold,
         t.duplicate_origin_unknown,
-        t.proof_bytes,
+        proof_label(t),
         t.proof_ops_observed,
         r.unattributed_proof_bytes
+            .map_or_else(|| "n/a".into(), |bytes| bytes.to_string())
     );
     let mut phases =
         crate::summary::table(1, &["phase", "ops %", "storage %", "proof %", "proof B"]);
-    for (name, p) in &r.phases {
+    for name in &r.phase_order {
+        let p = &r.phases[name];
         phases.add_row(vec![
             name.clone(),
             format!("{:.1}", p.ops_share * 100.0),
             format!("{:.1}", p.storage_time_share * 100.0),
-            format!("{:.1}", p.proof_bytes_share * 100.0),
-            p.tally.proof_bytes.to_string(),
+            p.proof_bytes_share
+                .map_or_else(|| "n/a".into(), |share| format!("{:.1}", share * 100.0)),
+            proof_label(&p.tally),
         ]);
     }
     out += &format!(
         "Phase shares\n{phases}\n\nTop items by proof bytes\n{}\n",
         item_table(&r.items, top)
     );
+    out += &truncated(r.items.len(), top);
     let mut exts = crate::summary::table(
         1,
         &[
@@ -467,16 +637,30 @@ pub fn render(r: &Report, top: usize) -> String {
             "storage µs med/p95",
         ],
     );
-    for (name, e) in r.extrinsics.iter().take(top) {
+    let mut rows: Vec<_> = r.extrinsics.iter().collect();
+    rows.sort_by(|a, b| {
+        let cost = |e: &ExtrinsicAggregate| match sort {
+            SortKey::Proof => e.total_proof_bytes as u128,
+            SortKey::Ops => e.total_ops as u128,
+            SortKey::Time => u128::from(e.total_storage_ns),
+        };
+        cost(b.1).cmp(&cost(a.1)).then(a.0.cmp(b.0))
+    });
+    for (name, e) in rows.into_iter().take(top) {
         exts.add_row(vec![
             name.clone(),
             e.count.to_string(),
             pair(&e.ops, 1.0),
-            pair(&e.proof_bytes, 1.0),
+            e.proof_bytes
+                .as_ref()
+                .map_or_else(|| "n/a".into(), |d| pair(d, 1.0)),
             pair(&e.storage_ns, 1000.0),
         ]);
     }
-    out += &format!("\nExtrinsic distributions\n{exts}\n");
+    out += &format!(
+        "\nExtrinsic distributions (ranked by {sort:?} total)\n{exts}\n{}",
+        truncated(r.extrinsics.len(), top)
+    );
     if !r.hooks.is_empty() {
         let mut hooks =
             crate::summary::table(1, &["hook: pallet", "n", "ops", "proof B", "span µs"]);
@@ -487,13 +671,45 @@ pub fn render(r: &Report, top: usize) -> String {
                 name.clone(),
                 h.count.to_string(),
                 h.tally.ops.to_string(),
-                h.tally.proof_bytes.to_string(),
+                proof_label(&h.tally),
                 format!("{:.1}", h.duration_ns as f64 / 1000.0),
             ]);
         }
         out += &format!("\nHooks (observed runtime spans)\n{hooks}\n");
+        out += &truncated(r.hooks.len(), top);
+    }
+    if !r.errors.is_empty() {
+        out += "\nErrors\n";
+        for error in &r.errors {
+            out += &format!("{}: {}\n", error.input, error.error);
+        }
     }
     out
+}
+fn truncated(n: usize, top: usize) -> String {
+    if n > top {
+        format!("… {} more\n", n - top)
+    } else {
+        String::new()
+    }
+}
+pub fn proof_label(t: &Tally) -> String {
+    if t.proof_ops_observed == 0 {
+        "n/a".into()
+    } else if t.proof_ops_observed < t.ops {
+        format!("{} (partial)", t.proof_bytes)
+    } else {
+        t.proof_bytes.to_string()
+    }
+}
+/// Shared origin column: overlay, warm, cold, unknown.
+pub fn origin_index(origin: Option<&str>) -> usize {
+    match origin {
+        Some("overlay") => 0,
+        Some("backend_warm") => 1,
+        Some("backend_cold") => 2,
+        _ => 3,
+    }
 }
 fn pair(d: &Distribution, scale: f64) -> String {
     format!("{:.1}/{:.1}", d.median / scale, d.p95 / scale)
@@ -516,7 +732,7 @@ pub fn item_table(items: &BTreeMap<String, Tally>, top: usize) -> comfy_table::T
     rows.sort_by(|a, b| {
         b.1.proof_bytes
             .cmp(&a.1.proof_bytes)
-            .then((b.1.reads + b.1.writes).cmp(&(a.1.reads + a.1.writes)))
+            .then(b.1.ops.cmp(&a.1.ops))
             .then(a.0.cmp(b.0))
     });
     for (item, t) in rows.into_iter().take(top) {
@@ -531,7 +747,7 @@ pub fn item_table(items: &BTreeMap<String, Tally>, top: usize) -> comfy_table::T
             t.bytes_read.to_string(),
             t.bytes_written.to_string(),
             t.duplicates.to_string(),
-            t.proof_bytes.to_string(),
+            proof_label(t),
         ]);
     }
     table
@@ -629,5 +845,151 @@ mod tests {
         );
         assert_eq!(r.phases["post_inherents"].tally.ops, 2);
         assert_eq!(r.phases["signed_extrinsics"].tally.ops, expected * 2);
+    }
+}
+
+#[cfg(test)]
+mod round5_tests {
+    #![allow(clippy::unwrap_used)]
+    use super::*;
+    fn legacy() -> AnnotatedBlock {
+        serde_json::from_str(include_str!("../../../fixtures/model/pre-e86f740.json")).unwrap()
+    }
+    #[test]
+    fn legacy_json_keeps_missing_proof_and_origins_unrecorded() {
+        let block = legacy();
+        assert_eq!(block.schema_version, 1);
+        assert!(
+            block
+                .all_phases()
+                .flat_map(|p| &p.ops)
+                .all(|op| op.origin.is_none() && op.proof_bytes_added.is_none())
+        );
+        let report = aggregate(std::slice::from_ref(&block));
+        assert_eq!(report.totals.proof_ops_observed, 0);
+        assert_eq!(report.totals.reads, report.totals.origin_unknown);
+        assert!(report.extrinsics.values().all(|e| e.proof_bytes.is_none()));
+        assert!(render(&report, 1).contains("proof n/a"));
+        assert!(crate::summary::render(&block, 1).contains("n/a"));
+    }
+    #[test]
+    fn report_ranges_are_inclusive_finalized_non_genesis_and_bounded() {
+        for (from, to, head) in [
+            (4, 3, 5),
+            (1, 6, 5),
+            (0, 1, 5),
+            (1, 10001, 10001),
+            (u64::MAX, 0, u64::MAX),
+        ] {
+            assert!(validate_range(from, to, head).is_err());
+        }
+        assert!(validate_range(1, 10000, 10000).is_ok());
+        assert!(validate_range(5, 5, 5).is_ok());
+    }
+    #[test]
+    fn crafted_json_max_durations_and_tallies_saturate() {
+        let mut value = serde_json::to_value(legacy()).unwrap();
+        value["runtime_spans"] = serde_json::json!([
+            {"id":1,"parent_id":null,"name":"on_initialize: Huge","target":"pallet_huge","wasm":true,
+             "fields":{},"start_ns":0,"end_ns":u64::MAX,"duration_ns":u64::MAX,"enters":1,"proof_start_bytes":0,"proof_end_bytes":0},
+            {"id":2,"parent_id":null,"name":"on_initialize: Huge","target":"pallet_huge","wasm":true,
+             "fields":{},"start_ns":0,"end_ns":u64::MAX,"duration_ns":u64::MAX,"enters":1,"proof_start_bytes":0,"proof_end_bytes":0}
+        ]);
+        for op in value["phases"][0]["ops"].as_array_mut().unwrap() {
+            op["timing"] = serde_json::json!({"start_ns":0,"duration_ns":u64::MAX});
+            op["proof_bytes_added"] = serde_json::json!(usize::MAX);
+            op["value_len"] = serde_json::json!(usize::MAX);
+        }
+        let block: AnnotatedBlock = serde_json::from_value(value).unwrap();
+        let report = aggregate(&[block.clone(), block]);
+        assert_eq!(report.hooks["on_initialize: Huge"].duration_ns, u64::MAX);
+        assert_eq!(report.totals.storage_ns, u64::MAX);
+        assert_eq!(report.totals.proof_bytes, usize::MAX);
+        assert!(
+            report.totals.bytes_read == usize::MAX || report.totals.bytes_written == usize::MAX
+        );
+        let _ = render(&report, 3);
+    }
+    #[test]
+    fn quantile_sketch_is_bounded_and_respects_documented_value_error() {
+        let mut samples = Samples::default();
+        for value in 1..=100_000 {
+            samples.push(value);
+        }
+        assert!(samples.exact.is_empty());
+        assert!(samples.buckets.len() <= 4097);
+        let result = samples.finish().unwrap();
+        assert!((50_000.5 - result.median).abs() <= 50_000.5 / 64.0);
+        assert!((95_000.0 - result.p95).abs() <= 95_000.0 / 64.0);
+        for value in [0, 1, 63, 64, 127, 128, u64::MAX] {
+            let estimate = Samples::lower(Samples::bucket(value));
+            assert!(estimate <= value);
+            assert!(value - estimate <= value / 64);
+        }
+    }
+    #[test]
+    fn top_extrinsics_sort_by_cost_and_phase_order_follows_execution() {
+        let mut block = legacy();
+        let phases: Vec<_> = block
+            .phases
+            .iter_mut()
+            .filter(|p| p.kind == "apply_extrinsic")
+            .collect();
+        for (i, phase) in phases.into_iter().enumerate() {
+            phase.call = Some(
+                if i == 0 {
+                    "Alphabet.first"
+                } else {
+                    "Zebra.expensive"
+                }
+                .into(),
+            );
+            if i == 0 {
+                let op = phase.ops[0].clone();
+                phase.ops.resize(100, op);
+            }
+            for op in &mut phase.ops {
+                op.timing = Some(frame_trace_model::MeasuredTiming {
+                    start_ns: 0,
+                    duration_ns: if i == 0 { 1 } else { 10000 },
+                });
+                op.proof_bytes_added = Some(if i == 0 { 1 } else { 1000 });
+            }
+        }
+        let r = aggregate(&[block]);
+        let text = render_sorted(&r, 1, SortKey::Proof);
+        assert!(text.contains("Zebra.expensive"));
+        assert!(!text.contains("Alphabet.first"));
+        let by_ops = render_sorted(&r, 1, SortKey::Ops);
+        assert!(by_ops.contains("Alphabet.first") && !by_ops.contains("Zebra.expensive"));
+        let by_time = render_sorted(&r, 1, SortKey::Time);
+        assert!(by_time.contains("Zebra.expensive") && !by_time.contains("Alphabet.first"));
+        assert!(text.contains("… 1 more"));
+        assert_eq!(r.phase_order.first().unwrap(), "initialization");
+        assert_eq!(r.phase_order.last().unwrap(), "finalization");
+    }
+    #[test]
+    fn completed_blocks_fold_immediately_and_errors_do_not_drop_successes() {
+        let mut accumulator = Accumulator::default();
+        let block = legacy();
+        accumulator.record("ok".into(), Ok(block.clone()));
+        accumulator.record("missing".into(), Err(anyhow::anyhow!("missing fixture")));
+        accumulator.record("duplicate".into(), Ok(block));
+        let report = accumulator.finish();
+        assert_eq!(report.blocks, 1);
+        assert_eq!(report.errors.len(), 2);
+        assert!(report.errors[1].error.contains("duplicate block hash"));
+    }
+    #[test]
+    fn summary_and_report_tables_match_checked_in_goldens() {
+        let block = legacy();
+        assert_eq!(
+            crate::summary::render(&block, 2),
+            include_str!("../../../fixtures/model/summary.golden.txt")
+        );
+        assert_eq!(
+            render(&aggregate(&[block]), 2),
+            include_str!("../../../fixtures/model/report.golden.txt")
+        );
     }
 }

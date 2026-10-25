@@ -1,7 +1,6 @@
 //! Bounded, finality-aware replay sampling. Every accepted job reaches a terminal event.
 use crate::{FollowArgs, source};
 use anyhow::{Context, Result};
-use frame_trace_decode::annotate;
 use frame_trace_otel::Timing;
 use frame_trace_replay::{
     ReplaySession,
@@ -277,8 +276,11 @@ pub fn run(args: FollowArgs) -> Result<()> {
                             frame_trace_replay::online_with_session(&rpc, &job.hash, &session)?,
                             None,
                         )?;
-                        let mut block = annotate(&loaded.traced, loaded.metadata.as_ref());
-                        block.block_number = loaded.block_number;
+                        let mut block = frame_trace_decode::annotate_at_block(
+                            &loaded.traced,
+                            loaded.metadata.as_ref(),
+                            loaded.block_number,
+                        );
                         block.execution = loaded.execution;
                         if let Some(endpoint) = &otlp {
                             frame_trace_otel::export_otlp(&block, endpoint, Timing::default())?;

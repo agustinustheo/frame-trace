@@ -23,6 +23,7 @@ sp-crypto-hashing.workspace = true
 codec = { package = "parity-scale-codec", version = "3.7.5", features = ["derive"] }
 hex.workspace = true
 hash-db = "0.16"
+trie-db = "0.32"
 parking_lot = "0.12"
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
 serde.workspace = true

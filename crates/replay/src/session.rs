@@ -15,7 +15,9 @@ type MetadataRead = (Vec<u8>, Option<Vec<u8>>, Option<H256>);
 pub(crate) struct MetadataEntry {
     pub metadata: String,
     pub reads: Vec<MetadataRead>,
+    /// Iteration and whole-state/child-root operations bind reuse to this root.
     pub iteration_root: Option<H256>,
+    pub proof_nodes: Vec<Vec<u8>>,
 }
 type MetadataCache = BTreeMap<H256, MetadataEntry>;
 

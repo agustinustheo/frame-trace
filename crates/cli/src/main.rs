@@ -4,7 +4,7 @@ use std::{fs, io::Write, path::PathBuf};
 
 use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
-use frame_trace_decode::{AnnotatedBlock, annotate};
+use frame_trace_decode::AnnotatedBlock;
 
 mod call;
 mod follow;
@@ -49,7 +49,7 @@ struct BlockArgs {
 struct SummaryArgs {
     #[command(flatten)]
     source: source::SourceArgs,
-    /// Number of rows in the "top items" and "duplicate reads" tables.
+    /// Maximum rows in each item, extrinsic, hook and per-phase duplicate table.
     #[arg(long, default_value_t = 15)]
     top: usize,
 }
@@ -119,7 +119,11 @@ fn load(args: &source::SourceArgs) -> Result<AnnotatedBlock> {
     if loaded.metadata.is_none() {
         eprintln!("notice: metadata unavailable; storage keys and extrinsics will not be named");
     }
-    let mut block = annotate(&traced, loaded.metadata.as_ref());
+    let mut block = frame_trace_decode::annotate_at_block(
+        &traced,
+        loaded.metadata.as_ref(),
+        loaded.block_number,
+    );
     let undecoded = block
         .phases
         .iter()
@@ -131,7 +135,6 @@ fn load(args: &source::SourceArgs) -> Result<AnnotatedBlock> {
              is it the metadata of the block's runtime?"
         );
     }
-    block.block_number = loaded.block_number;
     block.execution = loaded.execution;
     Ok(block)
 }

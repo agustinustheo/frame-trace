@@ -53,7 +53,7 @@ fn phases(block: &AnnotatedBlock) -> Table {
     let mut total = stats_row("total".into(), &block.totals);
     let tally = crate::report::Tally::of(block.all_phases().flat_map(|p| &p.ops));
     total.extend([
-        tally.proof_bytes.to_string(),
+        crate::report::proof_label(&tally),
         format!("{:.1}", tally.storage_ns as f64 / 1000.0),
         block.timing.map_or_else(
             || "?".into(),
@@ -68,7 +68,7 @@ fn phase_row(phase: &frame_trace_decode::AnnotatedPhase, label: String) -> Vec<S
     let mut row = stats_row(label, &phase.stats);
     let t = crate::report::Tally::of(&phase.ops);
     row.extend([
-        t.proof_bytes.to_string(),
+        crate::report::proof_label(&t),
         format!("{:.1}", t.storage_ns as f64 / 1000.0),
         phase.wall_time.as_ref().map_or_else(
             || "?".into(),
@@ -103,27 +103,30 @@ fn duplicates(block: &AnnotatedBlock, top: usize) -> Table {
             BTreeMap<(Option<&'a str>, &'a str), (&'a AnnotatedOp, [usize; 5])>;
         let mut counts: DuplicateRows<'_> = BTreeMap::new();
         for op in phase.ops.iter().filter(|op| op.duplicate_read) {
-            counts
+            let row = counts
                 .entry((op.child_trie.as_deref(), op.key.as_str()))
                 .or_insert((op, [0; 5]));
-            let counts = &mut counts
-                .get_mut(&(op.child_trie.as_deref(), op.key.as_str()))
-                .expect("inserted")
-                .1;
-            counts[0] += 1;
-            counts[match op.origin.as_deref() {
-                Some("overlay") => 1,
-                Some("backend_warm") => 2,
-                Some("backend_cold") => 3,
-                _ => 4,
-            }] += 1;
+            row.1[0] += 1;
+            row.1[crate::report::origin_index(op.origin.as_deref()) + 1] += 1;
         }
         let mut rows: Vec<_> = counts.into_values().collect();
         rows.sort_by(|a, b| b.1[0].cmp(&a.1[0]).then(a.0.seq.cmp(&b.0.seq)));
+        let omitted = rows.len().saturating_sub(top);
         for (op, n) in rows.into_iter().take(top) {
             let mut row = vec![phase.label.clone(), key_name(op)];
             row.extend(n.map(|n| n.to_string()));
             table.add_row(row);
+        }
+        if omitted > 0 {
+            table.add_row(vec![
+                phase.label.clone(),
+                format!("… {omitted} more"),
+                String::new(),
+                String::new(),
+                String::new(),
+                String::new(),
+                String::new(),
+            ]);
         }
     }
     table

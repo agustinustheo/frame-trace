@@ -14,11 +14,52 @@ use sp_state_machine::{
 use sp_trie::{MerkleValue, recorder::Recorder};
 use std::time::Instant;
 
-type Trie = TrieBackend<ProofDb, H>;
+// Wrap the SDK recorder: observe hashes incrementally, never copy its proof.
+// The lifetime set deliberately survives SDK recorder transaction rollback.
+#[derive(Clone)]
+struct ObservedRecorder {
+    inner: Recorder<H>,
+    seen: std::sync::Arc<parking_lot::Mutex<std::collections::HashSet<H256>>>,
+}
+struct ObservedTrieRecorder<'a> {
+    inner: sp_trie::recorder::TrieRecorder<'a, H>,
+    seen: &'a parking_lot::Mutex<std::collections::HashSet<H256>>,
+}
+impl sp_trie::TrieRecorder<H256> for ObservedTrieRecorder<'_> {
+    fn record(&mut self, access: trie_db::TrieAccess<'_, H256>) {
+        let hash = match &access {
+            trie_db::TrieAccess::NodeOwned { hash, .. }
+            | trie_db::TrieAccess::EncodedNode { hash, .. }
+            | trie_db::TrieAccess::Value { hash, .. } => Some(*hash),
+            _ => None,
+        };
+        if let Some(hash) = hash {
+            self.seen.lock().insert(hash);
+        }
+        self.inner.record(access);
+    }
+    fn trie_nodes_recorded_for_key(&self, key: &[u8]) -> trie_db::RecordedForKey {
+        self.inner.trie_nodes_recorded_for_key(key)
+    }
+}
+impl sp_trie::TrieRecorderProvider<H> for ObservedRecorder {
+    type Recorder<'a> = ObservedTrieRecorder<'a>;
+    fn drain_storage_proof(self) -> Option<sp_trie::StorageProof> {
+        Some(self.inner.drain_storage_proof())
+    }
+    fn as_trie_recorder(&self, root: H256) -> Self::Recorder<'_> {
+        ObservedTrieRecorder {
+            inner: self.inner.as_trie_recorder(root),
+            seen: &self.seen,
+        }
+    }
+}
+type Trie = TrieBackend<ProofDb, H, sp_trie::cache::LocalTrieCache<H>, ObservedRecorder>;
 pub struct TracedBackend {
-    pub trie: Trie,
+    trie: Trie,
     db: ProofDb,
     recorder: Recorder<H>,
+    seen: std::sync::Arc<parking_lot::Mutex<std::collections::HashSet<H256>>>,
 }
 impl std::fmt::Debug for TracedBackend {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -32,19 +73,28 @@ impl TracedBackend {
         child: Option<&ChildInfo>,
         before: usize,
         value: Option<H256>,
+        seen_before: usize,
     ) {
         tracing::trace!(target: "frame_trace_backend", method = "BackendRead", key = %hex0(key),
             child_info = %child.map(|c| hex0(c.storage_key())).unwrap_or_default(),
             value_hash = %value.map(|h| format!("{h:?}")).unwrap_or_else(|| "none".into()),
-            proof_bytes_added = self.recorder.estimate_encoded_size().saturating_sub(before));
+            proof_bytes_added = self.recorder.estimate_encoded_size().saturating_sub(before),
+            cold = self.seen.lock().len() > seen_before);
     }
 
     pub fn new(db: ProofDb, root: H256, recorder: Recorder<H>) -> Self {
+        let seen = Default::default();
+        let observed = ObservedRecorder {
+            inner: recorder.clone(),
+            seen: std::sync::Arc::clone(&seen),
+        };
         Self {
+            seen,
             db: db.clone(),
             recorder: recorder.clone(),
-            trie: TrieBackendBuilder::new(db, root)
-                .with_recorder(recorder)
+            trie: TrieBackendBuilder::new_with_cache(db, root, ())
+                .with_optional_cache(None::<sp_trie::cache::LocalTrieCache<H>>)
+                .with_recorder(observed)
                 .build(),
         }
     }
@@ -96,6 +146,7 @@ impl Backend<H> for TracedBackend {
     fn storage(&self, k: &[u8]) -> Result<Option<Vec<u8>>, String> {
         self.db.remember_key(k);
         let before = self.recorder.estimate_encoded_size();
+        let seen_before = self.seen.lock().len();
         let result = self
             .db
             .speculative_value(with_key_hint(k, || self.trie.storage(k)));
@@ -108,16 +159,24 @@ impl Backend<H> for TracedBackend {
                 .ok()
                 .and_then(|v| v.as_ref())
                 .map(|v| H256::from(sp_io::hashing::blake2_256(v))),
+            seen_before,
         );
         result
     }
     fn storage_hash(&self, k: &[u8]) -> Result<Option<H256>, String> {
         self.db.remember_key(k);
         let before = self.recorder.estimate_encoded_size();
+        let seen_before = self.seen.lock().len();
         let result = self
             .db
             .speculative_value(with_key_hint(k, || self.trie.storage_hash(k)));
-        self.read_event(k, None, before, result.as_ref().ok().copied().flatten());
+        self.read_event(
+            k,
+            None,
+            before,
+            result.as_ref().ok().copied().flatten(),
+            seen_before,
+        );
         result
     }
     fn closest_merkle_value(&self, k: &[u8]) -> Result<Option<MerkleValue<H256>>, String> {
@@ -137,6 +196,7 @@ impl Backend<H> for TracedBackend {
     }
     fn child_storage(&self, c: &ChildInfo, k: &[u8]) -> Result<Option<Vec<u8>>, String> {
         let before = self.recorder.estimate_encoded_size();
+        let seen_before = self.seen.lock().len();
         self.trie.storage(c.prefixed_storage_key().as_slice())?;
         let result = with_child(c, || with_key_hint(k, || self.trie.child_storage(c, k)));
         self.read_event(
@@ -148,16 +208,24 @@ impl Backend<H> for TracedBackend {
                 .ok()
                 .and_then(|v| v.as_ref())
                 .map(|v| H256::from(sp_io::hashing::blake2_256(v))),
+            seen_before,
         );
         result
     }
     fn child_storage_hash(&self, c: &ChildInfo, k: &[u8]) -> Result<Option<H256>, String> {
         let before = self.recorder.estimate_encoded_size();
+        let seen_before = self.seen.lock().len();
         self.trie.storage(c.prefixed_storage_key().as_slice())?;
         let result = with_child(c, || {
             with_key_hint(k, || self.trie.child_storage_hash(c, k))
         });
-        self.read_event(k, Some(c), before, result.as_ref().ok().copied().flatten());
+        self.read_event(
+            k,
+            Some(c),
+            before,
+            result.as_ref().ok().copied().flatten(),
+            seen_before,
+        );
         result
     }
     fn next_storage_key(&self, k: &[u8]) -> Result<Option<Vec<u8>>, String> {

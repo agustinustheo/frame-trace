@@ -105,10 +105,11 @@ from local execution of the authenticated runtime against the selected state:
 `Metadata_metadata_at_version(16)`, then 15, then legacy `Metadata_metadata` (V14).
 The cache is indexed by authenticated code hash and captured storage dependency values.
 Each new state root authenticates those values before reuse; an export with no
-storage reads reuses solely by code hash. Metadata constants in the People runtime
+storage or root dependencies reuses solely by code hash. Metadata constants in the People runtime
 do read storage, so treating metadata as code-only would be incorrect. A changed
-value regenerates metadata. Iteration dependencies conservatively retain the state
-root. Saved artifacts retain the current state’s metadata execution proofs, including
+value regenerates metadata. Iteration and whole-state/child-root dependencies conservatively retain the state
+root. Cache validation reads full authenticated values, including external value nodes.
+Root-bound entries also retain metadata execution proof nodes. Saved artifacts retain the current state’s metadata execution proofs, including
 after a cache hit, for self-contained offline replay. RPC `state_getMetadata` is never
 queried by default. If local metadata execution is impossible, replay uses unnamed
 storage/hex results; `--args` requires API types. Explicit `--unauthenticated-metadata`
@@ -120,12 +121,14 @@ Caught replay-execution panics return clean errors without the default panic tex
 panics outside that execution scope still use the normal panic hook.
 
 Hook spans are named `on_initialize: Balances` (also `on_finalize`, `on_idle` and
-`on_poll`). Metadata type paths resolve the pallet's runtime name. The n-th hook of a crate
-is assigned to the n-th matching pallet instance in metadata pallet index order
-(AllPalletsWithSystem): for example `on_initialize: Assets`, then
-`on_initialize: PoolAssets`. This uses observed hook order; missing/incomplete
-hook tracing can make instance attribution incomplete. Missing mappings use the crate name in CamelCase
-with `pallet_` removed (for example `Aura` and `CumulusXcmpQueue`).
+`on_poll`). Metadata type paths resolve runtime pallet names. SDK metadata V14–V16
+preserves the order used to construct `AllPalletsWithSystem`: legacy
+`construct_runtime!` uses declaration order; the newer runtime macro sorts by
+index unless legacy ordering is requested. We preserve the metadata list order.
+`on_idle` rotates the complete tuple by block number before selecting instances.
+Instances are assigned only for complete observed sequences; missing hook traces
+or an unknown idle block number retain candidates such as `Assets | PoolAssets`.
+Missing metadata mappings use the crate name in CamelCase with `pallet_` removed.
 `frame.runtime.target` is retained.
 Every storage op has `db.collection.name`: the decoded pallet (including prefixed
 iteration), `well_known` for keys such as `:code`, `child_trie` for child operations,
@@ -242,7 +245,8 @@ A fresh measured recorder excludes earlier runtime loading and metadata executio
 Legacy `state_traceBlock` JSON lacks this evidence and reports unknown origins.
 
 `proof_bytes_added` is positive growth of the SDK recorder's encoded-size estimate
-at ordered storage-operation events. The first operation to introduce shared trie
+at ordered storage-operation events. Append backend growth is assigned to the
+Append that owns the access, including when its SDK event precedes the read. The first operation to introduce shared trie
 nodes gets their bytes; later users get zero. Backend iteration events can introduce
 nodes inside an enclosing prefix clear, so those events receive the bytes and the
 outer event gets only subsequent growth. No nested double counting is added.
@@ -286,17 +290,24 @@ or a non-genesis, finalized inclusive range of at most 10,000 blocks. `--last K`
 anchors once to the finalized head. Live requests pin each block hash and reuse
 proof, compiled-runtime, and metadata caches. Two block workers run by default
 (configurable 1–4); proof RPC concurrency is a separate shared bound. Historical
-ranges may require archive state. Repeated input block hashes and call traces are
-rejected. Saved inputs do no replay and require no RPC client.
+ranges may require archive state. Each completed block is folded immediately into
+statistics; traces are released. Failed blocks/files, duplicate input hashes and call
+traces are listed in output while remaining inputs continue. Any failure exits non-zero. Saved inputs do no replay and require no RPC client.
 
 Short terminal tables and complete JSON show phase shares of operations, unioned
 storage time and attributed proof bytes; per-item origins, writes, iteration,
 logical bytes, proof bytes and duplicates; observed hook/pallet totals; and
 extrinsic-type count, median and nearest-rank p95 operations, marginal proof bytes,
-and storage time. JSON additionally includes observed extrinsic wall-time
+and storage time. `--top` limits ranked terminal rows and reports omitted counts;
+extrinsics rank by total proof bytes (`--sort-by ops|time` selects another cost).
+Distributions are exact through 1,024 samples; thereafter a bounded logarithmic
+sketch has at most 1.5625% value error (not a rank-error bound). JSON additionally includes observed extrinsic wall-time
 statistics when runtime span bounds exist. Inherents and signed extrinsics have
 separate phase groups when the extrinsic bytes identify them. Missing origins are counted as unknown; `proof_ops_observed` distinguishes
 missing proof evidence from a measured zero. Runtime wall-time distributions are
 null without defining runtime spans. Old saved output is never assigned an inferred
 origin or proof measurement. Avoid combining different chains with
 the same pallet/call names unless that grouping is intentional.
+
+The [JSON format](docs/json-schema.md) documents schema versions, legacy missing
+evidence, report errors, quantile bounds and ranking.

@@ -363,3 +363,73 @@ isolate their measured-run counters; the CLI regression also schedules two
 authenticated fixture replays concurrently and checks both zero-RPC guards.
 The complete workspace suite was rerun after this correction: the exact count
 remains **139 passed, 0 failed, 1 ignored; 0 doctests**.
+
+## Round 5 (e86f740 working tree, 2026-10-25)
+
+Rust **1.93.0** `fmt --all -- --check`, `clippy --workspace --all-targets
+--locked -- -D warnings`, and `test --workspace --locked --no-fail-fast` passed.
+Exact distinct counts: **154 passed, 0 failed, 1 ignored, 0 doctests**.
+CLI **42** (16 unit + 26 integration), decode **18** (5 unit + 13 integration),
+model **19** (11 unit + 8 integration), OTel **11**, replay **64** (46 unit +
+7 call integration + 11 block integration). The existing public-network test is
+ignored. Repeated probe runs and child-process executions are not additional cases.
+
+All eleven review findings are addressed. The Append regression records
+**Append = 148 B; unrelated overlay Get = 0 B**. Additional probes cover an
+Append served by the overlay followed by a backend read, iteration-owned growth,
+and recorder warmth after iteration/rollback. Capture observes hashes through a
+wrapper around the SDK recorder and keeps no duplicate node bytes; it no longer
+copies the full growing proof to establish read warmth.
+
+Metadata validation reads complete authenticated top-level and child values,
+including V1 external value nodes. Root-bound cache entries retain metadata proof
+nodes for iteration exports. Tests save after cache hits and execute metadata in
+**fresh processes** for top-level reads, child reads, iteration, storage roots and
+child roots. People reuse checks exact equality with the first execution.
+StorageRoot/ChildStorageRoot dependencies invalidate on a changed state root.
+
+SDK source finding: legacy `construct_runtime!` passes declaration order to both
+`decl_all_pallets` and `expand_runtime_metadata`; metadata IR V14/V15/V16 conversion
+maps that vector without sorting. The newer runtime macro may sort both by index
+before expansion (unless legacy ordering is enabled). Preserve metadata's tuple
+order, rather than independently sorting indices. OnIdle rotates the **complete**
+tuple by block number before filtering instances. A synthetic V16 fixture uses
+instance indices 90 then 1, with System between them, and tests declaration order,
+rotation, unknown block numbers and incomplete tracing. Ambiguous cases retain
+`DeclaredFirst | DeclaredSecond`.
+
+Report folds each completed worker result immediately and releases its trace.
+It retains aggregate statistics, a duplicate-hash set, errors and bounded quantile
+data. Samples are exact through 1,024 observations per metric/type, then use at
+most 4,097 logarithmic buckets with **1.5625% maximum value error** (no rank-error
+claim). Default behavior continues after block/file errors, emits them in JSON and
+tables, and exits 1 if any input failed. Cost ranking, omitted-row counts, phase
+order, legacy missing evidence, saturating sums, range validation and stable
+summary/report tables are covered by tests. The genuine legacy JSON fixture was
+built from 5a1963e in a temporary detached worktree, which has been removed.
+
+### Isolated before/after measurements
+
+macOS arm64, Rust 1.93.0 development executables; baseline copied from clean
+e86f740 before edits. Tests/compilation had stopped. Westend Asset Hub fixture
+**#18,558,320**: one warmup per executable, then three separate timed processes,
+with warm compiled Wasm, fresh overlays/recorders and JSON export. All six runs
+have **549 ops**, **92,458 proof bytes**, matching attributed sums, passing state
+roots and zero measured RPC calls. Read origins remain **142 overlay / 110 warm /
+89 cold**.
+
+Median measured capture duration: **68.866458 → 36.488417 ms**. End-to-end median:
+**2.19 → 2.14 seconds**. Median process peak RSS: **424,099,840 → 418,316,288 bytes**.
+These are local fixture measurements including tracing overhead, not node timings.
+
+Report memory uses **50 repetitions** of that saved Westend JSON with distinct
+synthetic input hashes (aggregation only, no replay), **27,450 ops** and
+**4,622,900 attributed proof bytes**, using `report … --top 3 --json FILE`.
+`/usr/bin/time -l` peak RSS: **34,275,328 → 12,730,368 bytes**
+(**32.6875 → 12.140625 MiB**, **62.86% lower**). This also includes buffered file
+parsing and terminal/JSON rendering. Raw commands, six block JSON files,
+measurements, full validation and Append probe logs are in
+`/tmp/frame-trace-round5/`; inputs are in `/tmp/frame-r5-memory/`.
+
+All processes started for this round have exited. HEAD remains e86f740; no commit
+or push was made.

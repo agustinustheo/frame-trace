@@ -290,3 +290,133 @@ fn recorder_rollback_keeps_block_lifetime_warmth_but_reports_new_marginal_growth
             > 0
     );
 }
+
+#[test]
+fn append_owns_backend_growth_before_unrelated_overlay_get() {
+    let mut seed = sp_state_machine::TestExternalities::<Blake2Hasher>::default();
+    seed.execute_with(|| sp_io::storage::set(b"key", &vec![7u8; 63].encode()));
+    seed.commit_all().unwrap();
+    let (raw, root) = seed.into_raw_snapshot();
+    let db = ProofDb::new(None, H256::zero());
+    db.insert_nodes(raw.into_iter().map(|(_, (node, _))| node));
+    let recorder = Recorder::default();
+    let backend = TracedBackend::new(db, root, recorder.clone());
+    let mut overlay = OverlayedChanges::default();
+    let mut ext = sp_state_machine::Ext::new(&mut overlay, &backend, None);
+    let capture = Capture::new();
+    capture.0.lock().recorder = Some(recorder.clone());
+    tracing::dispatcher::with_default(&tracing::Dispatch::new(capture.clone()), || {
+        sp_externalities::set_and_run_with_externalities(&mut ext, || {
+            sp_io::storage::set(b"unrelated", b"overlay");
+            sp_io::storage::append(b"key", vec![8]);
+            assert_eq!(
+                sp_io::storage::get(b"unrelated").unwrap().as_ref(),
+                b"overlay"
+            );
+        });
+    });
+    let d = capture.0.lock();
+    let append = d
+        .events
+        .iter()
+        .find(|e| e.fields.get("method").is_some_and(|m| m == "Append"))
+        .unwrap();
+    let get = d
+        .events
+        .iter()
+        .find(|e| e.fields.get("method").is_some_and(|m| m == "Get"))
+        .unwrap();
+    let growth: usize = append.fields["proof_bytes_added"].parse().unwrap();
+    println!(
+        "Append probe: Append = {growth} B; unrelated overlay Get = {} B",
+        get.fields["proof_bytes_added"]
+    );
+    assert_eq!(growth, 148);
+    assert_eq!(growth, recorder.estimate_encoded_size());
+    assert_eq!(get.fields["proof_bytes_added"], "0");
+    assert_eq!(get.fields["origin"], "overlay");
+}
+
+#[test]
+fn overlay_append_does_not_absorb_the_next_calls_backend_growth() {
+    let mut seed = sp_state_machine::TestExternalities::<Blake2Hasher>::default();
+    seed.execute_with(|| sp_io::storage::set(b"backend", &[1; 80]));
+    seed.commit_all().unwrap();
+    let (raw, root) = seed.into_raw_snapshot();
+    let db = ProofDb::new(None, H256::zero());
+    db.insert_nodes(raw.into_iter().map(|(_, (node, _))| node));
+    let recorder = Recorder::default();
+    let backend = TracedBackend::new(db, root, recorder.clone());
+    let mut overlay = OverlayedChanges::default();
+    let mut ext = sp_state_machine::Ext::new(&mut overlay, &backend, None);
+    let capture = Capture::new();
+    capture.0.lock().recorder = Some(recorder);
+    tracing::dispatcher::with_default(&tracing::Dispatch::new(capture.clone()), || {
+        sp_externalities::set_and_run_with_externalities(&mut ext, || {
+            sp_io::storage::set(b"overlay", &[0]);
+            sp_io::storage::append(b"overlay", vec![1]);
+            let _ = sp_io::storage::get(b"backend");
+        });
+    });
+    let d = capture.0.lock();
+    let find = |method| {
+        d.events
+            .iter()
+            .find(|e| e.fields.get("method").is_some_and(|m| m == method))
+            .unwrap()
+    };
+    assert_eq!(find("Append").fields["proof_bytes_added"], "0");
+    assert!(
+        find("Get").fields["proof_bytes_added"]
+            .parse::<usize>()
+            .unwrap()
+            > 0
+    );
+    assert_eq!(find("Get").fields["origin"], "backend_cold");
+}
+
+#[test]
+fn iteration_keeps_its_growth_and_warms_later_inline_value_reads() {
+    let mut seed = sp_state_machine::TestExternalities::<Blake2Hasher>::default();
+    seed.execute_with(|| {
+        sp_io::storage::set(b"a", b"one");
+        sp_io::storage::set(b"b", b"two");
+    });
+    seed.commit_all().unwrap();
+    let (raw, root) = seed.into_raw_snapshot();
+    let db = ProofDb::new(None, H256::zero());
+    db.insert_nodes(raw.into_iter().map(|(_, (node, _))| node));
+    let recorder = Recorder::default();
+    let backend = TracedBackend::new(db, root, recorder.clone());
+    let mut overlay = OverlayedChanges::default();
+    let mut ext = sp_state_machine::Ext::new(&mut overlay, &backend, None);
+    let capture = Capture::new();
+    capture.0.lock().recorder = Some(recorder.clone());
+    tracing::dispatcher::with_default(&tracing::Dispatch::new(capture.clone()), || {
+        sp_externalities::set_and_run_with_externalities(&mut ext, || {
+            assert_eq!(sp_io::storage::next_key(b"a"), Some(b"b".to_vec()));
+            assert_eq!(sp_io::storage::get(b"b").unwrap().as_ref(), b"two");
+        });
+    });
+    let d = capture.0.lock();
+    let iter = d
+        .events
+        .iter()
+        .find(|e| {
+            e.fields
+                .get("method")
+                .is_some_and(|m| m == "BackendNextKey")
+        })
+        .unwrap();
+    let get = d
+        .events
+        .iter()
+        .find(|e| e.fields.get("method").is_some_and(|m| m == "Get"))
+        .unwrap();
+    assert_eq!(
+        iter.fields["proof_bytes_added"].parse::<usize>().unwrap(),
+        recorder.estimate_encoded_size()
+    );
+    assert_eq!(get.fields["origin"], "backend_warm");
+    assert_eq!(get.fields["proof_bytes_added"], "0");
+}

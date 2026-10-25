@@ -206,6 +206,7 @@ fn synthetic_block(ops: usize) -> AnnotatedBlock {
         duplicate_read: seq > 0,
     };
     AnnotatedBlock {
+        schema_version: 2,
         execution: None,
         call: None,
         runtime_spans: Vec::new(),
@@ -647,7 +648,7 @@ fn hook_names_resolve_pallet_metadata_and_fall_back_to_crates() {
     .unwrap();
     let asset_md = Metadata::from_hex(&artifact.metadata).unwrap();
     let candidates = asset_md.pallet_for_crate("pallet_assets").unwrap();
-    assert!(candidates.contains(" / "), "{candidates}");
+    assert!(candidates.contains(" | "), "{candidates}");
     for span in &mut traced.runtime_spans[..3] {
         span.target = "pallet_assets::pallet".into();
         span.name = "on_initialize".into();
@@ -671,8 +672,14 @@ fn hook_names_resolve_pallet_metadata_and_fall_back_to_crates() {
     .unwrap();
     let people_md = Metadata::from_hex(&people.metadata).unwrap();
     let instances = annotate(&traced, Some(&people_md));
-    assert_eq!(instances.runtime_spans[0].name, "on_initialize: Assets");
-    assert_eq!(instances.runtime_spans[1].name, "on_initialize: PoolAssets");
+    assert_eq!(
+        instances.runtime_spans[0].name,
+        "on_initialize: Assets | PoolAssets"
+    );
+    assert_eq!(
+        instances.runtime_spans[1].name,
+        "on_initialize: Assets | PoolAssets"
+    );
 }
 
 #[test]

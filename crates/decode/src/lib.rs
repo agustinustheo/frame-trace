@@ -11,7 +11,7 @@ pub mod ss58;
 
 pub use annotate::{
     AnnotatedBlock, AnnotatedCall, AnnotatedOp, AnnotatedPhase, ExecutionInfo, PhaseTiming,
-    annotate,
+    annotate, annotate_at_block,
 };
 pub use key::KeyName;
 pub use metadata::{CallName, Metadata};

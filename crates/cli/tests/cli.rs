@@ -69,6 +69,7 @@ fn block_writes_json() {
     let json: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
     std::fs::remove_file(&path).ok();
+    assert_eq!(json["schema_version"], 2);
     assert_eq!(json["phases"][1]["call"], "Timestamp.set");
     assert_eq!(json["totals"]["duplicate_reads"], 4);
 }
@@ -622,6 +623,7 @@ fn call_offline_exports_measured_named_ops_and_self_contained_round_trip() {
         String::from_utf8_lossy(&out.stderr)
     );
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["schema_version"], 2);
     assert_eq!(json["call"]["method"], "AccountNonceApi_account_nonce");
     assert_eq!(json["call"]["result"], "0x00000000");
     assert!(json["call"]["decoded"].is_null()); // recorded metadata is V14
@@ -988,4 +990,56 @@ fn report_last_pins_finalized_hash_and_exports_replay_statistics() {
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert_eq!(stderr.matches("root check: PASS").count(), 2);
     assert_eq!(stderr.matches("(measured: 0)").count(), 2);
+}
+
+#[test]
+fn report_continues_after_bad_files_emits_errors_and_exits_nonzero() {
+    let absent = fixture("model/absent-round5.json");
+    let out = run(&[
+        "report",
+        &absent,
+        &fixture("model/pre-e86f740.json"),
+        "--json",
+        "-",
+    ]);
+    assert_eq!(out.status.code(), Some(1));
+    let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+    assert_eq!(json["blocks"], 1);
+    assert_eq!(json["errors"].as_array().unwrap().len(), 1);
+    assert_eq!(json["errors"][0]["input"], absent);
+    assert!(String::from_utf8_lossy(&out.stderr).contains("Errors"));
+}
+
+#[test]
+fn report_help_and_write_errors_explain_options_and_paths() {
+    let out = run(&["report", "--help"]);
+    let text = String::from_utf8_lossy(&out.stdout);
+    for expected in [
+        "First block",
+        "Last block",
+        "Shared maximum",
+        "compiled Wasm",
+        "disk cache",
+        "Maximum rows",
+        "--sort-by",
+    ] {
+        assert!(text.contains(expected), "{text}");
+    }
+    let out = run(&["summary", "--help"]);
+    assert!(String::from_utf8_lossy(&out.stdout).contains("extrinsic, hook"));
+    let path = std::env::temp_dir().join(format!(
+        "frame-r5-absent-{}/report.json",
+        std::process::id()
+    ));
+    let out = run(&[
+        "report",
+        &fixture("model/pre-e86f740.json"),
+        "--json",
+        path.to_str().unwrap(),
+    ]);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&out.stderr)
+            .contains(&format!("writing report JSON {}", path.display()))
+    );
 }
