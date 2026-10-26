@@ -82,4 +82,4 @@ Docs follow [docs/STYLE.md](docs/STYLE.md). Build them with `mdbook build`, usin
 
 ## License
 
-Apache-2.0.
+Apache-2.0. See [LICENSE](LICENSE).
