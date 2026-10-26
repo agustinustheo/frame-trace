@@ -703,8 +703,8 @@
     {
       "id": 11,
       "type": "bargauge",
-      "title": "Reads and writes by origin",
-      "description": "Where each operation was answered: cache, trie (already in proof), trie (new). Writes are unknown.",
+      "title": "Reads by origin",
+      "description": "Where each read (get, exists, hash) was answered: cache, trie (already in proof) or trie (new). unknown means the origin was not recorded. Writes have no origin and are left out.",
       "gridPos": {
         "x": 12,
         "y": 21,
@@ -723,7 +723,7 @@
             "uid": "tempo"
           },
           "queryType": "traceql",
-          "query": "{ span.db.system.name = \"substrate\" } | count_over_time() by (span.frame.storage.origin)",
+          "query": "{ span.db.operation.name =~ \"get|exists|hash\" } | count_over_time() by (span.frame.storage.origin)",
           "metricsQueryType": "instant"
         }
       ],

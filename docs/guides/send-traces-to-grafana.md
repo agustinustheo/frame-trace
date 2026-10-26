@@ -63,7 +63,7 @@ It shows every block you traced in the last hour.
 3. The [pallets](../reference/glossary.md#pallet) whose keys were read or written most.
 4. The storage items that added the most proof bytes. `<unknown>` holds operations without a storage item, such as `storage_root`.
 5. Keys read again in the same [phase](../concepts/phases.md). See [Find repeated reads](find-repeated-reads.md).
-6. Where operations were answered: [cache or trie](../concepts/cache-or-trie.md). Writes show as `unknown`.
+6. Where reads (`get`, `exists`, `hash`) were answered: [cache or trie](../concepts/cache-or-trie.md). Writes have no origin, so they are left out. A read whose origin was not recorded shows as `unknown`.
 7. Every read that went to the trie and added proof bytes, largest first.
 8. Storage operations that took more than 20 µs, slowest first. These times come from the replay on your machine, not from a node. See [Timings](../concepts/timings.md).
 
