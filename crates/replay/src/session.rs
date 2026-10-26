@@ -24,11 +24,11 @@ type MetadataCache = BTreeMap<H256, MetadataEntry>;
 const MAX_SHARED_BYTES: usize = 256 * 1024 * 1024;
 #[derive(Default)]
 pub(crate) struct Nodes {
-    pub nodes: BTreeMap<H256, Vec<u8>>,
+    pub nodes: BTreeMap<H256, Arc<[u8]>>,
     bytes: usize,
 }
 impl Nodes {
-    pub fn insert(&mut self, hash: H256, bytes: Vec<u8>) {
+    pub fn insert(&mut self, hash: H256, bytes: Arc<[u8]>) {
         if self.nodes.contains_key(&hash) {
             return;
         }
@@ -45,6 +45,9 @@ impl Nodes {
 pub struct ReplaySession {
     pub(crate) nodes: Arc<Mutex<Nodes>>,
     pub(crate) hints: Arc<Mutex<VecDeque<BTreeSet<Vec<u8>>>>>,
+    // One cold replay teaches the shared proof cache and key predictions before followers
+    // start. Otherwise every startup worker repeats the same sequential discovery rounds.
+    cold_start: Arc<Mutex<()>>,
     #[cfg(test)]
     pub(crate) executor: Arc<Executor>,
     executors: Arc<Mutex<BTreeMap<H256, Arc<Executor>>>>,
@@ -87,6 +90,7 @@ impl ReplaySession {
         let session = Self {
             nodes: Default::default(),
             hints: Default::default(),
+            cold_start: Default::default(),
             node_dir,
             cache_base: base,
             cache_max_bytes,
@@ -113,6 +117,49 @@ impl ReplaySession {
         // active runtime. Pruning here could delete the very module about to be loaded.
         session.refresh_disk_index()?;
         Ok(session)
+    }
+    /// Admit one cold replay at a time until successful replay paths are available.
+    /// `follow` holds the returned guard through replay; other callers need not use this gate.
+    pub fn cold_start(
+        &self,
+        cancel: &crate::rpc::CancellationToken,
+    ) -> Result<Option<parking_lot::MutexGuard<'_, ()>>> {
+        self.cold_start_wait(cancel, || {})
+    }
+    fn cold_start_wait(
+        &self,
+        cancel: &crate::rpc::CancellationToken,
+        waiting: impl FnOnce(),
+    ) -> Result<Option<parking_lot::MutexGuard<'_, ()>>> {
+        if cancel.is_cancelled() {
+            return Err(Error::Cancelled);
+        }
+        if !self.hints.lock().is_empty() {
+            return if cancel.is_cancelled() {
+                Err(Error::Cancelled)
+            } else {
+                Ok(None)
+            };
+        }
+        let mut waiting = Some(waiting);
+        loop {
+            if let Some(guard) = self
+                .cold_start
+                .try_lock_for(std::time::Duration::from_millis(25))
+            {
+                if cancel.is_cancelled() {
+                    return Err(Error::Cancelled);
+                }
+                // A replay may have finished while this worker waited.
+                return Ok(self.hints.lock().is_empty().then_some(guard));
+            }
+            if let Some(waiting) = waiting.take() {
+                waiting();
+            }
+            if cancel.is_cancelled() {
+                return Err(Error::Cancelled);
+            }
+        }
     }
     /// Full storage keys and trie paths from the last three successful replays.
     pub(crate) fn predicted_keys(&self) -> BTreeSet<Vec<u8>> {
@@ -327,6 +374,108 @@ impl DiskIndex {
 #[cfg(test)]
 mod disk_tests {
     use super::*;
+    #[test]
+    fn cold_followers_wait_until_first_replay_releases_guard() {
+        use std::{sync::mpsc, time::Duration};
+        let session = ReplaySession::new(None).expect("session");
+        let cancel = crate::rpc::CancellationToken::new();
+        let guard = session
+            .cold_start(&cancel)
+            .expect("admission")
+            .expect("cold");
+        std::thread::scope(|scope| {
+            let (waiting, ready) = mpsc::channel();
+            let (done, finished) = mpsc::channel();
+            let (session, cancel) = (&session, &cancel);
+            let next = scope.spawn(move || {
+                assert!(
+                    session
+                        .cold_start_wait(cancel, || waiting.send(()).expect("waiting"))
+                        .expect("admission")
+                        .is_none()
+                );
+                assert!(session.predicted_keys().contains(b"observed".as_slice()));
+                done.send(()).expect("done");
+            });
+            ready
+                .recv_timeout(Duration::from_secs(2))
+                .expect("contended lock");
+            session.remember_paths([b"observed".to_vec()].into_iter().collect());
+            assert!(matches!(
+                finished.recv_timeout(Duration::from_millis(75)),
+                Err(mpsc::RecvTimeoutError::Timeout)
+            ));
+            drop(guard);
+            finished
+                .recv_timeout(Duration::from_secs(2))
+                .expect("released");
+            next.join().expect("follower completed");
+        });
+        assert!(session.cold_start(&cancel).expect("warm").is_none());
+    }
+    #[test]
+    fn online_error_releases_explicit_startup_admission() {
+        let session = ReplaySession::new(None).expect("session");
+        let cancel = crate::rpc::CancellationToken::new();
+        let rpc = crate::rpc::Rpc::new("http://127.0.0.1:1").expect("rpc");
+        let replay = || -> Result<()> {
+            let _guard = session.cold_start(&cancel)?;
+            crate::online_with_session(&rpc, "invalid-selector", &session)?;
+            Ok(())
+        };
+        assert!(replay().is_err());
+        assert_eq!(rpc.count(), 0);
+        assert!(session.cold_start.try_lock().is_some());
+        assert!(session.cold_start(&cancel).expect("retry").is_some());
+    }
+    #[test]
+    fn panic_releases_startup_admission() {
+        let session = ReplaySession::new(None).expect("session");
+        let cancel = crate::rpc::CancellationToken::new();
+        assert!(
+            std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                let _guard = session.cold_start(&cancel).expect("admission");
+                panic!("replay panicked");
+            }))
+            .is_err()
+        );
+        assert!(session.cold_start.try_lock().is_some());
+    }
+    #[test]
+    fn cancelled_waiter_exits_while_first_replay_still_holds_gate() {
+        use std::{sync::mpsc, time::Duration};
+        let session = ReplaySession::new(None).expect("session");
+        let cancel = crate::rpc::CancellationToken::new();
+        let _guard = session.cold_start(&cancel).expect("admission");
+        std::thread::scope(|scope| {
+            let (waiting, ready) = mpsc::channel();
+            let (done, finished) = mpsc::channel();
+            let (session, cancel) = (&session, &cancel);
+            scope.spawn(move || {
+                assert!(matches!(
+                    session.cold_start_wait(cancel, || waiting.send(()).expect("waiting")),
+                    Err(Error::Cancelled)
+                ));
+                done.send(()).expect("done");
+            });
+            ready
+                .recv_timeout(Duration::from_secs(2))
+                .expect("contended lock");
+            cancel.cancel();
+            finished
+                .recv_timeout(Duration::from_secs(2))
+                .expect("cancelled without gate release");
+        });
+        assert!(matches!(session.cold_start(&cancel), Err(Error::Cancelled)));
+        let rpc =
+            crate::rpc::Rpc::with_options("http://127.0.0.1:1", 1, Duration::from_secs(1), cancel)
+                .expect("rpc");
+        assert!(matches!(
+            crate::online_with_session(&rpc, "best", &session),
+            Err(Error::Cancelled)
+        ));
+        assert_eq!(rpc.count(), 0);
+    }
     #[test]
     fn unchanged_files_are_not_statted_again_and_active_runtime_is_pinned() {
         let dir = std::env::temp_dir().join(format!("frame-trace-index-{}", std::process::id()));

@@ -58,7 +58,7 @@ fn runtime() -> Result<&'static Runtime> {
 }
 impl Rpc {
     /// Lazy connections. DNS, TCP, TLS and WS handshake share a ten-second connect deadline;
-    /// the entire logical call (including retries and pool wait) has a thirty-second deadline.
+    /// the logical call (including retries) has a thirty-second deadline after a slot is acquired.
     pub fn new(url: &str) -> Result<Self> {
         Self::with_options(url, 8, Duration::from_secs(30), CancellationToken::new())
     }
@@ -151,8 +151,13 @@ impl Rpc {
             tokio::select! {
                 biased;
                 _ = self.inner.cancel.cancelled() => Err(Error::Cancelled),
-                result = tokio::time::timeout(self.inner.deadline, self.retry(method, params)) =>
-                    result.unwrap_or_else(|_| Err(Error::TransientRpc(format!("{method}: overall request deadline exceeded")))),
+                result = async {
+                    // Queue wait is cancellable but does not consume the request budget.
+                    let _permit = self.inner.limit.acquire().await.map_err(|_| Error::Cancelled)?;
+                    tokio::time::timeout(self.inner.deadline, self.retry(method, params))
+                        .await
+                        .unwrap_or_else(|_| Err(Error::TransientRpc(format!("{method}: overall request deadline exceeded"))))
+                } => result,
             }
         })
     }
@@ -232,12 +237,6 @@ impl Rpc {
         .await;
     }
     async fn once(&self, request: &Value) -> std::result::Result<Value, (String, bool)> {
-        let _permit = self
-            .inner
-            .limit
-            .acquire()
-            .await
-            .map_err(|e| (e.to_string(), false))?;
         if self.inner.url.starts_with("http") {
             let response = self
                 .inner
@@ -385,6 +384,59 @@ mod tests {
             }
         });
         (Rpc::new(&url).unwrap(), worker)
+    }
+    #[test]
+    fn queued_call_gets_full_request_budget_and_forks_share_admission() {
+        let (mut rpc, server) =
+            responses(vec![(200, r#"{"jsonrpc":"2.0","id":$ID,"result":true}"#)]);
+        Arc::get_mut(&mut rpc.inner).unwrap().deadline = Duration::from_millis(200);
+        let fork = rpc.fork();
+        assert!(Arc::ptr_eq(&rpc.inner, &fork.inner));
+        let permit = runtime()
+            .unwrap()
+            .block_on(rpc.inner.limit.acquire_many(rpc.parallelism() as u32))
+            .unwrap();
+        let (done, finished) = std::sync::mpsc::channel();
+        let worker = thread::spawn(move || {
+            let value = fork.call("chain_getHeader", json!([]));
+            done.send((value, fork.count())).unwrap();
+        });
+        assert!(matches!(
+            finished.recv_timeout(Duration::from_millis(400)),
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout)
+        ));
+        assert_eq!(rpc.count(), 0);
+        drop(permit);
+        let (value, calls) = finished.recv_timeout(Duration::from_secs(2)).unwrap();
+        assert_eq!(value.unwrap(), true);
+        assert_eq!(calls, 1);
+        assert_eq!(rpc.count(), 0);
+        worker.join().unwrap();
+        server.join().unwrap();
+    }
+    #[test]
+    fn queued_call_cancels_without_waiting_for_slot() {
+        let rpc = Rpc::new("http://127.0.0.1:1").unwrap();
+        let permit = runtime()
+            .unwrap()
+            .block_on(rpc.inner.limit.acquire_many(rpc.parallelism() as u32))
+            .unwrap();
+        let fork = rpc.fork();
+        let (done, finished) = std::sync::mpsc::channel();
+        let worker =
+            thread::spawn(move || done.send(fork.call("chain_getHeader", json!([]))).unwrap());
+        assert!(matches!(
+            finished.recv_timeout(Duration::from_millis(50)),
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout)
+        ));
+        rpc.inner.cancel.cancel();
+        assert!(matches!(
+            finished.recv_timeout(Duration::from_secs(2)).unwrap(),
+            Err(Error::Cancelled)
+        ));
+        assert_eq!(rpc.count(), 0);
+        drop(permit);
+        worker.join().unwrap();
     }
     #[test]
     fn mock_responses_stops_at_request_eof() {

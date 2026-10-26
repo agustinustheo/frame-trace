@@ -313,6 +313,9 @@ pub fn online(rpc: &Rpc, selector: &str) -> Result<Replay> {
 }
 
 pub fn online_with_session(rpc: &Rpc, selector: &str, session: &ReplaySession) -> Result<Replay> {
+    if rpc.cancelled() {
+        return Err(Error::Cancelled);
+    }
     let initial_calls = rpc.count();
     let hash = if selector == "best" {
         None
@@ -360,20 +363,34 @@ pub fn online_with_session(rpc: &Rpc, selector: &str, session: &ReplaySession) -
         ));
     }
     let parent_hash = *block.header.parent_hash();
+    let (parent_header, runtime_version) = parent_context(rpc, parent_hash)?;
     let artifact = Artifact {
         format_version: 1,
         kind: ArtifactKind::Block,
         call: None,
         block_hash: block.header.hash(),
         block: response["block"].clone(),
-        parent_header: rpc.call("chain_getHeader", json!([parent_hash]))?,
-        runtime_version: rpc.call("state_getRuntimeVersion", json!([parent_hash]))?,
+        parent_header,
+        runtime_version,
         metadata: String::new(),
         proof_nodes: Vec::new(),
     };
     let mut replay = replay_with_session(artifact, Some(rpc.clone()), session)?;
     replay.rpc_count = rpc.count().saturating_sub(initial_calls);
     Ok(replay)
+}
+
+// Both calls are pinned to the block's parent and independent of each other. Join before
+// returning even on failure, so no context request can leak into timed replay accounting.
+fn parent_context(rpc: &Rpc, parent: H256) -> Result<(Value, Value)> {
+    std::thread::scope(|scope| {
+        let version = scope.spawn(|| rpc.call("state_getRuntimeVersion", json!([parent])));
+        let header = rpc.call("chain_getHeader", json!([parent]));
+        let version = version
+            .join()
+            .map_err(|_| Error::Invalid("context RPC worker panicked".into()))?;
+        Ok((header?, version?))
+    })
 }
 
 pub fn offline(dir: &Path) -> Result<Replay> {
@@ -430,7 +447,7 @@ fn replay_inner(
     let db = open_db(&artifact, rpc.clone(), session, &parent)?;
     if rpc.is_some() {
         eprintln!(
-            "replay #{number}: fetching state (up to {} concurrent proof requests)",
+            "replay #{number}: fetching state (shared limit: {} concurrent RPC requests)",
             rpc.as_ref().map_or(1, Rpc::parallelism)
         );
         let mut hints = session.predicted_keys();
@@ -476,9 +493,10 @@ fn replay_inner(
         &Capture::new(),
     )?;
     let capture = Capture::new();
-    let (proof_bytes, computed_state_root) = measured_run(&db, rpc.as_ref(), || {
-        execute(&db, root, &wasm, heap_pages, &executor, &block, &capture)
-    })?;
+    let ((proof_bytes, computed_state_root), measured_rpc_count) =
+        measured_run(&db, rpc.as_ref(), || {
+            execute(&db, root, &wasm, heap_pages, &executor, &block, &capture)
+        })?;
     let rpc_count = rpc.as_ref().map_or(0, Rpc::count);
     let capture = captured(&capture, artifact.block_hash, parent.hash());
     persist_export(&db, &mut artifact)?;
@@ -489,7 +507,7 @@ fn replay_inner(
         computed_state_root,
         expected_state_root: *block.header.state_root(),
         rpc_count,
-        measured_rpc_count: 0,
+        measured_rpc_count,
         proof_round_trips: db.round_trips.load(Ordering::Relaxed),
         proof_bytes,
         artifact,
@@ -661,19 +679,24 @@ fn persist_export(db: &ProofDb, artifact: &mut Artifact) -> Result<()> {
     Ok(())
 }
 
-fn measured_run<T>(db: &ProofDb, rpc: Option<&Rpc>, run: impl FnOnce() -> Result<T>) -> Result<T> {
+fn measured_run<T>(
+    db: &ProofDb,
+    rpc: Option<&Rpc>,
+    run: impl FnOnce() -> Result<T>,
+) -> Result<(T, usize)> {
     db.online.store(false, Ordering::SeqCst);
     db.begin_measured();
     without_rpc(rpc, run)
 }
 
-fn without_rpc<T>(rpc: Option<&Rpc>, run: impl FnOnce() -> Result<T>) -> Result<T> {
+fn without_rpc<T>(rpc: Option<&Rpc>, run: impl FnOnce() -> Result<T>) -> Result<(T, usize)> {
     let before = rpc.map_or(0, Rpc::count);
     let result = run();
-    if rpc.map_or(0, Rpc::count) != before {
+    let delta = rpc.map_or(0, Rpc::count).saturating_sub(before);
+    if delta != 0 {
         return Err(Error::Invalid("timed replay used RPC".into()));
     }
-    result
+    result.map(|value| (value, delta))
 }
 
 /// Metadata is only a source of speculative key hints; authentication always comes from trie traversal.

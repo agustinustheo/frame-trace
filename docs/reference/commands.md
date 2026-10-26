@@ -133,10 +133,15 @@ frame-trace follow --rpc URL --best
 | `--rpc <URL>` | | Node RPC endpoint, HTTP(S) or WS(S). Required. |
 | `--best` | off | Follow the newest blocks instead of finalized ones, and report reorgs. |
 | `--otlp [<URL>]` | `http://127.0.0.1:4318` when given without a URL | Send each trace over OTLP/HTTP. |
-| `--proof-concurrency <N>` | 8 | Proof requests at once, 1 to 64. |
+| `--workers <N>` | 8 | Blocks replayed at once, 1 to 16. |
+| `--proof-concurrency <N>` | 16 | RPC requests at once across all workers, 1 to 64. Each proof request asks for up to 32 keys. |
 | `--cache-dir <DIR>` | | Keep fetched state and compiled runtimes in this directory. |
 | `--cache-max-bytes <N>` | 1073741824 (1 GiB) | Size limit for the disk cache, in bytes. |
 | `--unauthenticated-metadata` | off | As for `block`. |
+
+| Limit | Value | Meaning |
+| --- | --- | --- |
+| Waiting blocks | 4 × `--workers`, at least 8 | Blocks queued for replay. A block older than this many recent heights is skipped. |
 
 ## Environment variables
 

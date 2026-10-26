@@ -204,8 +204,11 @@ struct FollowArgs {
     /// OTLP/HTTP endpoint (bare --otlp uses http://127.0.0.1:4318).
     #[arg(long, value_name = "URL", num_args = 0..=1, default_missing_value = "http://127.0.0.1:4318")]
     otlp: Option<String>,
-    /// Maximum concurrent proof requests (1–64; up to 32 keys per request).
-    #[arg(long, default_value_t = 8, value_parser = clap::value_parser!(u8).range(1..=64))]
+    /// Blocks replayed at once (1–16).
+    #[arg(long, default_value_t = 8, value_parser = clap::value_parser!(u8).range(1..=16))]
+    workers: u8,
+    /// Maximum concurrent RPC requests across all workers (1–64; up to 32 proof keys per request).
+    #[arg(long, default_value_t = 16, value_parser = clap::value_parser!(u8).range(1..=64))]
     proof_concurrency: u8,
     /// Persistent proof-node and compiled Wasm cache directory.
     #[arg(long, value_name = "DIR")]
@@ -220,4 +223,48 @@ struct FollowArgs {
 
 fn follow(args: FollowArgs) -> Result<()> {
     follow::run(args)
+}
+
+#[cfg(test)]
+mod argument_tests {
+    use super::*;
+
+    #[test]
+    fn follow_workers_default_and_limits() {
+        let Command::Follow(args) =
+            Cli::try_parse_from(["frame-trace", "follow", "--rpc", "ws://node"])
+                .expect("default follow arguments")
+                .command
+        else {
+            panic!("follow command");
+        };
+        assert_eq!(args.workers, 8);
+        assert_eq!(args.proof_concurrency, 16);
+        for workers in ["1", "4", "16"] {
+            assert!(
+                Cli::try_parse_from([
+                    "frame-trace",
+                    "follow",
+                    "--rpc",
+                    "ws://node",
+                    "--workers",
+                    workers
+                ])
+                .is_ok()
+            );
+        }
+        for workers in ["0", "17", "256", "-1", "many"] {
+            assert!(
+                Cli::try_parse_from([
+                    "frame-trace",
+                    "follow",
+                    "--rpc",
+                    "ws://node",
+                    "--workers",
+                    workers
+                ])
+                .is_err()
+            );
+        }
+    }
 }

@@ -159,7 +159,8 @@ fn replay_inner(
     );
     run(&Capture::new())?;
     let capture = Capture::new();
-    let (proof_bytes, output) = measured_run(&db, rpc.as_ref(), || run(&capture))?;
+    let ((proof_bytes, output), measured_rpc_count) =
+        measured_run(&db, rpc.as_ref(), || run(&capture))?;
     if call
         .result
         .as_ref()
@@ -197,7 +198,7 @@ fn replay_inner(
         result: output,
         oracle_match,
         rpc_count: rpc.as_ref().map_or(0, Rpc::count),
-        measured_rpc_count: 0,
+        measured_rpc_count,
         proof_round_trips: db.round_trips.load(Ordering::Relaxed),
         proof_bytes,
         artifact,

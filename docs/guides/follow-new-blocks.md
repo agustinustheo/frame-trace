@@ -12,33 +12,25 @@ frame-trace follow --rpc wss://westend-asset-hub-rpc.polkadot.io --otlp --cache-
 ```
 
 Press Ctrl-C to stop.
-Here is a real run, stopped after 50 seconds:
+Here is output from a 120-second run. Trace export was disabled when measuring these times.
 
 ```text
-follow: queued=1 in-flight=0 done=0 retrying=0 stopped=0 reverted=0 skipped=0 cancelled=0
-replay #18596971: fetching state (up to 8 concurrent proof requests)
-follow: queued=0 in-flight=1 done=0 retrying=0 stopped=0 reverted=0 skipped=0 cancelled=0
-replay #18596971: loading runtime and preparing state
-follow: queued=0 in-flight=1 done=0 retrying=0 stopped=0 reverted=0 skipped=0 cancelled=0
-follow: queued=0 in-flight=1 done=0 retrying=0 stopped=0 reverted=0 skipped=0 cancelled=0
-follow: queued=0 in-flight=1 done=0 retrying=0 stopped=0 reverted=0 skipped=0 cancelled=0
-follow: queued=0 in-flight=1 done=0 retrying=0 stopped=0 reverted=0 skipped=0 cancelled=0
-follow: queued=0 in-flight=1 done=0 retrying=0 stopped=0 reverted=0 skipped=0 cancelled=0
-root check: PASS; RPC calls: 61 (timed replay: 0); execution proof: 89181 bytes
-fetching state #18596971: 47 proof request rounds; 61 RPC calls
-state root: computed 0xa0b1f52c2aedb89c41e231c8bdec3f5497afd44eadfa5c55ac8b1ee9b23a11d7; header 0xa0b1f52c2aedb89c41e231c8bdec3f5497afd44eadfa5c55ac8b1ee9b23a11d7
-traced finalized block #18596971 0x8787996125a97c9a70d7bb7a083e8d49e1296821165050cc7043cd04175a956c: 562 storage operations in 16.892s
-follow: queued=0 in-flight=0 done=1 retrying=0 stopped=0 reverted=0 skipped=0 cancelled=0
+replay #18615397: fetching state (shared limit: 16 concurrent RPC requests)
 ...
-cancelled block 0x095999704fd4e455512b27ad9fe2fb8a7ab727da12198e5c5353eb3b0f2a64db: follow stopped
-cancelled block 0x25e832190366cb56aa8fb5de8340b68272feda04fa665a415f90aba4d8b4811a: follow stopped
+root check: PASS; RPC calls: 92 (timed replay: 0); execution proof: 92281 bytes
+fetching state #18615397: 63 proof request rounds; 92 RPC calls
+state root: computed 0x7dd23e635d4db00b0067ceec74d8b67b1c5c3627014eaea3b59488352a4f86df; header 0x7dd23e635d4db00b0067ceec74d8b67b1c5c3627014eaea3b59488352a4f86df
+traced finalized block #18615397 0xcdaa5219de6f7405d6189e42489cb0e2ffe6b77d042f6ffed70c4df54f5a1165: 550 storage operations in 36.737s
 ...
-follow shutdown: skipped=0 cancelled=7
+follow: queued=2 in-flight=8 done=48 retrying=0 stopped=0 reverted=0 skipped=0 cancelled=0
+...
+follow shutdown: skipped=0 cancelled=10
 follow stopped
 ```
 
-The first block took 17 seconds.
-Later blocks took about 6 seconds, because the cache already held most of the state.
+The first block took 37 seconds. After startup, the median was 12 seconds per block in this run.
+Each time covers loading state and replaying it on this machine.
+It does not include time spent waiting for the first replay.
 Each traced block appears in Jaeger as its own trace.
 
 ## 2. Read the status line
@@ -48,7 +40,7 @@ frame-trace checks the node for new final blocks every two seconds and prints a 
 | Field | Meaning |
 | --- | --- |
 | `queued` | Blocks waiting to be replayed. |
-| `in-flight` | Blocks being replayed now. Two run at a time. |
+| `in-flight` | Blocks assigned to workers, including those waiting for the first replay. |
 | `done` | Blocks traced and exported. |
 | `retrying` | Blocks that failed for a passing reason, such as a dropped connection, and will be tried again. |
 | `stopped` | Blocks that failed for good, such as pruned state or a failed root check. |
@@ -58,25 +50,30 @@ frame-trace checks the node for new final blocks every two seconds and prints a 
 
 ## 3. Keep up with the chain
 
-frame-trace keeps at most eight blocks waiting and always prefers the newest.
-If replays are slower than the chain, older blocks are skipped.
-So `follow` samples the chain at the speed your machine can replay; it does not promise every block.
+frame-trace replays several blocks at once. Raise `--workers` when the queue keeps growing.
+See the [worker and queue limits](../reference/commands.md#follow).
+The first replay runs on its own. Other workers wait until it finishes.
+If it fails, the next block also runs on its own.
+
+If replays remain slower than the chain, older blocks are skipped.
+A full queue makes `follow` sample recent blocks at replay speed; it does not promise every block.
 For a complete range, use [`report`](analyse-many-blocks.md) instead.
 
-Two log lines tell you this is happening:
+These log lines tell you this is happening:
 
 | Line | Meaning |
 | --- | --- |
-| `follow queue full; sampling near the tip at replay speed` | Eight blocks are already waiting. frame-trace stops queueing older blocks and keeps up with the newest. |
-| `replay job skipped: queued block expired behind tip` | A waiting block is no longer among the eight newest heights, so frame-trace dropped it without replaying it. It counts as `skipped`. |
+| `follow queue full; sampling near the tip at replay speed` | The waiting queue is full. frame-trace stops queueing older blocks and prefers recent heights. |
+| `replay job skipped: queued block expired behind tip` | A waiting block fell outside the recent-height limit. frame-trace dropped it without replaying it. It counts as `skipped`. |
 | `skipped block <hash>: retry expired behind tip` | The same, for a block that was waiting to be retried. |
 
-Neither is an error. They mean your machine replays more slowly than the chain produces blocks.
+These lines mean replays are falling behind the chain.
 
 To go faster:
 
 - keep `--cache-dir`, so each block fetches only what changed;
-- raise `--proof-concurrency` on a fast connection;
+- raise `--workers` to replay more blocks at once;
+- raise `--proof-concurrency` on a fast connection to send more requests at once;
 - use a node close to you.
 
 ## 4. Follow the newest blocks with `--best`

@@ -40,7 +40,7 @@ frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block finalize
 You should see this. Your block number and sizes will differ.
 
 ```text
-replay #18598757: fetching state (up to 8 concurrent proof requests)
+replay #18598757: fetching state (shared limit: 8 concurrent RPC requests)
 replay #18598757: loading runtime and preparing state
 root check: PASS; RPC calls: 93 (timed replay: 0); execution proof: 90712 bytes
 fetching state #18598757: 64 proof request rounds; 93 RPC calls

@@ -1,4 +1,4 @@
-//! Bounded, finality-aware replay sampling. Every accepted job reaches a terminal event.
+//! Bounded, finality-aware replay sampling. Unfinished jobs are marked cancelled at shutdown.
 use crate::{FollowArgs, source};
 use anyhow::{Context, Result};
 use frame_trace_otel::Timing;
@@ -17,7 +17,10 @@ use std::{
     time::{Duration, Instant},
 };
 
-const QUEUE: usize = 8;
+// Four queued blocks per worker absorb cold runtime startup without unbounded catch-up.
+fn queue_capacity(workers: u8) -> usize {
+    usize::from(workers).max(2) * 4
+}
 const MAX_ATTEMPTS: u32 = 4;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum State {
@@ -147,12 +150,13 @@ fn ancestry(
     mut header: serde_json::Value,
     floor: Option<u64>,
     known: &BTreeMap<String, Entry>,
+    capacity: usize,
     mut parent: impl FnMut(&str) -> Result<serde_json::Value>,
 ) -> Result<Vec<(String, u64)>> {
     let tip = number(&header)?;
     let lower = floor
         .unwrap_or(tip)
-        .max(tip.saturating_sub(QUEUE as u64 - 1));
+        .max(tip.saturating_sub(capacity as u64 - 1));
     let mut pending = Vec::new();
     loop {
         let height = number(&header)?;
@@ -224,6 +228,14 @@ fn report_reorg(pending: &[(String, u64)], tip: u64, entries: &mut BTreeMap<Stri
 }
 
 pub fn run(args: FollowArgs) -> Result<()> {
+    // Wasmtime uses Rayon's global pool to compile functions. Using every CPU here retains
+    // hundreds of MiB of compiler allocations on macOS, despite network-bound replay.
+    // This is a CLI process policy; the replay library does not change its caller's pool.
+    rayon::ThreadPoolBuilder::new()
+        .num_threads(2)
+        .thread_name(|index| format!("wasm-compile-{index}"))
+        .build_global()
+        .context("initializing runtime compilation pool")?;
     let cancel = CancellationToken::new();
     let signal = cancel.clone();
     ctrlc::set_handler(move || {
@@ -241,16 +253,18 @@ pub fn run(args: FollowArgs) -> Result<()> {
     let session =
         ReplaySession::with_cache_max_bytes(args.cache_dir.as_deref(), args.cache_max_bytes)?
             .with_rpc_metadata_fallback(args.rpc_metadata_fallback);
-    let (send, receive) = mpsc::sync_channel::<Job>(QUEUE);
+    let capacity = queue_capacity(args.workers);
+    let (send, receive) = mpsc::sync_channel::<Job>(capacity);
     let (events, completed) = mpsc::channel();
     let receive = Arc::new(Mutex::new(receive));
     let head_kind = if args.best { "best" } else { "finalized" };
     let active_floor = Arc::new(AtomicU64::new(0));
-    let workers: Vec<_> = (0..2)
+    let workers: Vec<_> = (0..args.workers)
         .map(|_| {
             let receive = receive.clone();
             let active_floor = active_floor.clone();
             let rpc = rpc.fork();
+            let cancel = cancel.clone();
             let session = session.clone();
             let otlp = args.otlp.clone();
             let events = events.clone();
@@ -268,18 +282,21 @@ pub fn run(args: FollowArgs) -> Result<()> {
                         break;
                     }
                     let _ = events.send(Event::Started(job.hash.clone(), job.reverted.clone()));
-                    let start = Instant::now();
                     let outcome = job_outcome(|| {
+                        // Waits behind a cold replay; returns Cancelled before or after admission.
+                        // Expiry is checked after admission, since the wait can outlast the window.
+                        let cold_start = session.cold_start(&cancel)?;
                         if job.reverted.load(Ordering::SeqCst) {
                             return Err(Skipped("block already reverted").into());
                         }
                         if job.number < active_floor.load(Ordering::SeqCst) {
                             return Err(Skipped("queued block expired behind tip").into());
                         }
-                        let loaded = source::replay_loaded(
-                            frame_trace_replay::online_with_session(&rpc, &job.hash, &session)?,
-                            None,
-                        )?;
+                        let start = Instant::now();
+                        let replay =
+                            frame_trace_replay::online_with_session(&rpc, &job.hash, &session)?;
+                        drop(cold_start);
+                        let loaded = source::replay_loaded(replay, None)?;
                         let mut block = frame_trace_decode::annotate_at_block(
                             &loaded.traced,
                             loaded.metadata.as_ref(),
@@ -345,10 +362,10 @@ pub fn run(args: FollowArgs) -> Result<()> {
             floor = Some(
                 floor
                     .unwrap_or(tip)
-                    .max(tip.saturating_sub(QUEUE as u64 - 1)),
+                    .max(tip.saturating_sub(capacity as u64 - 1)),
             );
             active_floor.store(floor.unwrap_or(tip), Ordering::SeqCst);
-            let pending = ancestry(header, floor, &entries, |hash| {
+            let pending = ancestry(header, floor, &entries, capacity, |hash| {
                 Ok(rpc.call("chain_getHeader", serde_json::json!([hash]))?)
             })?;
             if args.best {
@@ -446,6 +463,20 @@ pub fn run(args: FollowArgs) -> Result<()> {
             thread::sleep(Duration::from_millis(100));
         }
     }
+    drop(send);
+    let unfinished = join_workers(workers, Duration::from_secs(10));
+    if unfinished != 0 {
+        eprintln!(
+            "follow shutdown: {unfinished} worker(s) still running after 10s; remaining work may be interrupted"
+        );
+    }
+    for event in completed.try_iter() {
+        if let Event::Finished(hash, generation, outcome) = event
+            && let Some(entry) = current_entry(&mut entries, &hash, &generation)
+        {
+            finish(entry, outcome);
+        }
+    }
     for (hash, entry) in &mut entries {
         if matches!(entry.state, State::Queued | State::InFlight | State::Failed) {
             entry.state = State::Cancelled;
@@ -463,14 +494,30 @@ pub fn run(args: FollowArgs) -> Result<()> {
             .filter(|e| e.state == State::Cancelled)
             .count()
     );
-    drop(send);
-    for worker in workers {
-        if worker.is_finished() {
-            let _ = worker.join();
-        }
-    }
     eprintln!("follow stopped");
     Ok(())
+}
+
+// One shared deadline bounds shutdown even when a CPU replay or export ignores cancellation.
+fn join_workers(mut workers: Vec<thread::JoinHandle<()>>, timeout: Duration) -> usize {
+    let deadline = Instant::now() + timeout;
+    loop {
+        let mut pending = Vec::new();
+        for worker in workers {
+            if worker.is_finished() {
+                let _ = worker.join();
+            } else {
+                pending.push(worker);
+            }
+        }
+        if pending.is_empty() || Instant::now() >= deadline {
+            return pending.len();
+        }
+        workers = pending;
+        thread::sleep(
+            Duration::from_millis(10).min(deadline.saturating_duration_since(Instant::now())),
+        );
+    }
 }
 
 #[cfg(test)]
@@ -506,7 +553,7 @@ mod tests {
             fork.push(h);
         }
         let mut calls = 0;
-        let pending = ancestry(fork[2].clone(), Some(100), &entries, |hash| {
+        let pending = ancestry(fork[2].clone(), Some(100), &entries, 8, |hash| {
             calls += 1;
             Ok(fork
                 .iter()
@@ -542,7 +589,7 @@ mod tests {
         }
         let entries = BTreeMap::new();
         assert_eq!(
-            ancestry(chain[99].clone(), None, &entries, |_| panic!(
+            ancestry(chain[99].clone(), None, &entries, 8, |_| panic!(
                 "startup backfilled"
             ))
             .unwrap()
@@ -550,7 +597,7 @@ mod tests {
             1
         );
         let mut calls = 0;
-        let pending = ancestry(chain[99].clone(), Some(1), &entries, |hash| {
+        let pending = ancestry(chain[99].clone(), Some(1), &entries, 8, |hash| {
             calls += 1;
             Ok(chain
                 .iter()
@@ -560,8 +607,36 @@ mod tests {
         })
         .unwrap();
         assert_eq!(calls, 7);
-        assert_eq!(pending.len(), QUEUE);
+        assert_eq!(pending.len(), 8);
         assert_eq!(pending.last().unwrap().1, 93);
+    }
+    #[test]
+    fn worker_queue_preserves_consecutive_heights_during_startup() {
+        for workers in [1, 2, 4, 8, 16] {
+            let capacity = queue_capacity(workers);
+            assert_eq!(capacity, usize::from(workers).max(2) * 4);
+            let mut chain = BTreeMap::new();
+            let mut parent = format!("0x{}", "00".repeat(32));
+            let start = 100;
+            let known = BTreeMap::from([(parent.clone(), entry(start, State::InFlight))]);
+            let mut tip = serde_json::Value::Null;
+            for height in start + 1..=start + capacity as u64 - 1 {
+                tip = header(height, &parent, 1);
+                parent = frame_trace_replay::header_hash(&tip).unwrap();
+                chain.insert(parent.clone(), tip.clone());
+            }
+            let pending = ancestry(tip, Some(start), &known, capacity, |hash| {
+                Ok(chain[hash].clone())
+            })
+            .unwrap();
+            assert_eq!(pending.len(), capacity - 1);
+            let mut heights: Vec<_> = pending.into_iter().map(|(_, height)| height).collect();
+            heights.sort_unstable();
+            assert_eq!(
+                heights,
+                (start + 1..start + capacity as u64).collect::<Vec<_>>()
+            );
+        }
     }
     #[test]
     fn whole_job_panics_are_terminal_and_workers_can_accept_the_next_job() {
@@ -631,8 +706,10 @@ mod canonical_again_tests {
                 reverted: old.clone(),
             },
         )]);
-        let pending = ancestry(header.clone(), Some(1), &entries, |_| panic!("past floor"))
-            .expect("ancestry");
+        let pending = ancestry(header.clone(), Some(1), &entries, 8, |_| {
+            panic!("past floor")
+        })
+        .expect("ancestry");
         assert_eq!(pending, [(hash.clone(), 1)]);
         let new = Arc::new(AtomicBool::new(false));
         entries.insert(
@@ -653,7 +730,7 @@ mod canonical_again_tests {
         finish(entry, Outcome::Passed);
         assert_eq!(entry.state, State::Done);
         assert!(
-            ancestry(header, Some(1), &entries, |_| panic!("known tip"))
+            ancestry(header, Some(1), &entries, 8, |_| panic!("known tip"))
                 .expect("ancestry")
                 .is_empty()
         );

@@ -49,7 +49,7 @@ pub struct ProofDb {
     rpc: Option<Rpc>,
     parent: H256,
     session: ReplaySession,
-    nodes: Arc<Mutex<BTreeMap<H256, Vec<u8>>>>,
+    nodes: Arc<Mutex<BTreeMap<H256, Arc<[u8]>>>>,
     used: Arc<Mutex<BTreeSet<H256>>>,
     bootstrap: Arc<Mutex<BTreeSet<H256>>>,
     families: Arc<BTreeSet<(Vec<u8>, Concat)>>,
@@ -193,17 +193,26 @@ impl ProofDb {
         Ok(())
     }
     pub fn insert_nodes(&self, fetched: impl IntoIterator<Item = Vec<u8>>) {
+        let fetched: Vec<_> = fetched
+            .into_iter()
+            .map(|bytes| (H256::from(sp_io::hashing::blake2_256(&bytes)), bytes))
+            .collect();
         let mut nodes = self.nodes.lock();
         let mut shared = self.session.nodes.lock();
-        for bytes in fetched {
-            let hash = H256::from(sp_io::hashing::blake2_256(&bytes));
+        for (hash, bytes) in fetched {
+            // Keep one immutable allocation per content hash across active replays.
+            let bytes = shared
+                .nodes
+                .get(&hash)
+                .cloned()
+                .unwrap_or_else(|| bytes.into());
             shared.insert(hash, bytes.clone());
             nodes.entry(hash).or_insert(bytes);
         }
     }
     fn cached(&self, hash: &H256) -> std::result::Result<Option<Vec<u8>>, String> {
         if let Some(node) = self.nodes.lock().get(hash).cloned() {
-            return Ok(Some(node));
+            return Ok(Some(node.to_vec()));
         }
         // Offline artifacts must stand alone; a warm online session must not mask truncation.
         if self.rpc.is_none() {
@@ -212,7 +221,7 @@ impl ProofDb {
         let cached = self.session.nodes.lock().nodes.get(hash).cloned();
         if let Some(node) = cached {
             self.nodes.lock().insert(*hash, node.clone());
-            return Ok(Some(node));
+            return Ok(Some(node.to_vec()));
         }
         if let Some(dir) = &self.session.node_dir {
             let path = dir.join(format!("{hash:x}"));
@@ -322,7 +331,7 @@ impl ProofDb {
                     std::process::id(),
                     NEXT.fetch_add(1, Ordering::Relaxed)
                 ));
-                std::fs::write(&temporary, node)
+                std::fs::write(&temporary, node.as_ref())
                     .map_err(|e| Error::Invalid(format!("{}: {e}", temporary.display())))?;
                 std::fs::rename(&temporary, &path)
                     .map_err(|e| Error::Invalid(format!("{}: {e}", path.display())))?;
@@ -533,6 +542,28 @@ mod prediction_tests {
         }
         key.extend(id);
         key
+    }
+    #[test]
+    fn active_blocks_share_immutable_nodes_without_sharing_offline_coverage() {
+        let session = ReplaySession::new(None).expect("session");
+        let rpc = Rpc::new("ws://127.0.0.1:1").expect("lazy RPC");
+        let first = ProofDb::with_session(Some(rpc.clone()), H256::repeat_byte(1), session.clone());
+        let second = ProofDb::with_session(Some(rpc), H256::repeat_byte(2), session.clone());
+        let bytes = vec![7; 1024];
+        let hash = H256::from(sp_io::hashing::blake2_256(&bytes));
+        first.insert_nodes([bytes.clone()]);
+        assert_eq!(second.cached(&hash).expect("cached"), Some(bytes.clone()));
+        second.insert_nodes([bytes]);
+        assert!(Arc::ptr_eq(
+            &first.nodes.lock()[&hash],
+            &second.nodes.lock()[&hash]
+        ));
+        assert!(Arc::ptr_eq(
+            &first.nodes.lock()[&hash],
+            &session.nodes.lock().nodes[&hash]
+        ));
+        let offline = ProofDb::with_session(None, H256::repeat_byte(1), session);
+        assert!(offline.cached(&hash).expect("offline").is_none());
     }
     #[test]
     fn related_predictions_rehash_new_ids_across_observed_maps_and_bound_bandwidth() {

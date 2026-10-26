@@ -15,8 +15,8 @@ frame-trace report --rpc wss://westend-asset-hub-rpc.polkadot.io --last 5 --top 
 The progress lines for each block come first, then the tables:
 
 ```text
-replay #18596964: fetching state (up to 8 concurrent proof requests)
-replay #18596963: fetching state (up to 8 concurrent proof requests)
+replay #18596964: fetching state (shared limit: 8 concurrent RPC requests)
+replay #18596963: fetching state (shared limit: 8 concurrent RPC requests)
 replay #18596963: loading runtime and preparing state
 replay #18596964: loading runtime and preparing state
 root check: PASS; RPC calls: 85 (timed replay: 0); execution proof: 90290 bytes

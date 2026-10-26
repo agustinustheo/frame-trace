@@ -433,3 +433,285 @@ measurements, full validation and Append probe logs are in
 
 All processes started for this round have exited. HEAD remains e86f740; no commit
 or push was made.
+
+
+## Follow workers and memory (2026-10-26)
+
+The default now traces consecutive Westend Asset Hub heights after startup, rather
+than continually dropping queued blocks. The two 120-second default windows
+completed **49 and 38 blocks**, with **no expiry skips**. The chain advanced
+**56 and 46 best-head heights** in the respective windows. In their final
+60 seconds, the runs completed **40 and 37 blocks**, clearing startup backlog;
+the repeat ended with **zero queued and six in-flight** blocks. Every completed
+replay passed the storage-root check and reported **zero RPC in timed replay**.
+This demonstrates keeping up after startup in these windows, not a guarantee for
+every endpoint or block. Cold startup and unfinished jobs lower whole-window
+completion rates below the chain's production rate.
+
+All binaries are Rust **1.93.0 release builds**, on macOS arm64. Before is clean
+**3802322**, built from the detached worktree `/tmp/ft-perf/before`, with its own
+`CARGO_TARGET_DIR=/tmp/ft-perf/before-target`. After is the uncommitted working
+tree. Endpoint: `wss://westend-asset-hub-rpc.polkadot.io`. Each run uses a separate,
+initially empty `--cache-dir`. OTLP export is disabled. Follow defaults to finalized
+heads; chain rate uses best-head header numbers immediately before and after each
+window. Those bracketing HTTP calls add a small timing difference to the chain
+rate. These are different blocks and intervals, not a same-block latency comparison.
+The chain ran at **23–30.5 blocks/minute** here, rather than the earlier observed
+17 blocks/minute.
+
+Unrelated PolkaMeter Rust builds were running on the host throughout these tests.
+They were **not paused, signalled or killed**. At the user's direction, runs were
+sequential despite that load. Initial workspace verification was also finishing
+in the background during the early windows. Each boundary has an `uptime` capture
+and the full list of cargo/rustc processes in `/tmp/ft-perf/*-host-{start,end}.txt`.
+No frame-trace build overlapped a timed window. Load and endpoint conditions limit
+attribution: the before repeat's warm median rose from 8.952 to 11.745 seconds
+while user CPU stayed similar and host load fell. Both windows are reported.
+The chosen default was repeated too; its warm medians were 12.194 and 12.178 seconds.
+
+### Release windows
+
+Every window is **120 seconds**. Completions after its boundary are excluded.
+"Replay / chain" is completed blocks/minute versus the bracketing chain rate.
+Warm medians omit the first N completions, where N is the worker count. Startup
+jobs can overlap later jobs, so this convention is an approximation of a warm
+session. RSS is `/usr/bin/time -l` maximum resident set size in decimal **MB**;
+user CPU is process CPU **seconds**, not replay wall time.
+
+| Run | Workers / RPC slots | Completed blocks | Replay / chain, blocks/min | Warm median, seconds/block | Peak RSS, MB | User CPU, seconds | Heights skipped |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | --- |
+| Before | 2 / 8 | 20 | 10.0 / 30.5 | 8.952 | 738.8 | 11.31 | 24 expiry skips |
+| Trial: 6 workers | 6 / 8 | 31 | 15.5 / 30.5 | 13.926 | 805.7 | 13.54 | 1 expiry skips |
+| Trial: 8 workers | 8 / 8 | 37 | 18.5 / 30.0 | 17.324 | 797.7 | 14.29 | None |
+| After default | 8 / 16 | 49 | 24.5 / 28.0 | 12.194 | 752.0 | 16.08 | None |
+| After higher workers | 12 / 16 | 46 | 23.0 / 26.5 | 11.287 | 779.6 | 14.77 | None; 8 cancelled at shutdown, including #18615501 |
+| Before repeat | 2 / 8 | 18 | 9.0 / 30.0 | 11.745 | 819.3 | 10.90 | 22 expiry skips |
+| After default repeat | 8 / 16 | 38 | 19.0 / 23.0 | 12.178 | 698.3 | 14.49 | None |
+
+The six/eight-worker trials retained eight shared RPC slots and let all startup
+jobs run cold together. Increasing workers alone improved throughput but did not
+keep up. The final configuration uses **eight workers and 16 shared slots**,
+with one cold replay warming the session first. The 12-worker run did not improve
+whole-window completions; its chain interval was slower too. It is not evidence
+that 12 workers are always worse. The default of eight is a judgement, not a
+measured optimum. The six- and eight-worker trials ran before the cold-start gate
+and the 16 slots. The final configuration ran once at 12 workers and twice at
+eight, on a loaded host. Those windows cannot separate the worker count from
+endpoint and host variance.
+
+Default completion ranges were **#18615397–#18615445** and
+**#18615607–#18615644**, both consecutive. The 12-worker run completed
+**#18615456–#18615502** except **#18615501**, which was still in flight at Ctrl-C.
+That run's shutdown line was `follow shutdown: skipped=0 cancelled=8`: #18615501
+and seven other queued or in-flight heights were cancelled, not expired or rejected. Before windows had both explicit expiry
+skips and missing completed heights. Shutdown cancellations are not counted as
+successful replays. All seven clients exited successfully on one Ctrl-C.
+
+### Host load at each boundary
+
+Each cell lists the **1/5/15-minute load averages**, then the numbers of
+**cargo/rustc/cargo-clippy** processes. The raw files retain their PIDs, commands,
+CPU use and elapsed times. Load averages are host run-queue measurements, not
+frame-trace CPU percentages.
+
+| Run | Start: load averages (process counts) | End: load averages (process counts) |
+| --- | --- | --- |
+| Before | 133.47 105.26 72.04 (7/64/2) | 112.16 110.75 79.06 (8/30/2) |
+| Trial: 6 workers | 112.16 110.75 79.06 (8/30/2) | 78.07 99.99 79.07 (3/19/0) |
+| Trial: 8 workers | 78.07 99.99 79.07 (3/18/0) | 86.60 93.15 79.02 (2/4/0) |
+| After default | 65.19 85.49 77.26 (2/8/0) | 44.39 71.88 72.99 (1/0/0) |
+| After higher workers | 44.39 71.88 72.99 (1/0/0) | 39.79 61.31 68.66 (4/14/1) |
+| Before repeat | 39.79 61.31 68.66 (4/12/1) | 43.14 55.49 65.37 (1/11/1) |
+| After default repeat | 43.31 52.36 63.32 (3/34/2) | 57.33 54.78 62.85 (3/18/2) |
+
+### What changed and why
+
+- `follow --workers` accepts **1–16**, default **8**. The waiting queue holds four
+  blocks per worker, at least eight. Its recent-height floor uses that same bound.
+  Thus the default can absorb a cold first replay without expiring nearby heights.
+  Startup still begins at the current finalized tip; there is no pre-start backfill.
+- `Rpc::fork` already shares its semaphore and connection pool, while resetting
+  each worker's request counter. That isolation is essential to zero-RPC checking.
+  The follow default for `--proof-concurrency` is now **16**, shared globally,
+  not multiplied by workers. Other commands retain their existing defaults.
+  The eight-slot trials show why more workers need enough shared transport capacity.
+- In `follow`, one cold replay runs first. Other workers reuse its
+  authenticated node cache and learned paths, then run concurrently. Failure,
+  panic or cancellation releases the startup gate so another job can try. The
+  gate is opt-in (`ReplaySession::cold_start`); `report` and other callers do
+  not use it. No worker accepts another
+  block's values without traversing its own parent root.
+- Parent header and runtime version are fetched concurrently, at the same parent
+  hash. Both requests are joined before replay. The block body must arrive first
+  to identify that parent; selector resolution remains a dependency too.
+- Immutable proof-node bytes now use `Arc<[u8]>` in the session and active block
+  databases. SDK trie reads still return owned bytes as required by its interface.
+  Per-block proof coverage, overlays, recorder state and failures remain separate.
+  Offline artifacts cannot obtain missing nodes from an online session.
+- Compiled executors and raw authenticated metadata were already shared by code
+  hash. The CLI now limits Wasmtime's Rayon compilation pool to **two threads**
+  for follow; the replay library does not change an embedding application's pool.
+  This reuses the existing Rayon dependency; Cargo.lock includes its direct CLI edge.
+
+### Where the memory went
+
+Separate exploratory probes used `vmmap -summary` and `heap -s`; they are not
+throughput windows because inspection can suspend the target. In the baseline's
+cold profile, live malloc allocations were about **255 MiB**. After compilation,
+`heap` counted **54,039,872 live allocated bytes**. A later `vmmap` snapshot showed
+about **591 MiB resident in malloc regions** but only **52 MiB allocated** there.
+This identifies transient compilation and retained allocator pages as major
+contributors, rather than two independent compiled runtimes. The SDK executor
+and its compiled-module cache were already shared. This is not a complete byte
+accounting for every subsystem.
+
+The SDK's pool also reserved about **258 GiB of virtual address space** in that
+profile, with roughly **50 MiB resident** during the cold snapshot. Virtual
+reservations are not laptop RAM consumption. Proof nodes and metadata are much
+smaller than the cold compilation peak; avoiding their duplicate allocations
+still matters as worker count grows.
+
+The baseline memory probe peaked at **807.3 MB RSS** with two workers. A four-worker
+probe with `RAYON_NUM_THREADS=2` and shared nodes peaked at **681.4 MB**. Different
+blocks, host load and inspection mean that is supporting evidence, not an isolated
+Rayon comparison. The actual final windows are stronger operational evidence:
+eight workers used **698.3–752.0 MB**, versus **738.8–819.3 MB** in the two-worker
+before windows. The chosen default does not multiply baseline RSS by four.
+
+### Exact commands and retained evidence
+
+Run from `/Users/theo/Projects/parity/frame-trace` unless a subshell changes it:
+
+```sh
+git worktree add --detach /tmp/ft-perf/before 3802322
+(cd /tmp/ft-perf/before && CARGO_TARGET_DIR=/tmp/ft-perf/before-target cargo +1.93.0 build --release --locked)
+cargo +1.93.0 build --release --locked
+```
+
+The baseline build ended with:
+
+```text
+    Finished `release` profile [optimized] target(s) in 40.23s
+```
+
+The benchmark harness and its complete source are retained at
+`/tmp/ft-perf/bench.py`. It wraps the binary in `/usr/bin/time -l`, timestamps each
+output line, samples RSS, reads chain headers, and sends SIGINT to the client at
+120 seconds. The OS time wrapper runs slightly longer/shorter than the harness
+window because of process startup/shutdown. Commands, in order:
+
+```sh
+python3 /tmp/ft-perf/bench.py before-final /tmp/ft-perf/before-target/release/frame-trace
+python3 /tmp/ft-perf/bench.py after-six /Users/theo/Projects/parity/frame-trace/target/release/frame-trace --workers 6
+python3 /tmp/ft-perf/bench.py after-eight /Users/theo/Projects/parity/frame-trace/target/release/frame-trace --workers 8 -- --workers 8
+# Build the final cold-start/16-slot configuration after those trials.
+cargo +1.93.0 build --release --locked
+python3 /tmp/ft-perf/bench.py after-default /Users/theo/Projects/parity/frame-trace/target/release/frame-trace --workers 8
+python3 /tmp/ft-perf/bench.py after-high /Users/theo/Projects/parity/frame-trace/target/release/frame-trace --workers 12 -- --workers 12
+python3 /tmp/ft-perf/bench.py before-repeat /tmp/ft-perf/before-target/release/frame-trace
+python3 /tmp/ft-perf/bench.py after-default-repeat /Users/theo/Projects/parity/frame-trace/target/release/frame-trace --workers 8
+```
+
+The first three windows use the first implementation: default six workers,
+eight RPC slots, shared node bytes, concurrent context requests, and two compiler
+threads. The final four use the final configuration (or the unchanged baseline).
+`--workers` before `--` is a harness parameter for the warm-sample exclusion; flags
+after `--` are passed to follow. Default windows pass no follow flags except the
+endpoint and a fresh cache directory. Each JSON file records the full actual command.
+
+Real final-default output includes:
+
+```text
+root check: PASS; RPC calls: 92 (timed replay: 0); execution proof: 92281 bytes
+fetching state #18615397: 63 proof request rounds; 92 RPC calls
+...
+traced finalized block #18615397 0xcdaa5219de6f7405d6189e42489cb0e2ffe6b77d042f6ffed70c4df54f5a1165: 550 storage operations in 36.737s
+```
+
+For each run, `/tmp/ft-perf/<name>.log` retains raw output and `/usr/bin/time -l`
+statistics; `<name>-timestamped.log` records completion boundaries;
+`<name>.json` holds headers, completed heights and durations; `<name>-rss.log`
+retains RSS samples. Memory probe files use the `memory-probe` and
+`memory-two-threads` prefixes. Initial exploratory probes ran 65 seconds and
+used a process-group signal; they exited 130 and are excluded from the release
+tables. The final harness signals only the client, and all tabulated runs exited 0.
+All started clients and inspection tools were stopped. No Docker node was started.
+The only extra target directory is inside `/tmp/ft-perf`.
+
+
+### First-block latency and the compiler cap (review round)
+
+The first traced block in the 120-second windows was slower after the change:
+**32.4–47.8 s** in the three final-configuration windows, against **26.8–29.3 s**
+in the two before windows (and 43.4–44.6 s in the pre-gate trials). Each window
+replayed a different block under a different host load, so this was not a
+same-block comparison. The suspect was the two-thread Rayon cap, which limits
+Wasmtime's parallel compilation during the cold replay.
+
+Isolated test: release build of the review-round tree, one fixed finalized block
+(#18616746, `0x7f8777b87243d806d0827bfca7d2f3a14ae8f2fd95a43f8b7a2e117f217f6085`),
+`frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block <hash>
+--cache-dir <new empty dir>`, so each run fetched all state and compiled the
+runtime cold. `block` does not set the pool itself, so the cap was emulated with
+`RAYON_NUM_THREADS=2`; "uncapped" uses Rayon's default (12 threads on this host).
+Runs alternated. Host 1-minute load fell from 14.2 to 5.3 across the series.
+
+| Run | Rayon threads | Wall time, s | User CPU, s | Peak RSS, MB |
+| --- | --- | ---: | ---: | ---: |
+| 1 | 12 (default) | 25.96 | 7.89 | 852.5 |
+| 1 | 2 | 26.45 | 6.33 | 715.4 |
+| 2 | 12 (default) | 28.88 | 7.89 | 805.2 |
+| 2 | 2 | 26.18 | 6.28 | 734.3 |
+| 3 | 12 (default) | 29.36 | 7.95 | 873.1 |
+| 3 | 2 | 27.01 | 6.25 | 755.6 |
+
+Every run passed the root check with 92 RPC calls and zero timed RPC. The cap did
+not add startup latency: **26.2–27.0 s** capped versus **26.0–29.4 s** uncapped.
+It lowered peak RSS by **71–137 MB** per pair and user CPU by about 1.6 s.
+The cap stays at two threads.
+
+The 16 shared RPC slots were checked the same way, with `RAYON_NUM_THREADS=2`:
+`--proof-concurrency 16` took **28.37 and 28.75 s**, and 8 took **27.68 and
+27.46 s**. That difference is about one second, not the ten seen between windows.
+A short `follow` probe on the same binary at host load 4.2 traced its first block
+(#18616911) in **26.969 s**, inside the before range. The slower first blocks in
+the final windows are therefore attributed to host load and block/endpoint
+variance, not to the cap or the slot count. That probe also exited **55 ms** after
+SIGINT (`follow shutdown: skipped=0 cancelled=12`), with workers still waiting at
+the cold-start gate. Raw output: `/tmp/ft-perf/rayon/` (`summary.txt`, per-run
+`.log` with `/usr/bin/time -l`, `-host.txt` uptime captures, `follow-probe.log`).
+
+### Final verification
+
+All required checks passed on the final working tree:
+
+```sh
+cargo +1.93.0 fmt --check
+cargo +1.93.0 clippy --workspace --all-targets --locked -- -D warnings
+cargo +1.93.0 test --workspace --locked
+mdbook build
+```
+
+Fmt produced no output. Clippy finished successfully without warnings. mdBook
+logged only its normal build-start and HTML-backend messages, with no warnings.
+Workspace tests reported **182 passed, 0 failed, 1 ignored**, plus **0 doctests**.
+Breakdown: CLI **21 unit + 37 integration**; decode **5 unit + 13 integration**;
+model **11 unit + 8 integration**; OTel **15 integration**; replay **54 unit + 7 call
+integration + 11 offline integration**, with the public-network case ignored.
+The five added tests cover worker defaults/range validation, queue ancestry bounds,
+concurrent context requests and shared transport counters, immutable node sharing
+and offline isolation, and cold-start success/failure handoff. All existing
+conformance, tampering and root-check tests remain enabled.
+
+After the review round the same checks pass with **187 passed, 0 failed,
+1 ignored** (replay **59 unit**; other suites unchanged). The five new tests cover
+a queued RPC call keeping its full request deadline after waiting for a shared
+slot, cancellation of a call queued for a slot, and release of the opt-in
+cold-start gate after an error, a panic and cancellation of a waiter. The
+gate-handoff test now asserts that the follower is still blocked before the
+first replay's guard drops. Log: `/tmp/ft-perf/tests-round2.log`.
+
+The final logs are `/tmp/ft-perf/fmt-final.log`, `clippy-final.log`,
+`tests-final.log` and `mdbook-final.log`. A separate log check confirmed **239**
+completed benchmark replays with matching roots, `PASS`, zero timed RPC, and
+successful client exit across the seven tabulated windows.

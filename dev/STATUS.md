@@ -37,7 +37,7 @@ Then open http://127.0.0.1:16686.
 ## Limits
 
 - Replay timings are measured on the tracing machine, with tracing overhead. They show where time goes, not node database latency. Benchmarks stay the source of truth for weights.
-- `follow` replays about 6–9 blocks a minute on a public endpoint, slower than Asset Hub produces them, so it samples near the tip.
+- `follow` uses eight workers and 16 shared RPC slots. Two 120-second release runs completed 49 and 38 consecutive Westend Asset Hub blocks, with no expiry skips; the chain advanced 56 and 46 heights. Their final minutes completed 40 and 37 blocks as startup backlog cleared. Peak RSS was 698–752 MB. Public endpoint load and block contents still affect throughput; slower runs can fill the bounded queue and sample recent heights. See [measurements](performance.md#follow-workers-and-memory-2026-10-26).
 - The host functions are fixed at build time. Chains with extra host functions need them added.
 - Plain `#[pallet::constant]` values are compiled into the runtime and never touch storage, so they can't be traced yet.
 

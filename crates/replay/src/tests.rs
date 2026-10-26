@@ -355,7 +355,7 @@ fn online_acquisition_pins_context_and_measures_with_zero_rpc() {
 #[test]
 fn measured_run_rpc_guard_detects_network_activity() {
     let (rpc, requests, halt, worker) = server(|_| json!(null));
-    without_rpc(Some(&rpc), || Ok(())).unwrap();
+    assert_eq!(without_rpc(Some(&rpc), || Ok(())).unwrap(), ((), 0));
     let error = without_rpc(Some(&rpc), || rpc.call("chain_getHeader", json!([])))
         .unwrap_err()
         .to_string();
@@ -1105,4 +1105,68 @@ mod runtime_override {
             assert!(error.contains(expected), "{error}");
         }
     }
+}
+
+#[test]
+fn parent_context_overlaps_requests_and_forks_isolate_counters() {
+    use crate::rpc::CancellationToken;
+    use std::time::Duration;
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    listener.set_nonblocking(true).unwrap();
+    let rpc = Rpc::with_options(
+        &format!("ws://{}", listener.local_addr().unwrap()),
+        2,
+        Duration::from_secs(10),
+        CancellationToken::new(),
+    )
+    .unwrap();
+    let fork = rpc.fork();
+    assert_eq!(fork.parallelism(), 2);
+    let parent = sp_core::H256::repeat_byte(7);
+    let server = thread::spawn(move || {
+        let deadline = std::time::Instant::now() + Duration::from_secs(5);
+        let mut pending = Vec::new();
+        while pending.len() < 2 {
+            let (stream, _) = loop {
+                match listener.accept() {
+                    Ok(connection) => break connection,
+                    Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                        assert!(
+                            std::time::Instant::now() < deadline,
+                            "context calls were serialized"
+                        );
+                        thread::sleep(Duration::from_millis(5));
+                    }
+                    Err(e) => panic!("accept: {e}"),
+                }
+            };
+            stream.set_nonblocking(false).unwrap();
+            stream
+                .set_read_timeout(Some(Duration::from_secs(5)))
+                .unwrap();
+            let mut socket = tungstenite::accept(stream).unwrap();
+            let request: Value =
+                serde_json::from_str(socket.read().unwrap().to_text().unwrap()).unwrap();
+            assert_eq!(request["params"], json!([parent]));
+            pending.push((socket, request));
+        }
+        // Neither request receives a response until both are in flight.
+        for (mut socket, request) in pending {
+            socket
+                .send(tungstenite::Message::Text(
+                    json!({
+                        "jsonrpc":"2.0", "id":request["id"], "result":request["method"]
+                    })
+                    .to_string()
+                    .into(),
+                ))
+                .unwrap();
+        }
+    });
+    let (header, version) = parent_context(&fork, parent).unwrap();
+    assert_eq!(header, "chain_getHeader");
+    assert_eq!(version, "state_getRuntimeVersion");
+    assert_eq!(fork.count(), 2);
+    assert_eq!(rpc.count(), 0);
+    server.join().unwrap();
 }

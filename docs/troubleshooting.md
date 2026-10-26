@@ -32,7 +32,7 @@ This run used `--block latest`.
 ## `parent state may be pruned (use an archive endpoint)`
 
 ```text
-replay #18596954: fetching state (up to 8 concurrent proof requests)
+replay #18596954: fetching state (shared limit: 8 concurrent RPC requests)
 root check: NOT VERIFIED; RPC calls: 4
 Error: RPC unavailable: state_getReadProof: {"code":4003,"message":"Client error: State already discarded for 0x…"}; parent state may be pruned (use an archive endpoint)
 ```
@@ -176,7 +176,7 @@ For a call, use `--data` instead of `--args`.
 ## The first run is slow
 
 ```text
-replay #18598757: fetching state (up to 8 concurrent proof requests)
+replay #18598757: fetching state (shared limit: 8 concurrent RPC requests)
 ```
 
 This line can stay on screen for 20 seconds or more.
@@ -189,7 +189,7 @@ The first run also compiles the runtime.
 
 - Add `--cache-dir <dir>`. Later blocks and runs reuse fetched state. In [Analyse many blocks](guides/analyse-many-blocks.md), RPC calls per block dropped from 85 to about 40.
 - Compiled runtimes are kept in `~/.cache/frame-trace/wasm` even without `--cache-dir`.
-- Raise `--proof-concurrency` on a fast connection. The default is 8, the maximum 64.
+- Raise `--proof-concurrency` on a fast connection. See [defaults and limits](reference/commands.md).
 - Use a node close to you, or your own node.
 
 ## `failed to lookup address information`

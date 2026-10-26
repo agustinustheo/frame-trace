@@ -22,7 +22,7 @@ frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block 1000000
 ```
 
 ```text
-replay #1000000: fetching state (up to 8 concurrent proof requests)
+replay #1000000: fetching state (shared limit: 8 concurrent RPC requests)
 replay #1000000: loading runtime and preparing state
 root check: PASS; RPC calls: 17 (timed replay: 0); execution proof: 9840 bytes
 fetching state #1000000: 13 proof request rounds; 17 RPC calls

@@ -19,6 +19,7 @@ frame-trace-decode.workspace = true
 frame-trace-model.workspace = true
 frame-trace-replay.workspace = true
 ctrlc = "3.4"
+rayon = "1"
 frame-trace-otel.workspace = true
 serde_json.workspace = true
 serde.workspace = true
