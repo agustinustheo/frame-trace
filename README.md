@@ -59,7 +59,7 @@ Click any read to see where it was answered and its proof bytes.
 
 ## Learn more
 
-The [documentation](docs/README.md) has a [glossary](docs/reference/glossary.md) and:
+The [documentation](https://agustinustheodorus.com/frame-trace/) has a [glossary](docs/reference/glossary.md) and:
 
 - **Getting started:** [install](docs/getting-started/install.md), [your first trace](docs/getting-started/first-trace.md), [reading a trace](docs/getting-started/reading-a-trace.md).
 - **Guides** named after the job: [find repeated reads](docs/guides/find-repeated-reads.md), [measure proof size](docs/guides/measure-proof-size.md), [trace a runtime API call](docs/guides/trace-a-runtime-api-call.md), [analyse many blocks](docs/guides/analyse-many-blocks.md) and [more](docs/SUMMARY.md).
