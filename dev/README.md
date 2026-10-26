@@ -13,3 +13,5 @@ Material for people working on frame-trace itself. User documentation is in [`do
 | [`upstream/`](upstream/) | Draft bug reports for polkadot-sdk. Not filed. |
 
 The replay artifact format is specified in [`crates/replay/ARTIFACT.md`](../crates/replay/ARTIFACT.md). Fixture provenance is in [`fixtures/replay/README.md`](../fixtures/replay/README.md).
+
+- [HANDOFF.md](HANDOFF.md): a prompt that hands the project to another agent.
