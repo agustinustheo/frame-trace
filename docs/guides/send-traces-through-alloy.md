@@ -31,6 +31,8 @@ After that, all three are ready in about 3 seconds.
 `config.alloy` is the whole Alloy pipeline: receive OTLP, batch, send to Tempo.
 
 ```text
+// Receive OTLP from frame-trace, batch it, and send it to Tempo.
+
 otelcol.receiver.otlp "default" {
   http {
     endpoint = "0.0.0.0:4318"
