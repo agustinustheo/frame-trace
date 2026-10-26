@@ -19,7 +19,10 @@
 - [Analyse many blocks](guides/analyse-many-blocks.md)
 - [Follow new blocks](guides/follow-new-blocks.md)
 - [Save a block and replay it offline](guides/save-and-replay.md)
-- [Send traces to Tempo, Jaeger or JSON](guides/send-traces.md)
+- [Choose where to send traces](guides/send-traces.md)
+  - [Send traces to Grafana](guides/send-traces-to-grafana.md)
+  - [Send traces through Grafana Alloy to Tempo](guides/send-traces-through-alloy.md)
+- [Find storage problems with TraceQL](guides/query-traces-in-grafana.md)
 
 # Concepts
 

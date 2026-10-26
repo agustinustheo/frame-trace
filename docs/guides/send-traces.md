@@ -1,13 +1,32 @@
-# Send traces to Tempo, Jaeger or JSON
+# Choose where to send traces
 
 frame-trace has two outputs: OpenTelemetry traces over OTLP/HTTP, and JSON files.
 `block`, `call` and `follow` send traces with `--otlp`.
 `block` and `call` write JSON with `--json`.
 
+## Pick a trace viewer
+
+The repository has a ready Docker Compose setup for each of these, in [`examples/`](https://github.com/agustinustheo/frame-trace/tree/main/examples).
+
+| Setup | Use it when | Download | Ready in | Guide |
+| --- | --- | --- | --- | --- |
+| Grafana LGTM | You want a dashboard and TraceQL search. Parity uses this image for its own local tracing. Recommended. | 535 MB | about 3 s | [Send traces to Grafana](send-traces-to-grafana.md) |
+| Grafana Alloy, Tempo and Grafana | You want the shape of a cluster, or already run Alloy or a Collector. | about 690 MB | about 3 s | [Send traces through Grafana Alloy to Tempo](send-traces-through-alloy.md) |
+| Jaeger | You want to look at one trace, fast. | 51 MB | under 1 s | [Jaeger](#jaeger), below |
+
+Download sizes are compressed images. Start times were measured on a laptop once the images were downloaded, until the receiver and the web page answered.
+
+All three listen for OTLP/HTTP on port 4318, so bare `--otlp` works with each.
+Run one at a time.
+
 ## Jaeger
 
+Run this from the `frame-trace` directory:
+
 ```sh
-docker run -d --rm --name jaeger -p 16686:16686 -p 4318:4318 jaegertracing/jaeger:latest
+cd examples/jaeger
+docker compose up -d
+cd ../..
 frame-trace block --offline fixtures/replay/people-traced --otlp
 ```
 
@@ -18,8 +37,9 @@ exported 633 spans to http://127.0.0.1:4318
 
 Open <http://127.0.0.1:16686> and pick the service `frame-trace`.
 [Your first trace](../getting-started/first-trace.md) shows what you will see.
+Stop it with `docker compose down` from `examples/jaeger`.
 
-## Grafana Tempo or any OTLP collector
+## Any other OTLP receiver
 
 `--otlp` takes the base URL of an OTLP/HTTP receiver.
 frame-trace adds `/v1/traces` unless the URL already ends with it.
@@ -35,11 +55,9 @@ frame-trace block --offline fixtures/replay/people-transfer --otlp http://127.0.
 exported 428 spans to http://127.0.0.1:4318/v1/traces
 ```
 
-Point `--otlp` at your collector instead, for example `--otlp http://<tempo-host>:4318`.
-
-For Tempo, enable its OTLP receiver with the HTTP protocol.
-Its usual port is 4318.
-An OpenTelemetry Collector in front of any other backend works the same way.
+The receiver must accept OTLP over HTTP with protobuf, usually on port 4318.
+Headers, such as an authorization header, come from `OTEL_EXPORTER_OTLP_HEADERS`.
+See [Send traces through Grafana Alloy to Tempo](send-traces-through-alloy.md#send-to-an-alloy-or-collector-you-already-run).
 
 Every trace uses the service name `frame-trace`.
 Search by span name, such as `extrinsic 2: Utility.batch`, or by attribute, such as `frame.block.number`.

@@ -1,0 +1,21 @@
+# Grafana LGTM: Grafana, Tempo, Loki, Prometheus and an OpenTelemetry Collector in one container.
+# The same image and version as Parity's own local observability setup.
+# Run from this directory: docker compose up -d
+services:
+  lgtm:
+    image: grafana/otel-lgtm:0.11.16
+    ports:
+      - "3000:3000" # Grafana
+      - "4318:4318" # OTLP/HTTP, where frame-trace sends traces
+      - "4317:4317" # OTLP/gRPC, for other tools
+    environment:
+      # Open Grafana without a login, as a viewer. For a local machine only.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      # Let viewers use Explore to run their own TraceQL queries.
+      GF_USERS_VIEWERS_CAN_EDIT: "true"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /otel-lgtm/frame-trace/frame-trace.json
+    volumes:
+      - ./provisioning/frame-trace.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/frame-trace.yaml:ro
+      - ./dashboards:/otel-lgtm/frame-trace:ro

@@ -138,6 +138,20 @@ frame-trace follow --rpc URL --best
 | `--cache-max-bytes <N>` | 1073741824 (1 GiB) | Size limit for the disk cache, in bytes. |
 | `--unauthenticated-metadata` | off | As for `block`. |
 
+## Environment variables
+
+These standard OpenTelemetry variables change how `--otlp` sends traces.
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `OTEL_EXPORTER_OTLP_HEADERS` | none | Headers sent with every export, as `key=value` pairs separated by commas. Values are URL-decoded, so write a space as `%20`. |
+| `OTEL_EXPORTER_OTLP_TRACES_HEADERS` | none | The same. Replaces `OTEL_EXPORTER_OTLP_HEADERS` when both are set. |
+| `OTEL_EXPORTER_OTLP_TIMEOUT` | 10000 | How long to wait for the receiver, in milliseconds. |
+| `OTEL_EXPORTER_OTLP_TRACES_TIMEOUT` | 10000 | The same. Wins over `OTEL_EXPORTER_OTLP_TIMEOUT`. |
+
+`--otlp` always sets the URL, so `OTEL_EXPORTER_OTLP_ENDPOINT` has no effect.
+See [Send traces through Grafana Alloy to Tempo](../guides/send-traces-through-alloy.md#headers-and-authentication).
+
 ## Exit codes
 
 | Code | Meaning |

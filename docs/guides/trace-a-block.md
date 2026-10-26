@@ -35,7 +35,7 @@ Add an output to see the trace:
 
 | Flag | Output |
 | --- | --- |
-| `--otlp` | Send the trace to Jaeger or Tempo. See [Send traces to Tempo, Jaeger or JSON](send-traces.md). |
+| `--otlp` | Send the trace to Grafana, Jaeger or any OTLP receiver. See [Choose where to send traces](send-traces.md). |
 | `--json <file>` | Write the whole trace as JSON. `-` writes to stdout. See [JSON output](../reference/json.md). |
 | `--save <dir>` | Keep everything needed to replay the block later with no network. See [Save a block and replay it offline](save-and-replay.md). |
 

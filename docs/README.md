@@ -33,5 +33,6 @@ Then it runs the block with the chain's own runtime on your machine and records 
 
 - New here? [Install frame-trace](getting-started/install.md), then [get your first trace](getting-started/first-trace.md).
 - Have a question about a block? Pick a guide, such as [Find repeated reads](guides/find-repeated-reads.md).
+- Want a dashboard and search across blocks? [Send traces to Grafana](guides/send-traces-to-grafana.md).
 - Not sure what a number means? Read the [concepts](concepts/what-a-replay-proves.md).
 - Looking up a flag? See [Commands and flags](reference/commands.md).

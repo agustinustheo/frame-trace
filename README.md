@@ -63,6 +63,7 @@ The [documentation](https://agustinustheodorus.com/frame-trace/) has a [glossary
 
 - **Getting started:** [install](docs/getting-started/install.md), [your first trace](docs/getting-started/first-trace.md), [reading a trace](docs/getting-started/reading-a-trace.md).
 - **Guides** named after the job: [find repeated reads](docs/guides/find-repeated-reads.md), [measure proof size](docs/guides/measure-proof-size.md), [trace a runtime API call](docs/guides/trace-a-runtime-api-call.md), [analyse many blocks](docs/guides/analyse-many-blocks.md) and [more](docs/SUMMARY.md).
+- **Grafana:** [send traces to Grafana](docs/guides/send-traces-to-grafana.md) for a ready dashboard, [find storage problems with TraceQL](docs/guides/query-traces-in-grafana.md), or [send them through Grafana Alloy to Tempo](docs/guides/send-traces-through-alloy.md). Ready setups are in [`examples/`](examples/).
 - **Concepts:** [what a replay proves](docs/concepts/what-a-replay-proves.md), [phases](docs/concepts/phases.md), [cache or trie](docs/concepts/cache-or-trie.md), [proof bytes](docs/concepts/proof-bytes.md), [timings](docs/concepts/timings.md).
 - **Reference:** [commands and flags](docs/reference/commands.md), [span attributes](docs/reference/spans.md), [JSON output](docs/reference/json.md).
 - **[Troubleshooting](docs/troubleshooting.md)**, one section per error message.

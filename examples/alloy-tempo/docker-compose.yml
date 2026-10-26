@@ -1,0 +1,49 @@
+# Grafana Alloy receives OTLP from frame-trace and forwards it to Grafana Tempo.
+# Grafana shows the traces. The same shape as a cluster with Alloy as the agent.
+# Run from this directory: docker compose up -d
+services:
+  alloy:
+    image: grafana/alloy:v1.21.2
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --storage.path=/var/lib/alloy/data
+      - --server.http.listen-addr=0.0.0.0:12345
+    volumes:
+      - ./config.alloy:/etc/alloy/config.alloy:ro
+    ports:
+      - "4318:4318"   # OTLP/HTTP, where frame-trace sends traces
+      - "12345:12345" # Alloy web page: pipeline and health
+    depends_on:
+      - tempo
+
+  tempo:
+    image: grafana/tempo:3.1.1
+    command: ["-target=all", "-config.file=/etc/tempo.yaml"]
+    volumes:
+      - ./tempo.yaml:/etc/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - "3200:3200" # Tempo HTTP API
+
+  grafana:
+    image: grafana/grafana:13.2.4
+    environment:
+      # Open Grafana without a login, as a viewer. For a local machine only.
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      # Let viewers use Explore to run their own TraceQL queries.
+      GF_USERS_VIEWERS_CAN_EDIT: "true"
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/frame-trace.json
+    volumes:
+      - ./grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
+      - ./grafana/dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:ro
+      - ../grafana-lgtm/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3000:3000" # Grafana
+    depends_on:
+      - tempo
+
+volumes:
+  tempo-data:

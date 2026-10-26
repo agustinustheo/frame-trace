@@ -1,0 +1,10 @@
+apiVersion: 1
+
+providers:
+  - name: frame-trace
+    type: file
+    disableDeletion: true
+    allowUiUpdates: false
+    options:
+      path: /otel-lgtm/frame-trace
+      foldersFromFilesStructure: false

@@ -1,0 +1,8 @@
+# Jaeger v2 in one container, for a local trace viewer.
+# Run from this directory: docker compose up -d
+services:
+  jaeger:
+    image: jaegertracing/jaeger:2.22.0
+    ports:
+      - "16686:16686" # Jaeger web page
+      - "4318:4318"   # OTLP/HTTP, where frame-trace sends traces
