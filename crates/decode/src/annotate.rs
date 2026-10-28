@@ -65,6 +65,10 @@ pub struct AnnotatedPhase {
     pub kind: String,
     /// Extrinsic index for `apply_extrinsic`.
     pub extrinsic_index: Option<u32>,
+    /// `0x`-prefixed blake2-256 of the encoded extrinsic: the transaction hash a submitter
+    /// (for example a load generator) sees. Absent when the bytes were not in the trace.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extrinsic_hash: Option<String>,
     /// `Pallet.call` of the extrinsic, when its bytes were in the trace and decoded.
     pub call: Option<String>,
     /// Why the extrinsic bytes did not decode. Usually the metadata is not the block's runtime.
@@ -247,6 +251,10 @@ fn annotate_phase(
         }),
         kind: phase.kind.name().into(),
         extrinsic_index: phase.kind.extrinsic_index(),
+        extrinsic_hash: phase
+            .extrinsic
+            .as_deref()
+            .map(|bytes| format!("0x{}", hex::encode(sp_crypto_hashing::blake2_256(bytes)))),
         call,
         call_error,
         label,

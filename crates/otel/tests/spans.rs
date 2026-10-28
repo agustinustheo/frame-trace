@@ -102,6 +102,9 @@ fn builds_block_phase_op_tree() {
     let ext1 = by_name(&spans, "extrinsic 1: Balances.transfer_keep_alive");
     assert_eq!(attr(ext1, "frame.phase"), Some("extrinsic".into()));
     assert_eq!(attr(ext1, "frame.extrinsic.index"), Some(Value::I64(1)));
+    // The transaction hash a submitter knows, so load-test spans can be joined to this one.
+    let hash = attr(ext1, "frame.extrinsic.hash").expect("extrinsic hash attribute");
+    assert!(hash.as_str().starts_with("0x") && hash.as_str().len() == 66);
     assert_eq!(
         attr(ext1, "frame.storage.duplicate_reads"),
         Some(Value::I64(2))
@@ -223,6 +226,7 @@ fn synthetic_block(ops: usize) -> AnnotatedBlock {
             wall_time: None,
             signed: None,
             extrinsic_index: None,
+            extrinsic_hash: None,
             call: None,
             call_error: None,
             label: "unsegmented".into(),
