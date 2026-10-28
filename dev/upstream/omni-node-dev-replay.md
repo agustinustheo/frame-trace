@@ -1,6 +1,6 @@
 # polkadot-omni-node `--dev` cannot replay blocks with signed extrinsics
 
-DRAFT. Not filed.
+Filed as [paritytech/polkadot-sdk#13594](https://github.com/paritytech/polkadot-sdk/issues/13594). Fix: [#13596](https://github.com/paritytech/polkadot-sdk/pull/13596). This is the original draft; the filed issue is the current version.
 
 ## Summary
 
