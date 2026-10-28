@@ -6,7 +6,7 @@ use frame_metadata::{RuntimeMetadata, RuntimeMetadataPrefixed};
 use frame_trace_decode::{KeyName, Metadata, annotate};
 use frame_trace_model::{TracedBlock, rpc::parse_trace_block};
 use parity_scale_codec::{Decode, Encode};
-use sp_crypto_hashing::{blake2_128, twox_64, twox_128};
+use sp_crypto_hashing::{blake2_128, blake2_256, twox_64, twox_128};
 
 const ALICE: &str = "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d";
 
@@ -242,6 +242,47 @@ fn annotates_a_traced_block() {
     assert_eq!(bare.phases[1].ops[0].label, "get :extrinsic_index");
     assert_eq!(bare.phases[1].label, "extrinsic 0");
 }
+
+/// `extrinsic_hash` is blake2-256 of the extrinsic as submitted: SCALE-encoded, length prefix
+/// included. That is the hash `author_submitExtrinsic` returns, so a load generator can find its
+/// transactions in a trace.
+#[test]
+fn extrinsic_phases_carry_the_transaction_hash() {
+    let json = String::from_utf8(fixture("model/two-extrinsics.json")).unwrap();
+    let block = TracedBlock::from_trace(&parse_trace_block(&json).unwrap()).unwrap();
+    let annotated = annotate(&block, Some(&westend(16)));
+    for (phase, annotated) in block.phases.iter().zip(&annotated.phases) {
+        let Some(bytes) = &phase.extrinsic else {
+            assert_eq!(annotated.extrinsic_hash, None, "{}", annotated.label);
+            continue;
+        };
+        // The bytes are the encoded extrinsic: a compact length, then exactly that many bytes.
+        let mut rest = bytes.as_slice();
+        let len = parity_scale_codec::Compact::<u32>::decode(&mut rest)
+            .unwrap()
+            .0;
+        assert_eq!(rest.len(), len as usize);
+        assert_eq!(
+            annotated.extrinsic_hash.as_deref(),
+            Some(format!("0x{}", hex::encode(blake2_256(bytes))).as_str())
+        );
+    }
+    let hashes: Vec<_> = annotated
+        .phases
+        .iter()
+        .map(|p| p.extrinsic_hash.as_deref())
+        .collect();
+    assert_eq!(hashes, [None, Some(TIMESTAMP_SET), Some(TRANSFER), None]);
+    // JSON: present for extrinsics, omitted otherwise, and older JSON without it still loads.
+    let value = serde_json::to_value(&annotated).unwrap();
+    assert_eq!(value["phases"][1]["extrinsic_hash"], TIMESTAMP_SET);
+    assert!(value["phases"][0].get("extrinsic_hash").is_none());
+    let back: frame_trace_decode::AnnotatedBlock = serde_json::from_value(value).unwrap();
+    assert_eq!(back.phases[2].extrinsic_hash.as_deref(), Some(TRANSFER));
+}
+
+const TIMESTAMP_SET: &str = "0x12420777d2e104518e176109bd76bd24114b16c2085028873aba03acbb6676e9";
+const TRANSFER: &str = "0x9e7700ea1eae6e2d7a22131e3eca673efc35ba0377c7010bc877de4793de67cf";
 
 /// Keys start with `twox128(storage prefix)`, which may differ from the pallet name.
 #[test]

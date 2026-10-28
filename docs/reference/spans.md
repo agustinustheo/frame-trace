@@ -95,6 +95,7 @@ With `--runtime-override`, also:
 | `frame.phase` | string | Phase kind: `initialization`, `extrinsic`, `post inherents (on_poll)`, `finalization`, or `no phase markers` for a recorded trace without them. |
 | `frame.extrinsic.index` | int | Extrinsic number, for extrinsic phases. |
 | `frame.extrinsic.call` | string | `Pallet.call`, for extrinsic phases. |
+| `frame.extrinsic.hash` | string | `0x`-prefixed blake2-256 of the encoded extrinsic: the transaction hash `author_submitExtrinsic` returns. Use it to join a load generator's records or spans to this phase. Absent when the extrinsic bytes were not in the trace. |
 | `frame.phase.timing_available` | bool | `false` if the phase had no timed operations. Its bar then spans the whole block. |
 | `frame.timing` | string | `timed replay`, or `no timing` if the phase had no timed operations. |
 | `frame.storage.*` totals | int | See [Totals](#totals). |

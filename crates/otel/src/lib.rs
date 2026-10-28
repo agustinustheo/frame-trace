@@ -566,6 +566,9 @@ fn record_measured(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) -
         if let Some(call) = &phase.call {
             attrs.push(KeyValue::new("frame.extrinsic.call", call.clone()));
         }
+        if let Some(hash) = &phase.extrinsic_hash {
+            attrs.push(KeyValue::new("frame.extrinsic.hash", hash.clone()));
+        }
         let span = tracer
             .span_builder(phase.label.clone())
             .with_start_time(at(bounds[i].0))
@@ -665,6 +668,9 @@ fn record_phase(
     }
     if let Some(call) = &phase.call {
         attrs.push(KeyValue::new("frame.extrinsic.call", call.clone()));
+    }
+    if let Some(hash) = &phase.extrinsic_hash {
+        attrs.push(KeyValue::new("frame.extrinsic.hash", hash.clone()));
     }
     attrs.extend(stats_attributes(&phase.stats));
     let span = tracer
