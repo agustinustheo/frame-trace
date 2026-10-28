@@ -10,6 +10,6 @@ Material for people working on frame-trace itself. User documentation is in [`do
 | [`research/`](research/) | Background research: SDK internals, prior art, Rust OpenTelemetry, the Individuality setup, first findings from 65 blocks, docs inspiration and the docs audit. |
 | [`experiments/e1/`](experiments/e1/README.md) | Experiment E1: `state_traceBlock` on a local People chain, with scripts and patches. `people-with-tracing.patch` adds the `with-tracing` feature to that runtime. |
 | [`experiments/e2/`](experiments/e2/README.md) | Experiment E2: self-replay from safe RPC, which became the main design. Its results back the fixtures in `fixtures/replay/`. |
-| [`upstream/`](upstream/) | Draft bug reports for polkadot-sdk. Not filed. |
+| [`upstream/`](upstream/) | Original drafts of the polkadot-sdk bug reports, filed as #13594 and #13595 (fixes in #13596 and #13597). |
 
 The replay artifact format is specified in [`crates/replay/ARTIFACT.md`](../crates/replay/ARTIFACT.md). Fixture provenance is in [`fixtures/replay/README.md`](../fixtures/replay/README.md).

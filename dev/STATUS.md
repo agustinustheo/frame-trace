@@ -1,6 +1,6 @@
 # Status
 
-Last updated 25 October 2026.
+Last updated 28 October 2026.
 
 ## What works
 
@@ -29,7 +29,7 @@ Then open http://127.0.0.1:16686.
 | Step | Result |
 | --- | --- |
 | Research (`research/01`–`04`) | Nobody exports Substrate storage traces to OpenTelemetry. `state_traceBlock` is the closest piece. |
-| E1 (`experiments/e1`) | `state_traceBlock` is not enough: unsafe RPC only, drops keyless events, no timing or nesting, and omni-node dev mode can't replay signed blocks. Two upstream bug reports drafted in `upstream/` (not filed). |
+| E1 (`experiments/e1`) | `state_traceBlock` is not enough: unsafe RPC only, drops keyless events, no timing or nesting, and omni-node dev mode can't replay signed blocks. Two upstream bug reports, filed as polkadot-sdk #13594 and #13595. |
 | E2 (`experiments/e2`) | Self-replay from safe RPC works, with the real root check. Became the main path. |
 | Code | 5 crates, 165 tests, seven review rounds (GPT 6.1 Sol High + Haiku 5.5 High), each verified by Opus 5.5 Medium. |
 | First findings (`research/05-first-findings.md`) | 65 blocks traced. Most storage work is block initialization and finalization, not user extrinsics. `System::BlockWeight` is touched 100–143 times per block. In a 3-transfer batch, Alice's account is read 48 times: 42 from the overlay, 5 warm, 1 cold. |
@@ -43,8 +43,16 @@ Then open http://127.0.0.1:16686.
 
 ## Decisions for you
 
-1. **Upstream bug reports.** `upstream/omni-node-dev-replay.md` and `upstream/trace-block-drops-keyless-events.md` are ready to file on paritytech/polkadot-sdk. File them?
-2. **Make the repo public?** It is private now.
-3. **Constants (spec phase 4).** Tracing constants needs either an opt-in macro in pallets or an instrumented runtime build. Worth designing now?
-4. **PolkaMeter integration (spec phase 5).** Attach a block trace to each load-test step. This changes the PolkaMeter repo.
-5. **Docs.** Move the README and `docs/` to an mdBook site like PolkaMeter's?
+1. **Constants (spec phase 4).** Tracing constants needs either an opt-in macro in pallets or an instrumented runtime build. Worth designing now?
+2. **PolkaMeter integration (spec phase 5).** Attach a block trace to each load-test step. This changes the PolkaMeter repo.
+
+## Upstream
+
+| Bug | Issue | Fix PR | State (28 October 2026) |
+| --- | --- | --- | --- |
+| `polkadot-omni-node --dev` can't trace blocks with signed extrinsics | [#13594](https://github.com/paritytech/polkadot-sdk/issues/13594) | [#13596](https://github.com/paritytech/polkadot-sdk/pull/13596) | Open, waiting for review |
+| `state_traceBlock` drops keyless events with an empty filter | [#13595](https://github.com/paritytech/polkadot-sdk/issues/13595) | [#13597](https://github.com/paritytech/polkadot-sdk/pull/13597) | Open, review requested from koute |
+
+frame-trace does not depend on either fix: it replays blocks itself from safe RPC.
+
+Done since the last update: the repo is public, and the docs are an mdBook site.
