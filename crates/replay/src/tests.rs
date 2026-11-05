@@ -1218,3 +1218,195 @@ fn parent_context_overlaps_requests_and_forks_isolate_counters() {
     assert_eq!(rpc.count(), 0);
     server.join().unwrap();
 }
+
+/// A real contract call fetched through the loopback node: child trie nodes arrive only through
+/// `state_getChildReadProof`, pinned to the parent, and a missing or corrupted child proof fails.
+#[test]
+fn real_contract_call_fetches_pinned_child_proofs_and_rejects_bad_ones() {
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    enum Child {
+        Honest,
+        Empty,
+        Corrupt,
+    }
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../fixtures/replay/paseo-asset-hub-contract");
+    let artifact = Artifact::load(&path).unwrap();
+    let trie_id =
+        unhex("0xefdd7b91c3f1506385cbe9ee6e0255a6e4d12d4d2dd1f45975d5160872c45a2d").unwrap();
+    let child = ChildInfo::new_default(&trie_id);
+    let prefixed = rpc::hex0(child.prefixed_storage_key().as_slice());
+    // The child keys the block reads and writes, from the offline replay.
+    let offline = replay(artifact.clone(), None).unwrap();
+    let block_keys: std::collections::BTreeSet<String> =
+        frame_trace_model::TracedBlock::from_replay(&offline.capture)
+            .unwrap()
+            .ops
+            .iter()
+            .filter(|o| o.child_trie.is_some())
+            .map(|o| o.key.to_hex())
+            .collect();
+    assert_eq!(block_keys.len(), 6);
+    let parent_header: Header = serde_json::from_value(artifact.parent_header.clone()).unwrap();
+    let parent = parent_header.hash();
+    // Nodes of the contract's child trie: its full proof minus the top trie path to its root.
+    let backend = || {
+        let mut memory = sp_trie::MemoryDB::<Blake2Hasher>::default();
+        for node in &artifact.proof_nodes {
+            HashDB::insert(&mut memory, EMPTY_PREFIX, &unhex(node).unwrap());
+        }
+        sp_state_machine::TrieBackendBuilder::new(memory, *parent_header.state_root()).build()
+    };
+    let child_keys: Vec<_> = block_keys.iter().map(|k| unhex(k).unwrap()).collect();
+    let child_proof =
+        sp_state_machine::prove_child_read_on_trie_backend(&backend(), &child, &child_keys)
+            .unwrap();
+    let top_path = sp_state_machine::prove_read_on_trie_backend(
+        &backend(),
+        [child.prefixed_storage_key().into_inner()],
+    )
+    .unwrap();
+    let top_path: std::collections::BTreeSet<_> = top_path.into_iter_nodes().collect();
+    let child_nodes: std::collections::BTreeSet<_> = child_proof
+        .into_iter_nodes()
+        .filter(|n| !top_path.contains(n))
+        .collect();
+    assert!(!child_nodes.is_empty());
+    // Top trie requests get every other fixture node: the test is about child proofs.
+    let top_nodes: Vec<String> = artifact
+        .proof_nodes
+        .iter()
+        .filter(|n| !child_nodes.contains(&unhex(n).unwrap()))
+        .cloned()
+        .collect();
+
+    for mode in [Child::Honest, Child::Empty, Child::Corrupt] {
+        let trie = backend();
+        let served = artifact.clone();
+        let top_nodes = top_nodes.clone();
+        let child = child.clone();
+        let (rpc, requests, halt, worker) = server(move |request| {
+            let keys = |at: usize| -> Vec<Vec<u8>> {
+                request["params"][at]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|v| unhex(v.as_str().unwrap()).unwrap())
+                    .collect()
+            };
+            // The fixture holds only the nodes the block used. Prove each requested key on its
+            // own and merge, so one key outside the fixture does not empty the whole response.
+            let nodes = |proofs: Vec<sp_trie::StorageProof>| -> Value {
+                let nodes: std::collections::BTreeSet<_> = proofs
+                    .into_iter()
+                    .flat_map(|p| p.into_iter_nodes())
+                    .map(|n| rpc::hex0(&n))
+                    .collect();
+                json!({"at": parent, "proof": nodes})
+            };
+            match request["method"].as_str().unwrap() {
+                "chain_getBlock" => json!({"block": served.block}),
+                "chain_getHeader" => served.parent_header.clone(),
+                "state_getRuntimeVersion" => served.runtime_version.clone(),
+                "state_getReadProof" => {
+                    assert_eq!(request["params"][1], json!(parent));
+                    json!({"at": parent, "proof": top_nodes})
+                }
+                "state_getChildReadProof" => {
+                    let proofs = keys(1)
+                        .into_iter()
+                        .filter_map(|key| {
+                            sp_state_machine::prove_child_read_on_trie_backend(&trie, &child, [key])
+                                .ok()
+                        })
+                        .collect();
+                    match mode {
+                        Child::Honest => nodes(proofs),
+                        Child::Empty => nodes(Vec::new()),
+                        Child::Corrupt => {
+                            let mut response = nodes(proofs);
+                            for node in response["proof"].as_array_mut().unwrap() {
+                                let mut bytes = unhex(node.as_str().unwrap()).unwrap();
+                                let last = bytes.len() - 1;
+                                bytes[last] ^= 0x01;
+                                *node = json!(rpc::hex0(&bytes));
+                            }
+                            response
+                        }
+                    }
+                }
+                method => panic!("unexpected RPC {method}"),
+            }
+        });
+        let session = ReplaySession::new(None)
+            .unwrap()
+            .with_speculative_discovery(false);
+        let result = online_with_session(&rpc, &format!("{:?}", artifact.block_hash), &session);
+        let requests = requests.lock().unwrap().clone();
+        stop(halt, worker);
+
+        let child_requests: Vec<_> = requests
+            .iter()
+            .filter(|r| r["method"] == "state_getChildReadProof")
+            .collect();
+        assert!(!child_requests.is_empty(), "{mode:?}");
+        for request in &child_requests {
+            // Pinned to the parent block, the contract's prefixed child storage key and
+            // child-local keys the block uses.
+            assert_eq!(request["params"][0], json!(prefixed), "{mode:?}");
+            assert_eq!(request["params"][2], json!(parent), "{mode:?}");
+            for key in request["params"][1].as_array().unwrap() {
+                assert!(
+                    block_keys.contains(key.as_str().unwrap()),
+                    "{mode:?}: {key}"
+                );
+            }
+        }
+        match mode {
+            Child::Honest => {
+                let result = result.unwrap();
+                assert!(result.root_check);
+                assert_eq!(result.measured_rpc_count, 0);
+                assert_eq!(result.computed_state_root, offline.computed_state_root);
+                let requested: std::collections::BTreeSet<String> = child_requests
+                    .iter()
+                    .flat_map(|r| r["params"][1].as_array().unwrap())
+                    .map(|k| k.as_str().unwrap().to_owned())
+                    .collect();
+                assert_eq!(requested, block_keys);
+                // Every child op in the online trace is on the contract's trie, as offline.
+                let traced = frame_trace_model::TracedBlock::from_replay(&result.capture).unwrap();
+                assert!(
+                    traced
+                        .ops
+                        .iter()
+                        .filter_map(|o| o.child_trie.as_ref())
+                        .all(|c| c.complete() == Some(&trie_id[..]))
+                );
+            }
+            Child::Empty | Child::Corrupt => {
+                // Rejected at the first child read: the node the trie needs is not in the
+                // response (empty) or its hash no longer matches (corrupted).
+                let error = result.unwrap_err().to_string();
+                assert!(
+                    error.contains("proof did not contain")
+                        && error.contains("missing/invalid proof node"),
+                    "{mode:?}: {error}"
+                );
+                assert!(
+                    child_nodes.iter().any(|node| error.contains(&format!(
+                        "{:?}",
+                        H256::from(sp_io::hashing::blake2_256(node))
+                    ))),
+                    "{mode:?}: names a child trie node: {error}"
+                );
+                assert!(
+                    block_keys
+                        .iter()
+                        .any(|key| error.contains(&format!("at {key}"))),
+                    "{mode:?}: at a child key: {error}"
+                );
+            }
+        }
+    }
+}
