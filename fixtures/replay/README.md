@@ -17,6 +17,7 @@ Westend Wasm as raw blob bytes also reduces the original public block artifact.
 | `people-kill-prefix` | 8 / `7d99aaa1…` | E2 untraced People, sudo kill_prefix | 9,114 |
 | `people-traced` | 4 / `06618995…` | E2 traced People, three-transfer batch | 4,116,156 |
 | `westend-asset-hub` | 18,558,320 / `4c0d1d57…` | Public Westend Asset Hub, two inherents | 275,788 |
+| `westend-asset-hub-after-upgrade` | 18,985,170 / `1ccb4c8c…` | Public Westend Asset Hub, first block on spec 1025004 | 242,461 |
 
 The local `oracle.json.zst` files are E2's independent `state_traceBlock` RPC
 recordings of the exact same blocks. Tests compare the entire ordered keyed
@@ -94,3 +95,25 @@ kill-prefix / traced batch. Local regeneration used E1 `run-node.py`,
 runtime source/Binary/Wasm provenance remains E1’s. `--unauthenticated-metadata`
 (`--rpc-metadata-fallback` alias) explicitly allows stored metadata for older
 artifacts that still lack execution dependencies; output labels it unauthenticated.
+
+## Runtime upgrade fixture
+
+`westend-asset-hub-after-upgrade` is Westend Asset Hub #18,985,170
+(`0x1ccb4c8ce07cacb802982d8b2aa1c8ceea40267c2503d1f48504fd7e6a405d8d`), recorded
+2026-11-06 from `wss://westend-asset-hub-rpc.polkadot.io` with `block --save`.
+Its parent, #18,985,169 (`0xd0e2fe81…ce55b`), enacted spec 1025003 -> 1025004: the
+`ParachainSystem.set_validation_data` inherent wrote the new `:code`. #18,985,170 is the
+first block executed with the new code; its initialization writes
+`System::LastRuntimeUpgrade`. Root check PASS, 184 RPC calls, 237,816 execution-proof bytes.
+The new runtime (`c7a91f4a…`, 2,716,830 bytes compressed) and its V16 metadata
+(`d678e714…`) are blobs.
+
+The enactment block itself is not committed. It needs both runtimes, the old one as
+`:code` and the new one as `ParachainSystem::PendingValidationCode`. The pending value
+carries a 4-byte length prefix, so it cannot share the `:code` blob. Together that adds
+about 5.3 MB. The ignored live test `runtime_upgrade_enactment_and_next_block_live`
+replays both blocks from an archive endpoint instead (`FRAME_TRACE_WESTEND_AH_RPC`).
+
+Fixture blobs were made from the `--save` output by moving every hex value of at least
+100,000 bytes into `blobs/<blake2-256>.zst` (`zstd -19`) and writing `blob:<hash>` in its
+place; the artifact itself is recompressed with `zstd -19`.

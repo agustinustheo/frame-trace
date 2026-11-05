@@ -302,6 +302,8 @@ pub struct Replay {
     /// Sequential proof acquisition waves, excluding context RPC and retries.
     pub proof_round_trips: usize,
     pub proof_bytes: usize,
+    /// Blake2-256 of the runtime code that executed the block: the parent's `:code`, or the override.
+    pub runtime_code_hash: H256,
     pub artifact: Artifact,
     /// Set only when the session executed a substitute runtime.
     pub runtime_override: Option<RuntimeOverride>,
@@ -510,6 +512,7 @@ fn replay_inner(
         measured_rpc_count,
         proof_round_trips: db.round_trips.load(Ordering::Relaxed),
         proof_bytes,
+        runtime_code_hash: H256::from(sp_io::hashing::blake2_256(&wasm)),
         artifact,
         runtime_override,
     })
