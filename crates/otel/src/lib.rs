@@ -17,7 +17,10 @@
 //! and every span carries `frame.timing = "no timing"`. Spans are built with the OpenTelemetry
 //! SDK directly (not through `tracing-opentelemetry`).
 
-use std::time::{Duration, SystemTime};
+use std::{
+    sync::{Arc, Mutex, PoisonError},
+    time::{Duration, SystemTime},
+};
 
 mod delivery;
 mod http;
@@ -32,7 +35,10 @@ use opentelemetry::{
 };
 use opentelemetry_sdk::{
     Resource,
-    trace::{BatchConfigBuilder, BatchSpanProcessor, SdkTracer, SdkTracerProvider, SpanExporter},
+    trace::{
+        BatchConfigBuilder, BatchSpanProcessor, SdkTracer, SdkTracerProvider, SpanData,
+        SpanExporter,
+    },
 };
 
 /// `db.system.name` for every storage op.
@@ -119,47 +125,166 @@ fn runtime_span(span: &frame_trace_model::RuntimeSpan) -> bool {
 pub fn provider<E: SpanExporter + 'static>(exporter: E, max_spans: usize) -> SdkTracerProvider {
     let batch = BatchConfigBuilder::default()
         .with_max_queue_size(max_spans.max(2048))
-        .with_max_export_batch_size(512)
+        .with_max_export_batch_size(BATCH_SPANS)
         .build();
-    SdkTracerProvider::builder()
+    builder()
         .with_span_processor(
             BatchSpanProcessor::builder(exporter)
                 .with_batch_config(batch)
                 .build(),
         )
-        .with_max_attributes_per_span(256)
-        .with_resource(Resource::builder().with_service_name(SCOPE).build())
         .build()
+}
+
+/// Spans per OTLP request.
+const BATCH_SPANS: usize = 512;
+
+fn builder() -> opentelemetry_sdk::trace::TracerProviderBuilder {
+    SdkTracerProvider::builder()
+        .with_max_attributes_per_span(256)
+        .with_resource(resource())
+}
+
+fn resource() -> Resource {
+    Resource::builder().with_service_name(SCOPE).build()
 }
 
 /// An OTLP/HTTP (protobuf) span exporter. `/v1/traces` is appended to `endpoint` unless present,
 /// so `http://127.0.0.1:4318` works.
 pub fn otlp_http_exporter(endpoint: &str) -> Result<HttpExporter, Error> {
+    HttpExporter::new(traces_url(endpoint), None)
+}
+
+fn traces_url(endpoint: &str) -> String {
     let base = endpoint.trim_end_matches('/');
-    let url = if base.ends_with("/v1/traces") {
+    if base.ends_with("/v1/traces") {
         base.to_owned()
     } else {
         format!("{base}/v1/traces")
-    };
-    HttpExporter::new(url)
+    }
 }
 
-/// Exports `block` to an OTLP/HTTP endpoint. See [`export_block`].
+/// Exports `block` to an OTLP/HTTP endpoint once. See [`OtlpSender::send`].
 pub fn export_otlp(block: &AnnotatedBlock, endpoint: &str, timing: Timing) -> Result<usize, Error> {
-    let exporter = otlp_http_exporter(endpoint)?;
-    let rejections = exporter.rejections.clone();
-    let result = export_block(exporter, block, timing);
-    let rejections = rejections
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    if rejections.rejected > 0 {
-        return Err(Error::Rejected {
-            rejected: rejections.rejected,
-            total: span_count(block),
-            message: rejections.message.clone(),
-        });
+    OtlpSender::new(endpoint)?.send(&mut prepare(block, timing))
+}
+
+/// One block's spans, built once so that every export attempt sends the same span IDs.
+#[derive(Debug)]
+pub struct PreparedTrace {
+    // Batches the receiver has not accepted yet, in order.
+    batches: std::collections::VecDeque<Vec<SpanData>>,
+    total: usize,
+    rejected: u64,
+    message: String,
+}
+
+impl PreparedTrace {
+    /// Spans in the trace.
+    pub fn total(&self) -> usize {
+        self.total
     }
-    result
+    /// Spans not yet accepted by the receiver.
+    pub fn unsent(&self) -> usize {
+        self.batches.iter().map(Vec::len).sum()
+    }
+}
+
+/// Builds the spans of `block` without sending them.
+pub fn prepare(block: &AnnotatedBlock, timing: Timing) -> PreparedTrace {
+    let spans = Arc::new(Mutex::new(Vec::new()));
+    let provider = builder()
+        .with_simple_exporter(Collect(spans.clone()))
+        .build();
+    record_block(&provider.tracer(SCOPE), block, timing);
+    let _ = provider.shutdown();
+    let spans = std::mem::take(&mut *spans.lock().unwrap_or_else(PoisonError::into_inner));
+    let total = spans.len();
+    let mut batches = std::collections::VecDeque::new();
+    let mut spans = spans.into_iter().peekable();
+    while spans.peek().is_some() {
+        batches.push_back(spans.by_ref().take(BATCH_SPANS).collect());
+    }
+    PreparedTrace {
+        batches,
+        total,
+        rejected: 0,
+        message: String::new(),
+    }
+}
+
+/// Keeps finished spans in memory.
+#[derive(Debug)]
+struct Collect(Arc<Mutex<Vec<SpanData>>>);
+
+impl SpanExporter for Collect {
+    async fn export(&self, batch: Vec<SpanData>) -> opentelemetry_sdk::error::OTelSdkResult {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .extend(batch);
+        Ok(())
+    }
+}
+
+/// Sends [`PreparedTrace`]s over OTLP/HTTP, one request at a time, on the calling thread.
+#[derive(Debug)]
+pub struct OtlpSender {
+    exporter: HttpExporter,
+}
+
+impl OtlpSender {
+    /// A sender for `endpoint`, with the timeout from the standard OpenTelemetry variables.
+    pub fn new(endpoint: &str) -> Result<Self, Error> {
+        Self::build(endpoint, None)
+    }
+
+    /// A sender that waits at most `timeout` for each request.
+    pub fn with_timeout(endpoint: &str, timeout: Duration) -> Result<Self, Error> {
+        Self::build(endpoint, Some(timeout))
+    }
+
+    fn build(endpoint: &str, timeout: Option<Duration>) -> Result<Self, Error> {
+        let mut exporter = HttpExporter::new(traces_url(endpoint), timeout)?;
+        exporter.set_resource(&resource());
+        Ok(Self { exporter })
+    }
+
+    /// Sends the batches of `trace` that the receiver has not accepted yet, and stops at the
+    /// first failure. An accepted batch is never sent again, so calling this again after
+    /// [`Error::Incomplete`] retries only the rest. No request is still running when it
+    /// returns.
+    ///
+    /// Returns the number of spans once every batch was accepted, or [`Error::Rejected`] if
+    /// the receiver refused some spans of an accepted batch. Those are not sent again.
+    pub fn send(&self, trace: &mut PreparedTrace) -> Result<usize, Error> {
+        while let Some(batch) = trace.batches.front() {
+            match self.exporter.send(batch.clone()) {
+                Ok((rejected, message)) => {
+                    trace.batches.pop_front();
+                    if rejected > 0 && trace.rejected == 0 {
+                        trace.message = message;
+                    }
+                    trace.rejected += rejected;
+                }
+                Err(error) => {
+                    return Err(Error::Incomplete {
+                        lost: trace.unsent(),
+                        total: trace.total,
+                        first_error: Some(error.to_string()),
+                    });
+                }
+            }
+        }
+        if trace.rejected > 0 {
+            return Err(Error::Rejected {
+                rejected: trace.rejected,
+                total: trace.total,
+                message: trace.message.clone(),
+            });
+        }
+        Ok(trace.total)
+    }
 }
 
 /// Exports `block` through `exporter` and waits until every span was handed over. Returns the

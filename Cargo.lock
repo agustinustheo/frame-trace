@@ -2084,6 +2084,7 @@ dependencies = [
  "frame-trace-decode",
  "frame-trace-model",
  "frame-trace-replay",
+ "futures-executor",
  "opentelemetry",
  "opentelemetry-http",
  "opentelemetry-otlp",

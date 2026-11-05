@@ -249,6 +249,111 @@ fn exports_thousands_of_ops_without_drops() {
     assert_eq!(exported.unwrap(), 5002);
 }
 
+/// An OTLP/HTTP receiver that answers each request with the next `(status, delay)` and
+/// records the status and span IDs of every request it answered.
+type Seen = std::sync::Arc<std::sync::Mutex<Vec<(u16, Vec<Vec<u8>>)>>>;
+fn scripted_receiver(script: Vec<(u16, Duration)>) -> (String, Seen) {
+    use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
+    use prost::Message;
+    use std::io::{BufRead, BufReader, Read, Write};
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let log = seen.clone();
+    std::thread::spawn(move || {
+        for (index, stream) in listener.incoming().enumerate() {
+            let Ok(mut stream) = stream else { return };
+            let (status, delay) = script.get(index).copied().unwrap_or((200, Duration::ZERO));
+            let log = log.clone();
+            std::thread::spawn(move || {
+                let mut reader = BufReader::new(stream.try_clone().unwrap());
+                let mut length = 0;
+                loop {
+                    let mut line = String::new();
+                    if reader.read_line(&mut line).unwrap_or(0) == 0 || line == "\r\n" {
+                        break;
+                    }
+                    if let Some(v) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+                        length = v.trim().parse().unwrap_or(0);
+                    }
+                }
+                let mut body = vec![0; length];
+                if reader.read_exact(&mut body).is_err() {
+                    return;
+                }
+                let ids = ExportTraceServiceRequest::decode(body.as_slice())
+                    .unwrap()
+                    .resource_spans
+                    .iter()
+                    .flat_map(|r| &r.scope_spans)
+                    .flat_map(|s| &s.spans)
+                    .map(|span| span.span_id.clone())
+                    .collect();
+                std::thread::sleep(delay);
+                let _ = write!(
+                    stream,
+                    "HTTP/1.1 {status} Test\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"
+                );
+                log.lock().unwrap().push((status, ids));
+            });
+        }
+    });
+    (url, seen)
+}
+
+#[test]
+fn a_retry_sends_only_the_batches_not_yet_accepted_with_the_same_span_ids() {
+    // 1002 spans: batch 1 is accepted, batch 2 fails, then the retry sends only batch 2.
+    let (url, seen) = scripted_receiver(vec![
+        (200, Duration::ZERO),
+        // Not one the exporter retries by itself, so the failure reaches the caller.
+        (400, Duration::ZERO),
+        (200, Duration::ZERO),
+    ]);
+    let sender = frame_trace_otel::OtlpSender::new(&url).unwrap();
+    let mut trace = frame_trace_otel::prepare(&synthetic_block(1000), Timing::default());
+    let error = sender.send(&mut trace).unwrap_err().to_string();
+    assert!(
+        error.starts_with("490 of 1002 spans were not exported"),
+        "{error}"
+    );
+    assert_eq!(trace.unsent(), 490);
+    assert_eq!(sender.send(&mut trace).unwrap(), 1002);
+    std::thread::sleep(Duration::from_millis(200));
+    let seen = seen.lock().unwrap();
+    assert_eq!(seen.len(), 3);
+    assert_eq!(
+        seen[1].1, seen[2].1,
+        "the retry resends the failed batch unchanged"
+    );
+    let accepted: Vec<_> = seen
+        .iter()
+        .filter(|(status, _)| *status == 200)
+        .flat_map(|(_, ids)| ids.clone())
+        .collect();
+    let unique: std::collections::BTreeSet<_> = accepted.iter().collect();
+    assert_eq!(accepted.len(), 1002);
+    assert_eq!(unique.len(), 1002, "no span was accepted twice");
+}
+
+#[test]
+fn a_timed_out_request_is_not_sent_again_after_the_retry() {
+    let (url, seen) = scripted_receiver(vec![(200, Duration::from_secs(2))]);
+    let sender =
+        frame_trace_otel::OtlpSender::with_timeout(&url, Duration::from_millis(300)).unwrap();
+    let mut trace = frame_trace_otel::prepare(&synthetic_block(10), Timing::default());
+    assert!(
+        sender.send(&mut trace).is_err(),
+        "the first request times out"
+    );
+    assert_eq!(sender.send(&mut trace).unwrap(), 12);
+    // Give a stray background export time to land, as the old batch exporter's did.
+    std::thread::sleep(Duration::from_secs(3));
+    let seen = seen.lock().unwrap();
+    assert_eq!(seen.len(), 2, "exactly the timed-out request and the retry");
+    assert_eq!(seen[0].1, seen[1].1, "the retry carries the same span IDs");
+}
+
 #[test]
 fn otlp_partial_rejections_are_totalled_across_batches_without_retries() {
     use std::{

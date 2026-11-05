@@ -32,18 +32,20 @@ pub struct HttpExporter {
 }
 
 impl HttpExporter {
-    pub(crate) fn new(endpoint: String) -> Result<Self, crate::Error> {
+    pub(crate) fn new(endpoint: String, timeout: Option<Duration>) -> Result<Self, crate::Error> {
         // Match the upstream client's timeout resolution, including invalid-value fallback.
-        let timeout = [
-            "OTEL_EXPORTER_OTLP_TRACES_TIMEOUT",
-            "OTEL_EXPORTER_OTLP_TIMEOUT",
-        ]
-        .into_iter()
-        .find_map(|name| std::env::var(name).ok()?.parse().ok())
-        .map_or(
-            opentelemetry_otlp::OTEL_EXPORTER_OTLP_TIMEOUT_DEFAULT,
-            Duration::from_millis,
-        );
+        let timeout = timeout.unwrap_or_else(|| {
+            [
+                "OTEL_EXPORTER_OTLP_TRACES_TIMEOUT",
+                "OTEL_EXPORTER_OTLP_TIMEOUT",
+            ]
+            .into_iter()
+            .find_map(|name| std::env::var(name).ok()?.parse().ok())
+            .map_or(
+                opentelemetry_otlp::OTEL_EXPORTER_OTLP_TIMEOUT_DEFAULT,
+                Duration::from_millis,
+            )
+        });
         // Like upstream, build the blocking client outside any caller's async runtime.
         let client = std::thread::Builder::new()
             .spawn(move || {
@@ -68,6 +70,24 @@ impl HttpExporter {
             })
             .build()?;
         Ok(Self { inner, rejections })
+    }
+}
+
+impl HttpExporter {
+    /// Sends one batch on this thread and returns how many of its spans the receiver rejected,
+    /// with the receiver's first rejection message. Nothing is left running when it returns.
+    pub(crate) fn send(&self, batch: Vec<SpanData>) -> Result<(u64, String), OTelSdkError> {
+        let before = self
+            .rejections
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .rejected;
+        futures_executor::block_on(self.inner.export(batch))?;
+        let rejections = self
+            .rejections
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        Ok((rejections.rejected - before, rejections.message.clone()))
     }
 }
 
