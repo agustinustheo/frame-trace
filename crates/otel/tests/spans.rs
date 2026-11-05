@@ -434,31 +434,52 @@ fn the_exporters_own_retries_stay_within_the_timeout() {
     assert!(sender.send(&mut trace).is_err());
     let took = start.elapsed();
     assert!(took < Duration::from_millis(1000), "{took:?}");
+    // The same bound on the public span exporter path, with a fresh receiver.
+    let url = raw_receiver(|index, stream| {
+        if index == 0 {
+            std::thread::sleep(Duration::from_millis(500));
+            let _ = stream.write_all(
+                b"HTTP/1.1 503 Service Unavailable\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
+            );
+        } else {
+            std::thread::sleep(Duration::from_secs(10));
+        }
+    });
+    let exporter =
+        frame_trace_otel::otlp_http_exporter_with_timeout(&url, Duration::from_millis(800))
+            .unwrap();
+    let spans = export(&synthetic_block(10), Timing::default());
+    let start = std::time::Instant::now();
+    assert!(futures_executor::block_on(exporter.export(spans)).is_err());
+    let took = start.elapsed();
+    assert!(took < Duration::from_millis(1000), "{took:?}");
 }
 
-#[test]
-fn a_rejection_message_belongs_to_the_trace_it_came_with() {
+/// Answers request `index` with one span rejected: "quota" first, "invalid label" after.
+fn partially_rejecting(index: usize, stream: &mut std::net::TcpStream) {
     use opentelemetry_proto::tonic::collector::trace::v1::{
         ExportTracePartialSuccess, ExportTraceServiceResponse,
     };
     use prost::Message;
     use std::io::Write;
-    let url = raw_receiver(|index, stream| {
-        let body = ExportTraceServiceResponse {
-            partial_success: Some(ExportTracePartialSuccess {
-                rejected_spans: 1,
-                error_message: if index == 0 { "quota" } else { "invalid label" }.into(),
-            }),
-        }
-        .encode_to_vec();
-        let _ = write!(
-            stream,
-            "HTTP/1.1 200 OK\r\ncontent-type: application/x-protobuf\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
-            body.len()
-        );
-        let _ = stream.write_all(&body);
-    });
-    let sender = frame_trace_otel::OtlpSender::new(&url).unwrap();
+    let body = ExportTraceServiceResponse {
+        partial_success: Some(ExportTracePartialSuccess {
+            rejected_spans: 1,
+            error_message: if index == 0 { "quota" } else { "invalid label" }.into(),
+        }),
+    }
+    .encode_to_vec();
+    let _ = write!(
+        stream,
+        "HTTP/1.1 200 OK\r\ncontent-type: application/x-protobuf\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
+        body.len()
+    );
+    let _ = stream.write_all(&body);
+}
+
+#[test]
+fn a_rejection_message_belongs_to_the_trace_it_came_with() {
+    let sender = frame_trace_otel::OtlpSender::new(&raw_receiver(partially_rejecting)).unwrap();
     for message in ["quota", "invalid label"] {
         let mut trace = frame_trace_otel::prepare(&synthetic_block(10), Timing::default());
         let error = sender.send(&mut trace).unwrap_err().to_string();
@@ -467,6 +488,43 @@ fn a_rejection_message_belongs_to_the_trace_it_came_with() {
             format!("1 of 12 spans rejected by the receiver: {message}")
         );
     }
+    // The public span exporter path keeps each batch's own message too.
+    let exporter =
+        frame_trace_otel::otlp_http_exporter(&raw_receiver(partially_rejecting)).unwrap();
+    for message in ["quota", "invalid label"] {
+        let spans = export(&synthetic_block(10), Timing::default());
+        let error = futures_executor::block_on(exporter.export(spans))
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.ends_with(&format!(
+                "1 of 12 spans rejected by the receiver: {message}"
+            )),
+            "{error}"
+        );
+    }
+}
+
+#[test]
+fn senders_and_exporters_work_inside_an_async_runtime() {
+    let (url, seen) = scripted_receiver(Vec::new());
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    runtime.block_on(async {
+        // Built, used and dropped inside the caller's runtime: no nested runtime, no panic.
+        let sender = frame_trace_otel::OtlpSender::new(&url).unwrap();
+        let mut trace = frame_trace_otel::prepare(&synthetic_block(10), Timing::default());
+        assert_eq!(sender.send(&mut trace).unwrap(), 12);
+        drop(sender);
+        let exporter = frame_trace_otel::otlp_http_exporter(&url).unwrap();
+        let spans = export(&synthetic_block(10), Timing::default());
+        exporter.export(spans).await.unwrap();
+        drop(exporter);
+    });
+    drop(runtime);
+    assert_eq!(seen.lock().unwrap().len(), 2);
 }
 
 #[test]
