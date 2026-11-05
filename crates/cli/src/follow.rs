@@ -23,6 +23,83 @@ const EXPORT_QUEUE: usize = 32;
 const FIRST_EXPORT_DELAY: Duration = Duration::from_secs(1);
 const MAX_EXPORT_DELAY: Duration = Duration::from_secs(30);
 const SHUTDOWN_WAIT: Duration = Duration::from_secs(10);
+// How long the summary may wait for earlier lines to reach stderr before `follow` exits.
+const LOG_FLUSH_WAIT: Duration = Duration::from_secs(2);
+
+/// `follow` logs through one writer thread. Writing to stderr blocks when nobody reads it,
+/// for example a full pipe; then only that thread waits. Signals, locks and the stop never
+/// wait for a write. Lines beyond the buffer are dropped and counted.
+mod log {
+    use std::{
+        sync::{
+            OnceLock,
+            atomic::{AtomicU64, AtomicUsize, Ordering},
+            mpsc::{SyncSender, sync_channel},
+        },
+        time::{Duration, Instant},
+    };
+    static SENDER: OnceLock<SyncSender<String>> = OnceLock::new();
+    static DROPPED: AtomicU64 = AtomicU64::new(0);
+    static PENDING: AtomicUsize = AtomicUsize::new(0);
+
+    pub fn start() {
+        let (sender, lines) = sync_channel::<String>(4096);
+        if SENDER.set(sender).is_ok() {
+            let _ = std::thread::Builder::new()
+                .name("log".into())
+                .spawn(move || {
+                    for line in lines {
+                        let dropped = DROPPED.swap(0, Ordering::SeqCst);
+                        if dropped > 0 {
+                            eprintln!(
+                                "follow: {dropped} log line(s) dropped while stderr was blocked"
+                            );
+                        }
+                        eprintln!("{line}");
+                        PENDING.fetch_sub(1, Ordering::SeqCst);
+                    }
+                });
+        }
+    }
+    /// Queues a line without waiting. Before [`start`], as in unit tests, writes it directly.
+    pub fn line(text: String) {
+        let Some(sender) = SENDER.get() else {
+            eprintln!("{text}");
+            return;
+        };
+        PENDING.fetch_add(1, Ordering::SeqCst);
+        if sender.try_send(text).is_err() {
+            PENDING.fetch_sub(1, Ordering::SeqCst);
+            DROPPED.fetch_add(1, Ordering::SeqCst);
+        }
+    }
+    /// Waits up to `timeout` for queued lines to be written.
+    pub fn flush(timeout: Duration) {
+        let deadline = Instant::now() + timeout;
+        while PENDING.load(Ordering::SeqCst) > 0 && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+}
+macro_rules! say {
+    ($($arg:tt)*) => { log::line(format!($($arg)*)) };
+}
+
+/// An error `follow` has already logged; the caller exits 1 without writing it again.
+#[derive(Debug)]
+pub struct Reported;
+impl std::fmt::Display for Reported {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("follow stopped unexpectedly")
+    }
+}
+impl std::error::Error for Reported {}
+
+/// A failure injected by the CLI tests. Debug builds only.
+fn fault(name: &str) -> bool {
+    cfg!(debug_assertions)
+        && std::env::var("FRAME_TRACE_TEST_FAULT").is_ok_and(|value| value == name)
+}
 
 /// Repeated failures of one kind. The first is logged, then at most one line per
 /// [`HEARTBEAT`]. The log time survives recoveries, so a failure that comes and goes cannot
@@ -122,19 +199,25 @@ impl Shared {
         self.state.lock().unwrap_or_else(PoisonError::into_inner)
     }
     /// Counts a replayed block and queues its trace, unless the stop wait is over. `admitted`
-    /// runs under the lock, so the main loop sees its effects before it closes admission.
+    /// runs under the lock, so the main loop sees its effects before it closes admission. It
+    /// must not write to the log; nothing under this lock does.
     fn admit(&self, trace: Option<Trace>, admitted: impl FnOnce()) -> bool {
         let mut state = self.lock();
         if state.closed {
             return false;
         }
         state.traced += 1;
+        let mut dropped = None;
         if let Some(trace) = trace {
             state.waiting.push_back(trace);
-            drop_oldest(&mut state);
+            dropped = drop_oldest(&mut state);
             self.ready.notify_one();
         }
         admitted();
+        drop(state);
+        if let Some(line) = dropped {
+            say!("{line}");
+        }
         true
     }
     fn next(&self) -> Option<Trace> {
@@ -167,11 +250,12 @@ impl Shared {
             let error = match result {
                 Ok(Ok(_)) => {
                     state.exported += 1;
+                    let waiting = state.waiting.len();
+                    drop(state);
                     if let Some((failures, lasted)) = streak.recover() {
-                        eprintln!(
-                            "OTLP export recovered after {failures} failed attempt(s) over {}; {} trace(s) waiting",
-                            duration_text(lasted),
-                            state.waiting.len()
+                        say!(
+                            "OTLP export recovered after {failures} failed attempt(s) over {}; {waiting} trace(s) waiting",
+                            duration_text(lasted)
                         );
                     }
                     continue;
@@ -179,9 +263,11 @@ impl Shared {
                 Ok(Err(error)) => error,
                 Err(_) => {
                     state.failed += 1;
-                    eprintln!(
+                    drop(state);
+                    say!(
                         "OTLP export of block #{} {} panicked; trace dropped",
-                        trace.number, trace.hash
+                        trace.number,
+                        trace.hash
                     );
                     continue;
                 }
@@ -190,27 +276,30 @@ impl Shared {
             // was delivered, so there is nothing left to send.
             if matches!(error, OtelError::Rejected { .. }) {
                 state.rejected += 1;
-                eprintln!(
+                drop(state);
+                say!(
                     "OTLP export of block #{} {} failed: {error}; will not retry",
-                    trace.number, trace.hash
+                    trace.number,
+                    trace.hash
                 );
                 continue;
             }
             let log = streak.fail();
             let delay = streak.delay(FIRST_EXPORT_DELAY, MAX_EXPORT_DELAY);
             state.waiting.push_front(trace);
-            drop_oldest(&mut state);
+            let dropped = drop_oldest(&mut state);
             let waiting = state.waiting.len();
             drop(state);
+            if let Some(line) = dropped {
+                say!("{line}");
+            }
             if draining {
                 // The receiver is still down: trying the rest would only use up the stop wait.
-                eprintln!(
-                    "OTLP export failed during shutdown: {error}; {waiting} trace(s) not sent"
-                );
+                say!("OTLP export failed during shutdown: {error}; {waiting} trace(s) not sent");
                 return;
             }
             if log {
-                eprintln!(
+                say!(
                     "OTLP export failed ({} attempt(s) in a row): {error}; retrying in {}, {waiting} trace(s) waiting",
                     streak.failures,
                     duration_text(delay)
@@ -220,19 +309,23 @@ impl Shared {
         }
     }
 }
-fn drop_oldest(state: &mut Ledger) {
+/// Drops the oldest traces beyond the queue size. Returns the line to log, if one is due,
+/// so the caller can write it after releasing the lock.
+fn drop_oldest(state: &mut Ledger) -> Option<String> {
+    let mut line = None;
     while state.waiting.len() > EXPORT_QUEUE {
         let Some(old) = state.waiting.pop_front() else {
             break;
         };
         state.dropped += 1;
         if state.full.fail() {
-            eprintln!(
+            line = Some(format!(
                 "OTLP export queue full ({EXPORT_QUEUE} traces); dropped the oldest, block #{} {} ({} dropped so far)",
                 old.number, old.hash, state.dropped
-            );
+            ));
         }
     }
+    line
 }
 
 /// Totals since start. The block table only keeps recent blocks, so it cannot count these.
@@ -322,20 +415,20 @@ fn job_outcome(run: impl FnOnce() -> Result<()>) -> Outcome {
         Ok(Ok(())) => Outcome::Passed,
         Ok(Err(error)) => {
             if error.downcast_ref::<Skipped>().is_some() {
-                eprintln!("replay job skipped: {error}");
+                say!("replay job skipped: {error}");
                 return Outcome::Skipped;
             }
             if matches!(
                 error.downcast_ref::<frame_trace_replay::Error>(),
                 Some(frame_trace_replay::Error::Cancelled)
             ) {
-                eprintln!("replay job cancelled");
+                say!("replay job cancelled");
                 return Outcome::Cancelled;
             }
             let retry = error
                 .downcast_ref::<frame_trace_replay::Error>()
                 .is_some_and(|e| e.is_transient());
-            eprintln!(
+            say!(
                 "replay job failed: {error:#}; {}",
                 if retry {
                     "will retry"
@@ -350,7 +443,7 @@ fn job_outcome(run: impl FnOnce() -> Result<()>) -> Outcome {
             }
         }
         Err(_) => {
-            eprintln!("replay job panicked; will not retry");
+            say!("replay job panicked; will not retry");
             Outcome::Terminal
         }
     }
@@ -451,7 +544,7 @@ fn report_reorg(pending: &[(String, u64)], tip: u64, entries: &mut BTreeMap<Stri
     if let Some(fork) = fork {
         for (hash, entry) in entries.iter_mut().filter(|(_, e)| e.number >= fork) {
             if !entry.reverted.swap(true, Ordering::SeqCst) {
-                eprintln!(
+                say!(
                     "reorg: reverted block #{} {hash} (previous state {:?}; previously traced={})",
                     entry.number,
                     entry.state,
@@ -467,6 +560,7 @@ fn report_reorg(pending: &[(String, u64)], tip: u64, entries: &mut BTreeMap<Stri
 
 pub fn run(args: FollowArgs) -> Result<()> {
     let started = Instant::now();
+    log::start();
     // Wasmtime uses Rayon's global pool to compile functions. Using every CPU here retains
     // hundreds of MiB of compiler allocations on macOS, despite network-bound replay.
     // This is a CLI process policy; the replay library does not change its caller's pool.
@@ -479,12 +573,13 @@ pub fn run(args: FollowArgs) -> Result<()> {
     let signal = cancel.clone();
     // Ctrl-C, SIGTERM and SIGHUP all stop gracefully; a second one exits at once.
     ctrlc::set_handler(move || {
+        // Never write before acting: stderr may be blocked.
         if signal.is_cancelled() {
             std::process::exit(130);
         }
-        // Printed here, first: cancelling ends replays waiting on the node at once.
-        eprintln!("follow: stopping (signal again to exit now)");
         signal.cancel();
+        // Queued without waiting, ahead of the lines from replays that the cancel ends.
+        say!("follow: stopping (signal again to exit now)");
     })?;
     let rpc = source::rpc(
         &args.rpc,
@@ -512,7 +607,12 @@ pub fn run(args: FollowArgs) -> Result<()> {
     let mut totals = Totals::default();
     let exporter = sender.map(|sender| {
         let shared = shared.clone();
-        thread::spawn(move || shared.export(|trace| sender.send(trace)))
+        thread::spawn(move || {
+            if fault("export-thread") {
+                panic!("injected export thread failure");
+            }
+            shared.export(|trace| sender.send(trace))
+        })
     });
     let workers: Vec<_> = (0..args.workers)
         .map(|_| {
@@ -524,6 +624,9 @@ pub fn run(args: FollowArgs) -> Result<()> {
             let shared = shared.clone();
             let events = events.clone();
             thread::spawn(move || {
+                if fault("workers") {
+                    return;
+                }
                 while !rpc.cancelled() {
                     let job = match receive.lock() {
                         Ok(rx) => match rx.recv_timeout(Duration::from_millis(100)) {
@@ -565,7 +668,14 @@ pub fn run(args: FollowArgs) -> Result<()> {
                             spans: frame_trace_otel::prepare(&block, Timing::default()),
                         });
                         let admitted = shared.admit(trace, || {
-                            eprintln!(
+                            let _ = events.send(Event::Finished(
+                                job.hash.clone(),
+                                job.reverted.clone(),
+                                Outcome::Passed,
+                            ));
+                        });
+                        if admitted {
+                            say!(
                                 "traced {}{head_kind} block #{} {}: {} storage operations in {:.3}s",
                                 if job.reverted.load(Ordering::SeqCst) {
                                     "reverted "
@@ -577,12 +687,7 @@ pub fn run(args: FollowArgs) -> Result<()> {
                                 block.totals.ops,
                                 elapsed.as_secs_f64()
                             );
-                            let _ = events.send(Event::Finished(
-                                job.hash.clone(),
-                                job.reverted.clone(),
-                                Outcome::Passed,
-                            ));
-                        });
+                        }
                         if !admitted {
                             // Finished after the stop wait; the block counts as cancelled.
                             return Err(frame_trace_replay::Error::Cancelled.into());
@@ -617,7 +722,7 @@ pub fn run(args: FollowArgs) -> Result<()> {
                     finish(entry, &outcome);
                     totals.count(entry.state);
                     if entry.state == State::Terminal {
-                        eprintln!(
+                        say!(
                             "stopped retrying block {hash} after {} attempt(s); no further retries",
                             entry.attempts
                         );
@@ -631,7 +736,7 @@ pub fn run(args: FollowArgs) -> Result<()> {
                        status: &mut (String, Option<Instant>)| {
         let (key, line) = status_line(entries, totals, &shared, otlp);
         if key != status.0 || status.1.is_none_or(|at| at.elapsed() >= HEARTBEAT) {
-            eprintln!("{line} up={}", duration_text(started.elapsed()));
+            say!("{line} up={}", duration_text(started.elapsed()));
             *status = (key, Some(Instant::now()));
         }
     };
@@ -646,7 +751,7 @@ pub fn run(args: FollowArgs) -> Result<()> {
             fatal = Some("the OTLP export thread stopped");
         }
         if let Some(reason) = fatal {
-            eprintln!("follow: {reason}; stopping");
+            say!("follow: {reason}; stopping");
             break;
         }
         let result = (|| -> Result<()> {
@@ -695,7 +800,7 @@ pub fn run(args: FollowArgs) -> Result<()> {
                     Err(mpsc::TrySendError::Full(_)) => {
                         saturated = true;
                         if full.fail() {
-                            eprintln!("follow queue full; sampling near the tip at replay speed");
+                            say!("follow queue full; sampling near the tip at replay speed");
                         }
                         break;
                     }
@@ -709,7 +814,7 @@ pub fn run(args: FollowArgs) -> Result<()> {
                 if entry.state == State::Failed && entry.number < floor.unwrap_or(tip) {
                     entry.state = State::Skipped;
                     totals.skipped += 1;
-                    eprintln!("skipped block {hash}: retry expired behind tip");
+                    say!("skipped block {hash}: retry expired behind tip");
                 }
                 if entry.state == State::Failed
                     && entry.retry_at <= Instant::now()
@@ -722,7 +827,7 @@ pub fn run(args: FollowArgs) -> Result<()> {
                         .is_ok()
                 {
                     entry.state = State::Queued;
-                    eprintln!(
+                    say!(
                         "retrying block {hash} (attempt {}/{MAX_ATTEMPTS})",
                         entry.attempts + 1
                     );
@@ -745,7 +850,7 @@ pub fn run(args: FollowArgs) -> Result<()> {
         match result {
             Ok(()) => {
                 if let Some((failures, lasted)) = poll.recover() {
-                    eprintln!(
+                    say!(
                         "follow poll recovered after {failures} failed attempt(s) over {}",
                         duration_text(lasted)
                     );
@@ -756,9 +861,9 @@ pub fn run(args: FollowArgs) -> Result<()> {
                 if poll.fail() {
                     let delay = duration_text(poll.delay(POLL_INTERVAL, MAX_POLL_DELAY));
                     if poll.failures == 1 {
-                        eprintln!("follow poll failed: {error:#}; retrying in {delay}");
+                        say!("follow poll failed: {error:#}; retrying in {delay}");
                     } else {
-                        eprintln!(
+                        say!(
                             "follow poll still failing after {} attempts over {}: {error:#}; retrying in {delay}",
                             poll.failures,
                             duration_text(poll.since.map_or(Duration::ZERO, |at| at.elapsed()))
@@ -792,7 +897,7 @@ pub fn run(args: FollowArgs) -> Result<()> {
         .filter(|e| e.state == State::InFlight)
         .count();
     if busy > 0 {
-        eprintln!(
+        say!(
             "follow: waiting up to {} for {busy} block(s) still being replayed",
             duration_text(SHUTDOWN_WAIT)
         );
@@ -802,7 +907,7 @@ pub fn run(args: FollowArgs) -> Result<()> {
     // later is counted once, as cancelled.
     shared.lock().closed = true;
     if unfinished != 0 {
-        eprintln!(
+        say!(
             "follow shutdown: {unfinished} of {} worker(s) still replaying after {}; their blocks count as cancelled",
             args.workers,
             duration_text(SHUTDOWN_WAIT)
@@ -815,13 +920,13 @@ pub fn run(args: FollowArgs) -> Result<()> {
         if matches!(entry.state, State::Queued | State::InFlight | State::Failed) {
             entry.state = State::Cancelled;
             totals.cancelled += 1;
-            eprintln!("cancelled block {hash}: follow stopped");
+            say!("cancelled block {hash}: follow stopped");
         }
     }
     if let Some(exporter) = exporter {
         let waiting = shared.lock().waiting.len();
         if waiting > 0 {
-            eprintln!(
+            say!(
                 "follow shutdown: exporting {waiting} waiting trace(s), up to {}",
                 duration_text(SHUTDOWN_WAIT)
             );
@@ -829,7 +934,7 @@ pub fn run(args: FollowArgs) -> Result<()> {
         shared.draining.store(true, Ordering::SeqCst);
         shared.ready.notify_all();
         if join_workers(vec![exporter], SHUTDOWN_WAIT) != 0 {
-            eprintln!("follow shutdown: OTLP export still running; remaining traces not sent");
+            say!("follow shutdown: OTLP export still running; remaining traces not sent");
         }
     }
     // One snapshot: every traced block is in exactly one of the export counts.
@@ -846,7 +951,7 @@ pub fn run(args: FollowArgs) -> Result<()> {
     } else {
         String::new()
     };
-    eprintln!(
+    say!(
         "follow stopped after {}: traced={}{export_summary} stopped={} skipped={} reverted={} cancelled={} poll-failures={}",
         duration_text(started.elapsed()),
         state.traced,
@@ -856,8 +961,12 @@ pub fn run(args: FollowArgs) -> Result<()> {
         totals.cancelled,
         totals.poll_failures
     );
+    if let Some(reason) = fatal {
+        say!("Error: follow stopped because {reason}");
+    }
+    log::flush(LOG_FLUSH_WAIT);
     match fatal {
-        Some(reason) => anyhow::bail!("follow stopped because {reason}"),
+        Some(_) => Err(Reported.into()),
         None => Ok(()),
     }
 }
@@ -1127,6 +1236,40 @@ mod tests {
         let state = shared.lock();
         assert_eq!((state.exported, state.failed, state.sending), (2, 1, 0));
         assert!(state.waiting.is_empty());
+    }
+    #[test]
+    fn closing_admission_while_a_worker_admits_counts_each_block_once() {
+        let shared = Arc::new(Shared::default());
+        let reported = Arc::new(AtomicU64::new(0));
+        let worker = {
+            let (shared, reported) = (shared.clone(), reported.clone());
+            thread::spawn(move || {
+                let mut admitted = 0u64;
+                for number in 0.. {
+                    if !shared.admit(Some(trace(number)), || {
+                        reported.fetch_add(1, Ordering::SeqCst);
+                    }) {
+                        return admitted;
+                    }
+                    admitted += 1;
+                }
+                admitted
+            })
+        };
+        while shared.lock().traced < 50 {
+            thread::yield_now();
+        }
+        shared.lock().closed = true;
+        let admitted = worker.join().unwrap();
+        let state = shared.lock();
+        // Every admitted block was counted and reported exactly once, none after the close.
+        assert_eq!(state.traced, admitted);
+        assert_eq!(reported.load(Ordering::SeqCst), admitted);
+        assert_eq!(
+            state.waiting.len() as u64 + state.dropped,
+            admitted,
+            "each admitted trace is queued or dropped"
+        );
     }
     #[test]
     fn admission_closes_at_the_stop_deadline() {
