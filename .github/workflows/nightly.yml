@@ -1,7 +1,7 @@
 name: Nightly live check
 
-# Replays real blocks from a public Westend Asset Hub node. Failures here can
-# come from the public endpoint as well as from frame-trace.
+# Replays real blocks from public Westend Asset Hub and Westend relay chain nodes.
+# Failures here can come from the public endpoints as well as from frame-trace.
 
 on:
   schedule:
@@ -23,7 +23,7 @@ jobs:
   live:
     name: Public network
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -40,7 +40,13 @@ jobs:
       - name: Cache Cargo build
         uses: Swatinem/rust-cache@v2
 
+      - name: Build tests
+        run: cargo +1.93.0 test --workspace --locked --no-run
+
+      # The three ignored tests replay live blocks; the runtime upgrade test reads
+      # archive state; it took 4 minutes in a local debug build. Endpoints: dev/README.md#live-tests.
       - name: Run ignored public-network tests
+        timeout-minutes: 20
         run: cargo +1.93.0 test --workspace --locked -- --ignored
 
       - name: Build release binary
