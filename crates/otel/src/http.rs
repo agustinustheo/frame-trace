@@ -2,7 +2,7 @@
 
 use std::{
     sync::{Arc, Mutex, PoisonError},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use async_trait::async_trait;
@@ -29,6 +29,9 @@ pub(crate) struct Rejections {
 pub struct HttpExporter {
     inner: opentelemetry_otlp::SpanExporter,
     pub(crate) rejections: Arc<Mutex<Rejections>>,
+    // Ends every request of the batch [`HttpExporter::send`] is sending, retries included.
+    deadline: Arc<Mutex<Option<Instant>>>,
+    timeout: Duration,
 }
 
 impl HttpExporter {
@@ -46,43 +49,57 @@ impl HttpExporter {
                 Duration::from_millis,
             )
         });
-        // Like upstream, build the blocking client outside any caller's async runtime.
-        let client = std::thread::Builder::new()
-            .spawn(move || {
-                reqwest::blocking::Client::builder()
-                    .timeout(timeout)
-                    .build()
-            })
-            .map_err(|e| ExporterBuildError::InternalFailure(e.to_string()))?
-            .join()
-            .map_err(|_| {
-                ExporterBuildError::InternalFailure("HTTP client builder panicked".into())
-            })?
+        let client = reqwest::Client::builder()
+            .timeout(timeout)
+            .build()
+            .map_err(|e| ExporterBuildError::InternalFailure(e.to_string()))?;
+        // Requests run on this small runtime, on the caller's thread, under one deadline.
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
             .map_err(|e| ExporterBuildError::InternalFailure(e.to_string()))?;
         let rejections = Arc::new(Mutex::new(Rejections::default()));
+        let deadline = Arc::new(Mutex::new(None));
         let inner = opentelemetry_otlp::SpanExporter::builder()
             .with_http()
             .with_endpoint(endpoint)
             .with_timeout(timeout)
             .with_http_client(CheckedClient {
                 client,
+                runtime,
+                timeout,
+                deadline: deadline.clone(),
                 rejections: rejections.clone(),
             })
             .build()?;
-        Ok(Self { inner, rejections })
+        Ok(Self {
+            inner,
+            rejections,
+            deadline,
+            timeout,
+        })
     }
 }
 
 impl HttpExporter {
     /// Sends one batch on this thread and returns how many of its spans the receiver rejected,
-    /// with the receiver's first rejection message. Nothing is left running when it returns.
+    /// with the receiver's rejection message for this batch. The exporter's own retries share
+    /// one deadline of the export timeout, which covers connecting, the response and its body.
+    /// Nothing is left running when it returns.
     pub(crate) fn send(&self, batch: Vec<SpanData>) -> Result<(u64, String), OTelSdkError> {
-        let before = self
-            .rejections
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .rejected;
-        futures_executor::block_on(self.inner.export(batch))?;
+        let before = {
+            let mut rejections = self
+                .rejections
+                .lock()
+                .unwrap_or_else(PoisonError::into_inner);
+            rejections.message.clear();
+            rejections.rejected
+        };
+        *self.deadline.lock().unwrap_or_else(PoisonError::into_inner) =
+            Some(Instant::now() + self.timeout);
+        let result = futures_executor::block_on(self.inner.export(batch));
+        *self.deadline.lock().unwrap_or_else(PoisonError::into_inner) = None;
+        result?;
         let rejections = self
             .rejections
             .lock()
@@ -129,14 +146,56 @@ impl SpanExporter for HttpExporter {
 
 #[derive(Debug)]
 struct CheckedClient {
-    client: reqwest::blocking::Client,
+    client: reqwest::Client,
+    runtime: tokio::runtime::Runtime,
+    timeout: Duration,
+    deadline: Arc<Mutex<Option<Instant>>>,
     rejections: Arc<Mutex<Rejections>>,
+}
+
+/// Largest response body read from the receiver.
+const MAX_RESPONSE_BYTES: usize = 4 << 20;
+
+impl CheckedClient {
+    /// One request with an absolute deadline. reqwest's blocking client restarts its timeout
+    /// for every read, so a receiver sending its body slowly could hold it much longer.
+    fn exchange(&self, request: Request<Bytes>) -> Result<Response<Bytes>, HttpError> {
+        let deadline = self
+            .deadline
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .unwrap_or_else(|| Instant::now() + self.timeout);
+        let left = deadline.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return Err("export deadline exceeded".into());
+        }
+        let request = reqwest::Request::try_from(request)?;
+        self.runtime.block_on(async {
+            tokio::time::timeout(left, async {
+                let mut response = self.client.execute(request).await?;
+                let mut builder = Response::builder().status(response.status());
+                for (name, value) in response.headers() {
+                    builder = builder.header(name, value);
+                }
+                let mut body = Vec::new();
+                while let Some(chunk) = response.chunk().await? {
+                    body.extend_from_slice(&chunk);
+                    if body.len() > MAX_RESPONSE_BYTES {
+                        return Err::<_, HttpError>("response body too large".into());
+                    }
+                }
+                Ok(builder.body(Bytes::from(body))?)
+            })
+            .await
+            .unwrap_or_else(|_| Err("export deadline exceeded".into()))
+        })
+    }
 }
 
 #[async_trait]
 impl HttpClient for CheckedClient {
     async fn send_bytes(&self, request: Request<Bytes>) -> Result<Response<Bytes>, HttpError> {
-        let response = self.client.send_bytes(request).await?;
+        let response = self.exchange(request)?;
         if response.status().is_success()
             && let Some(partial) = partial_success(&response)
             && partial.rejected_spans > 0
@@ -145,7 +204,8 @@ impl HttpClient for CheckedClient {
                 .rejections
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner);
-            if rejections.rejected == 0 {
+            // The first message since the batch began; [`HttpExporter::send`] clears it.
+            if rejections.message.is_empty() {
                 rejections.message = partial.error_message;
             }
             rejections.rejected += partial.rejected_spans as u64;

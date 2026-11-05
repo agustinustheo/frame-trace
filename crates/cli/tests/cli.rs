@@ -1195,6 +1195,130 @@ fn follow_retries_only_the_export_while_the_collector_is_down() {
     assert_eq!(accepted.load(Ordering::SeqCst), 1, "{text}");
 }
 
+/// A pipe already full, so that every write to it blocks until the test ends.
+fn full_pipe() -> (std::io::PipeReader, std::io::PipeWriter) {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+    let (reader, writer) = std::io::pipe().unwrap();
+    let mut filler = writer.try_clone().unwrap();
+    let written = Arc::new(AtomicUsize::new(0));
+    let progress = written.clone();
+    std::thread::spawn(move || {
+        while filler.write_all(&[b'x'; 512]).is_ok() {
+            progress.fetch_add(512, Ordering::SeqCst);
+        }
+    });
+    // Full once the filler stops making progress.
+    let mut last = usize::MAX;
+    loop {
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        let now = written.load(Ordering::SeqCst);
+        if now == last && now > 0 {
+            break;
+        }
+        last = now;
+    }
+    (reader, writer)
+}
+
+#[test]
+fn follow_stops_on_signals_while_nobody_reads_its_stderr() {
+    use std::{
+        process::Stdio,
+        time::{Duration, Instant},
+    };
+    for (signals, code) in [(vec!["-TERM"], 0), (vec!["-TERM", "-INT"], 130)] {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("ws://{}", listener.local_addr().unwrap());
+        let (_reader, writer) = full_pipe();
+        let mut child = Child(
+            Command::new(BIN)
+                .args(["follow", "--rpc", &url])
+                .stdout(Stdio::null())
+                .stderr(Stdio::from(writer))
+                .spawn()
+                .unwrap(),
+        );
+        // The first check for new blocks waits on this stalled handshake.
+        let (_stream, _) = listener.accept().unwrap();
+        let start = Instant::now();
+        for signal in &signals {
+            Command::new("kill")
+                .args([*signal, &child.0.id().to_string()])
+                .status()
+                .unwrap();
+        }
+        let status = loop {
+            if let Some(status) = child.0.try_wait().unwrap() {
+                break Some(status);
+            }
+            if start.elapsed() > Duration::from_secs(15) {
+                break None;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        };
+        assert_eq!(
+            status.and_then(|s| s.code()),
+            Some(code),
+            "{signals:?} after {:?}",
+            start.elapsed()
+        );
+    }
+}
+
+#[test]
+fn follow_exits_1_with_a_summary_when_its_threads_die() {
+    use std::{process::Stdio, time::Duration};
+    for (fault, reason) in [
+        ("workers", "all replay workers stopped"),
+        ("export-thread", "the OTLP export thread stopped"),
+    ] {
+        let log = std::env::temp_dir().join(format!(
+            "frame-trace-fault-{fault}-{}.log",
+            std::process::id()
+        ));
+        let mut child = Child(
+            Command::new(BIN)
+                .args([
+                    "follow",
+                    "--rpc",
+                    "ws://127.0.0.1:9",
+                    "--otlp",
+                    "http://127.0.0.1:9",
+                ])
+                .env("FRAME_TRACE_TEST_FAULT", fault)
+                .stdout(Stdio::null())
+                .stderr(std::fs::File::create(&log).unwrap())
+                .spawn()
+                .unwrap(),
+        );
+        let start = std::time::Instant::now();
+        let status = loop {
+            if let Some(status) = child.0.try_wait().unwrap() {
+                break Some(status);
+            }
+            if start.elapsed() > Duration::from_secs(30) {
+                break None;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        };
+        let text = std::fs::read_to_string(&log).unwrap();
+        std::fs::remove_file(log).unwrap();
+        assert_eq!(status.and_then(|s| s.code()), Some(1), "{fault}: {text}");
+        assert!(
+            text.contains(&format!("follow: {reason}; stopping")),
+            "{text}"
+        );
+        assert!(text.contains("follow stopped after "), "{text}");
+        assert!(
+            text.contains(&format!("Error: follow stopped because {reason}")),
+            "{text}"
+        );
+    }
+}
+
 #[test]
 fn rpc_timeout_lets_a_slow_node_answer() {
     let _serial = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
