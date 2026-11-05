@@ -69,6 +69,7 @@ When you stop `follow`, the last line sums up the run.
 It adds `cancelled` and `poll-failures`, the failed checks for new blocks.
 `cancelled` counts blocks that were waiting, waiting on the node, or still running when the stop wait ended.
 With `--otlp`, `export-unsent` counts traces not yet sent when the stop ended.
+If stderr was blocked long enough to lose log lines, the summary ends with `log-dropped`, the number lost.
 
 ## 3. Keep up with the chain
 

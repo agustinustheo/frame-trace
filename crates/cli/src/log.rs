@@ -2,56 +2,123 @@
 //! `follow` therefore queues its lines, and the replay library's, for one writer thread: only
 //! that thread waits. Signals, locks and the stop never wait for a write.
 //!
+//! One policy bounds the queue: at most [`MAX_LINES`] lines and [`MAX_BYTES`] bytes. When it is
+//! full, the oldest line of the least important kind goes. A line never displaces a more
+//! important one; it is dropped instead. Every dropped line is counted. The summary and a fatal
+//! error are the most important kind, so they always find room.
+//!
 //! Before [`start`], as in the other commands, lines go straight to stderr.
 
 use std::{
     collections::VecDeque,
+    io::Write,
     sync::{Condvar, Mutex, MutexGuard, OnceLock, PoisonError},
     time::{Duration, Instant},
 };
 
-/// Lines waiting for the writer. Progress lines beyond `capacity` displace the oldest progress
-/// line, which is counted as dropped. Important lines, such as errors and the summary, are
-/// always kept.
+const MAX_LINES: usize = 4096;
+const MAX_BYTES: usize = 1 << 20;
+// A longer line is cut, so one line cannot fill the byte limit.
+const MAX_LINE_BYTES: usize = 16 << 10;
+
+/// How much a line matters when the queue is full.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Kind {
+    /// Progress: traced blocks, status lines.
+    Progress,
+    /// Failures and warnings.
+    Failure,
+    /// The summary and a fatal error.
+    Final,
+}
+
+struct Line {
+    text: String,
+    kind: Kind,
+    // The same line queued again right after itself.
+    repeats: u64,
+}
+
+/// Lines waiting for the writer.
 pub struct Queue {
     state: Mutex<State>,
     ready: Condvar,
-    capacity: usize,
+    max_lines: usize,
+    max_bytes: usize,
 }
 #[derive(Default)]
 struct State {
-    lines: VecDeque<(String, bool)>,
-    progress: usize,
+    lines: VecDeque<Line>,
+    bytes: usize,
+    // Dropped since the last line written, and in total.
     dropped: u64,
+    total_dropped: u64,
     writing: bool,
+    // The writer could not write; later lines are counted as dropped, not kept.
+    closed: bool,
 }
 impl Queue {
-    pub fn new(capacity: usize) -> Self {
+    pub fn new(max_lines: usize, max_bytes: usize) -> Self {
         Self {
             state: Mutex::default(),
             ready: Condvar::new(),
-            capacity,
+            max_lines,
+            max_bytes,
         }
     }
     fn lock(&self) -> MutexGuard<'_, State> {
         self.state.lock().unwrap_or_else(PoisonError::into_inner)
     }
     /// Queues a line without waiting for the writer.
-    pub fn push(&self, text: String, important: bool) {
-        let mut state = self.lock();
-        if !important && state.progress >= self.capacity {
-            if let Some(oldest) = state.lines.iter().position(|(_, important)| !important) {
-                state.lines.remove(oldest);
-                state.progress -= 1;
+    pub fn push(&self, mut text: String, kind: Kind) {
+        if text.len() > MAX_LINE_BYTES {
+            let mut cut = MAX_LINE_BYTES;
+            while !text.is_char_boundary(cut) {
+                cut -= 1;
             }
-            state.dropped += 1;
+            text.truncate(cut);
+            text.push_str(" [cut]");
         }
-        state.progress += usize::from(!important);
-        state.lines.push_back((text, important));
+        let mut state = self.lock();
+        if state.closed {
+            state.total_dropped += 1;
+            return;
+        }
+        if let Some(last) = state.lines.back_mut()
+            && last.text == text
+            && last.kind == kind
+        {
+            last.repeats += 1;
+            return;
+        }
+        while state.lines.len() >= self.max_lines || state.bytes + text.len() > self.max_bytes {
+            // The oldest line of the least important kind that is not more important than this.
+            let victim = state
+                .lines
+                .iter()
+                .map(|line| line.kind)
+                .min()
+                .filter(|least| *least <= kind)
+                .and_then(|least| state.lines.iter().position(|line| line.kind == least));
+            let Some(victim) = victim.and_then(|at| state.lines.remove(at)) else {
+                state.dropped += 1;
+                state.total_dropped += 1;
+                return;
+            };
+            state.bytes -= victim.text.len();
+            state.dropped += 1 + victim.repeats;
+            state.total_dropped += 1 + victim.repeats;
+        }
+        state.bytes += text.len();
+        state.lines.push_back(Line {
+            text,
+            kind,
+            repeats: 0,
+        });
         self.ready.notify_one();
     }
-    /// The next line, and how many progress lines were dropped before it. Waits up to `wait`.
-    fn pop(&self, wait: Duration) -> Option<(u64, String)> {
+    /// The next line to write, with the lines dropped before it. Waits up to `wait`.
+    fn pop(&self, wait: Duration) -> Option<(u64, Line)> {
         let mut state = self.lock();
         if state.lines.is_empty() {
             state = self
@@ -60,17 +127,53 @@ impl Queue {
                 .unwrap_or_else(PoisonError::into_inner)
                 .0;
         }
-        let (text, important) = state.lines.pop_front()?;
-        state.progress -= usize::from(!important);
+        let line = state.lines.pop_front()?;
+        state.bytes -= line.text.len();
         state.writing = true;
-        Some((std::mem::take(&mut state.dropped), text))
+        Some((std::mem::take(&mut state.dropped), line))
     }
     fn written(&self) {
         self.lock().writing = false;
     }
+    /// The writer cannot write: what is queued is lost, and nothing more is kept.
+    fn close(&self) {
+        let mut state = self.lock();
+        let lost: u64 = state.lines.iter().map(|line| 1 + line.repeats).sum();
+        state.total_dropped += lost + 1;
+        state.lines.clear();
+        state.bytes = 0;
+        state.writing = false;
+        state.closed = true;
+    }
     fn idle(&self) -> bool {
         let state = self.lock();
         state.lines.is_empty() && !state.writing
+    }
+    fn total_dropped(&self) -> u64 {
+        self.lock().total_dropped
+    }
+    /// Writes queued lines to `out` until a write fails. The lock is not held while writing.
+    fn write_all(&self, out: &mut impl Write) {
+        loop {
+            let Some((dropped, line)) = self.pop(Duration::from_secs(1)) else {
+                continue;
+            };
+            let mut text = String::new();
+            if dropped > 0 {
+                text +=
+                    &format!("follow: {dropped} log line(s) dropped while stderr was blocked\n");
+            }
+            text += &line.text;
+            if line.repeats > 0 {
+                text += &format!(" (repeated {} more time(s))", line.repeats);
+            }
+            text.push('\n');
+            if out.write_all(text.as_bytes()).is_err() {
+                self.close();
+                return;
+            }
+            self.written();
+        }
     }
 }
 
@@ -78,31 +181,32 @@ static QUEUE: OnceLock<Queue> = OnceLock::new();
 
 /// Starts the writer thread. Later lines are queued.
 pub fn start() {
-    if QUEUE.set(Queue::new(4096)).is_err() {
+    if QUEUE.set(Queue::new(MAX_LINES, MAX_BYTES)).is_err() {
         return;
     }
-    let _ = std::thread::Builder::new().name("log".into()).spawn(|| {
-        let Some(queue) = QUEUE.get() else { return };
-        loop {
-            let Some((dropped, text)) = queue.pop(Duration::from_secs(1)) else {
-                continue;
-            };
-            // The lock is not held here: this write may block for as long as stderr does.
-            if dropped > 0 {
-                eprintln!("follow: {dropped} log line(s) dropped while stderr was blocked");
-            }
-            eprintln!("{text}");
-            queue.written();
+    let spawned = std::thread::Builder::new().name("log".into()).spawn(|| {
+        if let Some(queue) = QUEUE.get() {
+            queue.write_all(&mut std::io::stderr());
         }
     });
+    if spawned.is_err()
+        && let Some(queue) = QUEUE.get()
+    {
+        queue.close();
+    }
 }
 
-/// Logs a line. `important` lines are never dropped.
-pub fn line(text: String, important: bool) {
+/// Logs a line.
+pub fn line(text: String, kind: Kind) {
     match QUEUE.get() {
-        Some(queue) => queue.push(text, important),
+        Some(queue) => queue.push(text, kind),
         None => eprintln!("{text}"),
     }
+}
+
+/// Lines dropped so far, because the queue was full or stderr failed.
+pub fn dropped() -> u64 {
+    QUEUE.get().map_or(0, Queue::total_dropped)
 }
 
 /// Waits up to `timeout` for queued lines to be written.
@@ -114,42 +218,102 @@ pub fn flush(timeout: Duration) {
     }
 }
 
-/// A progress line: dropped, oldest first, when too many wait.
+/// Progress: the first to go when too many lines wait.
 macro_rules! say {
-    ($($arg:tt)*) => { $crate::log::line(format!($($arg)*), false) };
+    ($($arg:tt)*) => { $crate::log::line(format!($($arg)*), $crate::log::Kind::Progress) };
 }
-/// An error, a stop line or the summary: always kept.
+/// A failure or warning: kept ahead of progress.
 macro_rules! shout {
-    ($($arg:tt)*) => { $crate::log::line(format!($($arg)*), true) };
+    ($($arg:tt)*) => { $crate::log::line(format!($($arg)*), $crate::log::Kind::Failure) };
+}
+/// The summary or a fatal error: kept ahead of everything else.
+macro_rules! last_word {
+    ($($arg:tt)*) => { $crate::log::line(format!($($arg)*), $crate::log::Kind::Final) };
 }
 
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used)]
     use super::*;
-    #[test]
-    fn a_full_queue_drops_old_progress_but_keeps_errors_and_the_summary() {
-        let queue = Queue::new(10);
-        queue.push("error".into(), true);
-        for n in 0..50 {
-            queue.push(format!("progress {n}"), false);
-        }
-        queue.push("summary".into(), true);
-        let mut lines = Vec::new();
+
+    fn drain(queue: &Queue) -> (u64, Vec<String>) {
         let mut dropped = 0;
-        while let Some((before, text)) = queue.pop(Duration::ZERO) {
+        let mut lines = Vec::new();
+        while let Some((before, line)) = queue.pop(Duration::ZERO) {
             dropped += before;
-            lines.push(text);
+            lines.push(line.text);
             queue.written();
         }
-        assert_eq!(dropped, 40);
-        assert_eq!(lines.len(), 12);
-        assert_eq!(lines[0], "error");
+        (dropped, lines)
+    }
+
+    #[test]
+    fn a_full_queue_drops_the_least_important_lines_first_and_counts_them() {
+        let queue = Queue::new(10, MAX_BYTES);
+        queue.push("error 0".into(), Kind::Failure);
+        for n in 0..50 {
+            queue.push(format!("progress {n}"), Kind::Progress);
+        }
+        queue.push("summary".into(), Kind::Final);
+        let (dropped, lines) = drain(&queue);
+        assert_eq!(dropped, 42);
+        assert_eq!(lines.len(), 10);
+        assert_eq!(lines[0], "error 0");
         assert_eq!(
-            lines[1], "progress 40",
+            lines[1], "progress 42",
             "the newest progress lines are kept"
         );
         assert_eq!(lines.last().unwrap(), "summary");
-        assert!(queue.idle());
+    }
+
+    #[test]
+    fn errors_are_bounded_too_and_the_summary_still_fits() {
+        let queue = Queue::new(10, MAX_BYTES);
+        for n in 0..100_000 {
+            queue.push(format!("error {n}"), Kind::Failure);
+        }
+        queue.push("summary".into(), Kind::Final);
+        // Progress cannot push out a failure: it is dropped instead.
+        queue.push("progress".into(), Kind::Progress);
+        let (dropped, lines) = drain(&queue);
+        assert_eq!(lines.len(), 10);
+        assert_eq!(dropped, 100_000 - 9 + 1);
+        assert_eq!(queue.total_dropped(), 100_000 - 9 + 1);
+        assert_eq!(lines[0], "error 99991");
+        assert_eq!(lines.last().unwrap(), "summary");
+    }
+
+    #[test]
+    fn bytes_are_bounded_and_repeats_collapse() {
+        let queue = Queue::new(MAX_LINES, 100);
+        for _ in 0..1000 {
+            queue.push("same failure".into(), Kind::Failure);
+        }
+        queue.push("x".repeat(MAX_LINE_BYTES * 2), Kind::Progress);
+        let state = queue.lock();
+        assert_eq!(state.lines.len(), 1);
+        assert_eq!(state.lines[0].repeats, 999);
+        assert!(state.bytes <= 100);
+        assert_eq!(state.total_dropped, 1, "the long line did not fit");
+    }
+
+    #[test]
+    fn a_failed_write_closes_the_log_and_counts_what_is_lost() {
+        struct Broken;
+        impl Write for Broken {
+            fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+                Err(std::io::ErrorKind::BrokenPipe.into())
+            }
+            fn flush(&mut self) -> std::io::Result<()> {
+                Ok(())
+            }
+        }
+        let queue = Queue::new(10, MAX_BYTES);
+        queue.push("first".into(), Kind::Progress);
+        queue.push("second".into(), Kind::Failure);
+        queue.write_all(&mut Broken);
+        queue.push("third".into(), Kind::Final);
+        assert!(queue.idle(), "nothing is kept or being written");
+        assert_eq!(queue.total_dropped(), 3);
     }
 }
