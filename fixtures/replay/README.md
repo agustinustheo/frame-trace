@@ -161,40 +161,23 @@ in its latest 200 blocks.
 ### How it was recorded
 
 On 2026-11-06 that endpoint took about 35 seconds to return the proof of `:code`
-(5,128,826 hex characters, measured once). frame-trace's RPC client gives each attempt
-`min(deadline / 4, 10 s)`; the CLI's deadline is 30 seconds, so each attempt gets
-7.5 seconds and a call gets 30 seconds overall. The unmodified build failed with
-`state_getReadProof: overall request deadline exceeded`. The recording used a local build
-with this patch on top of the branch's code, reverted afterwards. It changes only the RPC
-time limits; the replay and its checks are unchanged.
-
-```diff
-diff --git a/crates/cli/src/source.rs b/crates/cli/src/source.rs
-index 2527599..12a87d4 100644
---- a/crates/cli/src/source.rs
-+++ b/crates/cli/src/source.rs
-@@ -134,3 +134,3 @@ pub fn load(args: &SourceArgs) -> Result<Loaded> {
-                 args.proof_concurrency as usize,
--                std::time::Duration::from_secs(30),
-+                std::time::Duration::from_secs(400),
-                 Default::default(),
-diff --git a/crates/replay/src/rpc.rs b/crates/replay/src/rpc.rs
-index 15a692b..9ad4bd1 100644
---- a/crates/replay/src/rpc.rs
-+++ b/crates/replay/src/rpc.rs
-@@ -167,3 +167,3 @@ impl Rpc {
-             let request = json!({"jsonrpc":"2.0", "id":id, "method":method, "params":params});
--            let attempt_deadline = (self.inner.deadline / 4).min(Duration::from_secs(10));
-+            let attempt_deadline = (self.inner.deadline / 4).min(Duration::from_secs(120));
-             let response = tokio::time::timeout(attempt_deadline, self.once(&request))
-```
+(5,128,826 hex characters, measured once). `--rpc-timeout` (default 7.5 seconds) is the
+wait for one try; a request gets four tries, so its overall deadline is four times that.
+With the default, the run failed with `state_getReadProof: overall request deadline
+exceeded`. With `--rpc-timeout 120`, each try waits up to 120 seconds and the run passed.
+Only the RPC time limits change; the replay and its checks are the same.
 
 ```sh
 cargo +1.93.0 build --release --locked -p frame-trace
 target/release/frame-trace block --rpc wss://asset-hub-paseo-rpc.n.dwellir.com \
-  --block 15366850 --save <dir> --json <file>
+  --block 15366850 --rpc-timeout 120 --save <dir> --json <file>
 python3 -I fixtures/replay/blobify.py <dir> fixtures/replay/paseo-asset-hub-contract fixtures/replay/blobs 100000
 ```
+
+Run again on 2026-11-06 with this command, the replay passed the root check with 113 RPC
+calls in 58 seconds, and `blobify.py` reproduced the artifact and both blobs byte for byte.
+On 2026-11-07, `blobify.py` without metadata, run on the offline `--save` output, gave the
+same artifact JSON apart from the emptied metadata.
 
 ## Relay chain
 
