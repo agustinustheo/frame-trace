@@ -6,15 +6,12 @@ name: Release
 on:
   push:
     tags: ["v*"]
+  # To re-run by hand, choose the tag (not a branch) under "Use workflow from".
+  # The run then builds and attests the tag's commit.
   workflow_dispatch:
-    inputs:
-      tag:
-        description: Existing tag to release, for example v0.1.0
-        required: true
-        type: string
 
 concurrency:
-  group: release-${{ inputs.tag || github.ref_name }}
+  group: release-${{ github.ref }}
   cancel-in-progress: false
 
 permissions:
@@ -22,7 +19,7 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  TAG: ${{ inputs.tag || github.ref_name }}
+  TAG: ${{ github.ref_name }}
 
 jobs:
   verify:
@@ -31,11 +28,17 @@ jobs:
     timeout-minutes: 60
     outputs:
       version: ${{ steps.version.outputs.version }}
+      sha: ${{ steps.version.outputs.sha }}
     steps:
+      - name: Check the run is for a tag
+        run: |
+          if [ "$GITHUB_REF" != "refs/tags/$TAG" ]; then
+            echo "::error::Run this workflow from a tag, not $GITHUB_REF. Choose the tag under 'Use workflow from'."
+            exit 1
+          fi
+
       - name: Checkout tag
         uses: actions/checkout@v7
-        with:
-          ref: refs/tags/${{ env.TAG }}
 
       - name: Use the runner temp directory
         run: echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
@@ -59,11 +62,19 @@ jobs:
             echo "::error::Tag $TAG does not match the frame-trace version $version in Cargo.toml"
             exit 1
           fi
-          if ! grep -q "^## \[$version\]" CHANGELOG.md; then
-            echo "::error::CHANGELOG.md has no '## [$version]' section"
+          heading="^## \\[${version//./\\.}\\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          if ! grep -Eq "$heading" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md needs a dated heading '## [$version] - YYYY-MM-DD'. Replace 'Unreleased' with the release date."
+            exit 1
+          fi
+          # Provenance is attested for the run's commit, so it must be the tag's commit.
+          sha=$(git rev-parse HEAD)
+          if [ "$sha" != "$GITHUB_SHA" ]; then
+            echo "::error::Tag $TAG points to $sha, but the run is for $GITHUB_SHA"
             exit 1
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
       - name: Check formatting
         run: cargo +1.93.0 fmt --check
@@ -99,7 +110,7 @@ jobs:
       - name: Checkout tag
         uses: actions/checkout@v7
         with:
-          ref: refs/tags/${{ env.TAG }}
+          ref: ${{ needs.verify.outputs.sha }}
 
       - name: Use the runner temp directory
         run: echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
@@ -149,7 +160,7 @@ jobs:
       - name: Checkout tag
         uses: actions/checkout@v7
         with:
-          ref: refs/tags/${{ env.TAG }}
+          ref: ${{ needs.verify.outputs.sha }}
 
       - name: Download packages
         uses: actions/download-artifact@v8
@@ -186,7 +197,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$TAG" --verify-tag --draft \
+          # A version with a suffix, such as 0.2.0-rc.1, is a pre-release.
+          prerelease=""
+          if [[ "$VERSION" == *-* ]]; then
+            prerelease="--prerelease"
+          fi
+          gh release create "$TAG" --verify-tag --draft ${prerelease:+"$prerelease"} \
             --title "frame-trace $VERSION" \
             --notes-file "$RUNNER_TEMP/notes.md" \
             dist/*.tar.gz dist/SHA256SUMS
