@@ -157,7 +157,7 @@ impl Shared {
         admitted();
         drop(state);
         if let Some(line) = dropped {
-            say!("{line}");
+            shout!("{line}");
         }
         true
     }
@@ -205,7 +205,7 @@ impl Shared {
                 Err(_) => {
                     state.failed += 1;
                     drop(state);
-                    say!(
+                    shout!(
                         "OTLP export of block #{} {} panicked; trace dropped",
                         trace.number,
                         trace.hash
@@ -218,7 +218,7 @@ impl Shared {
             if matches!(error, OtelError::Rejected { .. }) {
                 state.rejected += 1;
                 drop(state);
-                say!(
+                shout!(
                     "OTLP export of block #{} {} failed: {error}; will not retry",
                     trace.number,
                     trace.hash
@@ -232,15 +232,15 @@ impl Shared {
             let waiting = state.waiting.len();
             drop(state);
             if let Some(line) = dropped {
-                say!("{line}");
+                shout!("{line}");
             }
             if draining {
                 // The receiver is still down: trying the rest would only use up the stop wait.
-                say!("OTLP export failed during shutdown: {error}; {waiting} trace(s) not sent");
+                shout!("OTLP export failed during shutdown: {error}; {waiting} trace(s) not sent");
                 return;
             }
             if log {
-                say!(
+                shout!(
                     "OTLP export failed ({} attempt(s) in a row): {error}; retrying in {}, {waiting} trace(s) waiting",
                     streak.failures,
                     duration_text(delay)
@@ -369,7 +369,7 @@ fn job_outcome(run: impl FnOnce() -> Result<()>) -> Outcome {
             let retry = error
                 .downcast_ref::<frame_trace_replay::Error>()
                 .is_some_and(|e| e.is_transient());
-            say!(
+            shout!(
                 "replay job failed: {error:#}; {}",
                 if retry {
                     "will retry"
@@ -384,7 +384,7 @@ fn job_outcome(run: impl FnOnce() -> Result<()>) -> Outcome {
             }
         }
         Err(_) => {
-            say!("replay job panicked; will not retry");
+            shout!("replay job panicked; will not retry");
             Outcome::Terminal
         }
     }
@@ -485,7 +485,7 @@ fn report_reorg(pending: &[(String, u64)], tip: u64, entries: &mut BTreeMap<Stri
     if let Some(fork) = fork {
         for (hash, entry) in entries.iter_mut().filter(|(_, e)| e.number >= fork) {
             if !entry.reverted.swap(true, Ordering::SeqCst) {
-                say!(
+                shout!(
                     "reorg: reverted block #{} {hash} (previous state {:?}; previously traced={})",
                     entry.number,
                     entry.state,
@@ -503,11 +503,27 @@ fn report_reorg(pending: &[(String, u64)], tip: u64, entries: &mut BTreeMap<Stri
 /// a blocked stderr cannot keep it from exiting.
 pub fn run(args: FollowArgs) -> Result<()> {
     crate::log::start();
-    frame_trace_replay::set_log_hook(|line| crate::log::line(line, false));
-    std::panic::set_hook(Box::new(|info| shout!("{info}")));
+    frame_trace_replay::set_log_hook(|line| {
+        let kind = if line.starts_with("warning") {
+            crate::log::Kind::Failure
+        } else {
+            crate::log::Kind::Progress
+        };
+        crate::log::line(line, kind)
+    });
+    // Like the default hook, with a backtrace when RUST_BACKTRACE asks for one.
+    std::panic::set_hook(Box::new(|info| {
+        let backtrace = std::backtrace::Backtrace::capture();
+        match backtrace.status() {
+            std::backtrace::BacktraceStatus::Captured => {
+                shout!("{info}\nstack backtrace:\n{backtrace}")
+            }
+            _ => shout!("{info}"),
+        }
+    }));
     let result = follow(args);
     if let Err(error) = &result {
-        shout!("Error: {error:#}");
+        last_word!("Error: {error:#}");
     }
     crate::log::flush(LOG_FLUSH_WAIT);
     result.map_err(|_| Reported.into())
@@ -676,7 +692,7 @@ fn follow(args: FollowArgs) -> Result<()> {
                     finish(entry, &outcome);
                     totals.count(entry.state);
                     if entry.state == State::Terminal {
-                        say!(
+                        shout!(
                             "stopped retrying block {hash} after {} attempt(s); no further retries",
                             entry.attempts
                         );
@@ -705,7 +721,7 @@ fn follow(args: FollowArgs) -> Result<()> {
             fatal = Some("the OTLP export thread stopped");
         }
         if let Some(reason) = fatal {
-            shout!("follow: {reason}; stopping");
+            last_word!("follow: {reason}; stopping");
             break;
         }
         let result = (|| -> Result<()> {
@@ -754,7 +770,7 @@ fn follow(args: FollowArgs) -> Result<()> {
                     Err(mpsc::TrySendError::Full(_)) => {
                         saturated = true;
                         if full.fail() {
-                            say!("follow queue full; sampling near the tip at replay speed");
+                            shout!("follow queue full; sampling near the tip at replay speed");
                         }
                         break;
                     }
@@ -815,9 +831,9 @@ fn follow(args: FollowArgs) -> Result<()> {
                 if poll.fail() {
                     let delay = duration_text(poll.delay(POLL_INTERVAL, MAX_POLL_DELAY));
                     if poll.failures == 1 {
-                        say!("follow poll failed: {error:#}; retrying in {delay}");
+                        shout!("follow poll failed: {error:#}; retrying in {delay}");
                     } else {
-                        say!(
+                        shout!(
                             "follow poll still failing after {} attempts over {}: {error:#}; retrying in {delay}",
                             poll.failures,
                             duration_text(poll.since.map_or(Duration::ZERO, |at| at.elapsed()))
@@ -907,8 +923,13 @@ fn follow(args: FollowArgs) -> Result<()> {
     };
     let traced = state.traced;
     drop(state);
-    shout!(
-        "follow stopped after {}: traced={traced}{export_summary} stopped={} skipped={} reverted={} cancelled={} poll-failures={}",
+    // Shown only when the log lost lines, which stderr may not show by itself.
+    let log_dropped = match crate::log::dropped() {
+        0 => String::new(),
+        dropped => format!(" log-dropped={dropped}"),
+    };
+    last_word!(
+        "follow stopped after {}: traced={traced}{export_summary} stopped={} skipped={} reverted={} cancelled={} poll-failures={}{log_dropped}",
         duration_text(started.elapsed()),
         totals.stopped,
         totals.skipped,

@@ -1362,6 +1362,7 @@ fn follow_exits_1_with_a_summary_when_its_threads_die() {
                     "http://127.0.0.1:9",
                 ])
                 .env("FRAME_TRACE_TEST_FAULT", fault)
+                .env("RUST_BACKTRACE", "1")
                 .stdout(Stdio::null())
                 .stderr(std::fs::File::create(&log).unwrap())
                 .spawn()
@@ -1389,6 +1390,13 @@ fn follow_exits_1_with_a_summary_when_its_threads_die() {
             text.contains(&format!("Error: follow stopped because {reason}")),
             "{text}"
         );
+        if fault == "export-thread" {
+            // The injected panic is logged with its backtrace.
+            assert!(
+                text.contains("injected export thread failure\nstack backtrace:"),
+                "{text}"
+            );
+        }
     }
 }
 
