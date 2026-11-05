@@ -26,17 +26,33 @@ jobs:
   build:
     name: Build mdBook
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Install Rust 1.93.0
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.93.0
 
-      - name: Install mdBook and mdbook-mermaid
-        run: |
-          cargo install mdbook --locked --version 0.4.52
-          cargo install mdbook-mermaid --locked --version 0.16.0
+      # Downloads a prebuilt binary instead of compiling it on every run.
+      - name: Install mdBook
+        uses: taiki-e/install-action@v2
+        with:
+          tool: mdbook@0.4.52
+
+      # mdbook-mermaid 0.16.0 has no prebuilt binary, so build it once and cache it.
+      - name: Cache mdbook-mermaid
+        id: mermaid-cache
+        uses: actions/cache@v6
+        with:
+          path: ~/.cargo/bin/mdbook-mermaid
+          key: mdbook-mermaid-0.16.0-${{ runner.os }}-${{ runner.arch }}
+
+      - name: Build mdbook-mermaid
+        if: steps.mermaid-cache.outputs.cache-hit != 'true'
+        run: cargo +1.93.0 install mdbook-mermaid --locked --version 0.16.0
 
       - name: Build documentation
         run: mdbook build
