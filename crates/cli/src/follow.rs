@@ -482,6 +482,8 @@ pub fn run(args: FollowArgs) -> Result<()> {
         if signal.is_cancelled() {
             std::process::exit(130);
         }
+        // Printed here, first: cancelling ends replays waiting on the node at once.
+        eprintln!("follow: stopping (signal again to exit now)");
         signal.cancel();
     })?;
     let rpc = source::rpc(
@@ -784,17 +786,16 @@ pub fn run(args: FollowArgs) -> Result<()> {
     for event in completed.try_iter() {
         process(event, &mut entries, &mut totals);
     }
+    // Replays waiting on the node have ended; these are still running on the CPU.
     let busy = entries
         .values()
         .filter(|e| e.state == State::InFlight)
         .count();
     if busy > 0 {
         eprintln!(
-            "follow: stopping; waiting up to {} for {busy} block(s) being replayed (signal again to exit now)",
+            "follow: waiting up to {} for {busy} block(s) still being replayed",
             duration_text(SHUTDOWN_WAIT)
         );
-    } else {
-        eprintln!("follow: stopping (signal again to exit now)");
     }
     let unfinished = join_workers(workers, SHUTDOWN_WAIT);
     // Close admission, then collect everything admitted before it: a replay that finishes
