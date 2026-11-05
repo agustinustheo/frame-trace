@@ -107,19 +107,29 @@ artifacts that still lack execution dependencies; output labels it unauthenticat
 Its parent, #18,985,169 (`0xd0e2fe81…ce55b`), enacted spec 1025003 -> 1025004: the
 `ParachainSystem.set_validation_data` inherent wrote the new `:code`. #18,985,170 is the
 first block executed with the new code; its initialization writes
-`System::LastRuntimeUpgrade`. Root check PASS, 184 RPC calls, 237,816 execution-proof bytes.
+`System::LastRuntimeUpgrade`. The recording run on 2026-11-06 measured root check PASS,
+184 RPC calls and 237,816 execution-proof bytes; RPC counts depend on the endpoint and
+the run.
 The new runtime (`c7a91f4a…`, 2,716,830 bytes compressed) and its V16 metadata
 (`d678e714…`) are blobs.
 
 The enactment block itself is not committed. It needs both runtimes, the old one as
 `:code` and the new one as `ParachainSystem::PendingValidationCode`. The pending value
-carries a 4-byte length prefix, so it cannot share the `:code` blob. Together that adds
-about 5.3 MB. The ignored live test `runtime_upgrade_enactment_and_next_block_live`
+carries a 4-byte length prefix, so it cannot share the `:code` blob. Saved on 2026-11-06
+and converted with `blobify.py`, the two runtime blobs plus metadata measured about
+5.3 MB (the self-contained `--save` directory was 5.8 MB). The ignored live test `runtime_upgrade_enactment_and_next_block_live`
 replays both blocks from an archive endpoint instead (`FRAME_TRACE_WESTEND_AH_RPC`).
 
-Fixture blobs were made from the `--save` output by moving every hex value of at least
-100,000 bytes into `blobs/<blake2-256>.zst` (`zstd -19`) and writing `blob:<hash>` in its
-place; the artifact itself is recompressed with `zstd -19`.
+Fixture blobs were made from the `--save` output with [`blobify.py`](blobify.py): every
+hex value of at least 100,000 bytes moves into `blobs/<blake2-256>.zst` (`zstd -19`) and
+is replaced by `blob:<hash>`; the artifact itself is recompressed with `zstd -19`. Running
+it again on `block --offline paseo-asset-hub-contract --save <dir>` reproduces that
+fixture's blobs byte for byte and the same artifact JSON.
+
+```sh
+frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block 18985170 --save <dir>
+python3 -I fixtures/replay/blobify.py <dir> fixtures/replay/westend-asset-hub-after-upgrade fixtures/replay/blobs 100000
+```
 
 ## Child trie fixture
 
@@ -131,14 +141,52 @@ Extrinsic 2 is a `Revive.eth_transact` to contract
 `0x5936d008…b2ec`, found with `eth_getBlockTransactionCountByNumber` on
 `https://eth-rpc-testnet.polkadot.io`). pallet-revive stores the contract's storage in
 default child trie `0xefdd7b91…5a2d`, the trie id in its `Revive::AccountInfoOf` entry.
-The call makes 14 child trie reads and 4 child trie writes. Root check PASS, 113 RPC calls,
-101,420 execution-proof bytes. The runtime (`d85bfdb1…`) and V16 metadata (`25dcaa7e…`)
-are blobs.
+The call makes 14 child trie reads and 4 child trie writes. The recording run on
+2026-11-06 measured root check PASS, 113 RPC calls and 101,420 execution-proof bytes. The
+runtime (`d85bfdb1…`) and V16 metadata (`25dcaa7e…`) are blobs.
 
-That endpoint took about 35 seconds to return the `:code` proof, longer than
-frame-trace's 10-second per-attempt RPC limit. The recording used a local build with
-longer limits; the replay itself is unchanged. Westend Asset Hub had one Ethereum
-transaction (#19,008,649) in the 40,000 blocks before #19,021,000.
+Paseo Asset Hub was used because Westend Asset Hub has almost no contract activity: on
+2026-11-06 a scan of the 40,000 blocks before #19,021,000 through Westend Asset Hub's
+Ethereum RPC found one Ethereum transaction (#19,008,649). The same scan on Paseo found 13
+in its latest 200 blocks.
+
+### How it was recorded
+
+On 2026-11-06 that endpoint took about 35 seconds to return the proof of `:code`
+(5,128,826 hex characters, measured once). frame-trace's RPC client gives each attempt
+`min(deadline / 4, 10 s)`; the CLI's deadline is 30 seconds, so each attempt gets
+7.5 seconds and a call gets 30 seconds overall. The unmodified build failed with
+`state_getReadProof: overall request deadline exceeded`. The recording used a local build
+with this patch on top of the branch's code, reverted afterwards. It changes only the RPC
+time limits; the replay and its checks are unchanged.
+
+```diff
+diff --git a/crates/cli/src/source.rs b/crates/cli/src/source.rs
+index 2527599..12a87d4 100644
+--- a/crates/cli/src/source.rs
++++ b/crates/cli/src/source.rs
+@@ -134,3 +134,3 @@ pub fn load(args: &SourceArgs) -> Result<Loaded> {
+                 args.proof_concurrency as usize,
+-                std::time::Duration::from_secs(30),
++                std::time::Duration::from_secs(400),
+                 Default::default(),
+diff --git a/crates/replay/src/rpc.rs b/crates/replay/src/rpc.rs
+index 15a692b..9ad4bd1 100644
+--- a/crates/replay/src/rpc.rs
++++ b/crates/replay/src/rpc.rs
+@@ -167,3 +167,3 @@ impl Rpc {
+             let request = json!({"jsonrpc":"2.0", "id":id, "method":method, "params":params});
+-            let attempt_deadline = (self.inner.deadline / 4).min(Duration::from_secs(10));
++            let attempt_deadline = (self.inner.deadline / 4).min(Duration::from_secs(120));
+             let response = tokio::time::timeout(attempt_deadline, self.once(&request))
+```
+
+```sh
+cargo +1.93.0 build --release --locked -p frame-trace
+target/release/frame-trace block --rpc wss://asset-hub-paseo-rpc.n.dwellir.com \
+  --block 15366850 --save <dir> --json <file>
+python3 -I fixtures/replay/blobify.py <dir> fixtures/replay/paseo-asset-hub-contract fixtures/replay/blobs 100000
+```
 
 ## Relay chain fixture
 
@@ -146,8 +194,14 @@ transaction (#19,008,649) in the 40,000 blocks before #19,021,000.
 (`0xa7ab2bf3de7abcdc97740fc6a1187288e61490f174f4146a9a0b05e81596ff07`), recorded
 2026-11-06 from `wss://westend-rpc.polkadot.io` with `block --save`. The relay runtime
 imports only the standard Substrate host functions. Extrinsic 1 is
-`ParaInherent.enter`; it reads `Paras::Heads` 14 times and writes it 11 times. Root
-check PASS, 309 RPC calls in 293 proof request rounds, 107,322 execution-proof bytes.
+`ParaInherent.enter`; it reads `Paras::Heads` 14 times and writes it 11 times. The
+recording run on 2026-11-06 measured root check PASS, 309 RPC calls in 293 proof request
+rounds and 107,322 execution-proof bytes.
 The runtime (`b5723ec5…`, 1,552,297 bytes compressed) and V16 metadata (`6e63addd…`) are
 blobs. The ignored live test `public_relay_network` replays the finalized block from
 `FRAME_TRACE_WESTEND_RPC` (default `wss://westend-rpc.polkadot.io`).
+
+```sh
+frame-trace block --rpc wss://westend-rpc.polkadot.io --block 33614892 --save <dir>
+python3 -I fixtures/replay/blobify.py <dir> fixtures/replay/westend-relay fixtures/replay/blobs 100000
+```
