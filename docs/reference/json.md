@@ -53,7 +53,7 @@ Top-level fields:
 
 | Field | Meaning |
 | --- | --- |
-| `kind` | `initialization`, `apply_extrinsic`, `post_inherents` or `finalization`. |
+| `kind` | `initialization`, `apply_extrinsic`, `post_inherents`, `finalization` or `unsegmented`. `unsegmented` is the one phase of a runtime API call, or of a block without phase markers. |
 | `label` | The name in tables and Jaeger, such as `extrinsic 2: Utility.batch`. |
 | `extrinsic_index`, `call`, `signed` | For extrinsics: the index, `Pallet.call`, and whether it was signed. |
 | `call_error` | Why frame-trace could not decode the extrinsic's call name, otherwise `null`. It says nothing about whether the extrinsic succeeded. |

@@ -72,10 +72,10 @@ The [documentation](https://agustinustheodorus.com/frame-trace/) has a [glossary
 
 - Rust 1.93.0. `rust-toolchain.toml` pins it and `rustup` installs it.
 - The RPC URL of a node for the chain. For old blocks, the node must keep their state, so use an archive node.
-- A Polkadot SDK chain with Blake2 headers and `u32` block numbers. Decoded names need metadata V14 or newer.
+- A Polkadot SDK chain with Blake2 headers and `u32` block numbers. Decoded names need metadata V14, V15 or V16.
 - Docker, or any trace viewer that accepts OTLP over HTTP. JSON output needs neither.
 
-The full list of supported chains, node methods and host functions is in [What frame-trace supports](docs/reference/support.md).
+[What frame-trace supports](docs/reference/support.md) lists the chain requirements, the RPC methods frame-trace sends, the host functions and the tested chains.
 
 ## Contributing
 

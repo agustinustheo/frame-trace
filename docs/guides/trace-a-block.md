@@ -76,7 +76,7 @@ Defaults and limits are in [Commands and flags](../reference/commands.md).
 
 frame-trace decodes keys such as `System::Account(5Grw…)` using the runtime's own metadata.
 It gets the metadata by running the runtime's metadata API on your machine, checked like any other state.
-Runtimes need metadata V14 or newer.
+Runtimes need metadata V14, V15 or V16, see [What frame-trace supports](../reference/support.md).
 If that fails, frame-trace prints a notice and shows raw keys and hex values.
 `--unauthenticated-metadata` lets it fall back to the node's `state_getMetadata` instead.
 That metadata is not checked, and the output says so.
