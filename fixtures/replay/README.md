@@ -135,3 +135,14 @@ That endpoint took about 35 seconds to return the `:code` proof, longer than
 frame-trace's 10-second per-attempt RPC limit. The recording used a local build with
 longer limits; the replay itself is unchanged. Westend Asset Hub had one Ethereum
 transaction (#19,008,649) in the 40,000 blocks before #19,021,000.
+
+## Relay chain
+
+No relay chain block is committed. Westend relay chain #33,614,892
+(`0xa7ab2bf3de7abcdc97740fc6a1187288e61490f174f4146a9a0b05e81596ff07`) passed the root
+check; its runtime blob alone is 1,552,297 bytes compressed, and the runtime's `:code` is
+already zstd-compressed by the SDK, so recompressing it saves nothing. The ignored live test
+`public_relay_network` replays the finalized block from `FRAME_TRACE_WESTEND_RPC` (default
+`wss://westend-rpc.polkadot.io`). It checks the root, that no call fails to decode, that the
+first extrinsics are `Timestamp.set` and `ParaInherent.enter`, and that `ParaInherent.enter`
+writes `ParaInherent::OnChainVotes`.

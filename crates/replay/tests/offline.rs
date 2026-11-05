@@ -227,13 +227,50 @@ fn artifact_round_trip_and_version_rejection() {
             .contains("unsupported artifact version")
     );
 }
+/// A public endpoint, overridable for CI: `FRAME_TRACE_WESTEND_AH_RPC`, `FRAME_TRACE_WESTEND_RPC`.
+fn endpoint(var: &str, default: &str) -> String {
+    std::env::var(var).unwrap_or_else(|_| default.into())
+}
 #[test]
-#[ignore = "requires public network and recent parent state"]
+#[ignore = "requires public network and recent parent state (FRAME_TRACE_WESTEND_AH_RPC)"]
 fn public_network() {
-    let rpc = frame_trace_replay::rpc::Rpc::new("wss://westend-asset-hub-rpc.polkadot.io").unwrap();
+    let url = endpoint(
+        "FRAME_TRACE_WESTEND_AH_RPC",
+        "wss://westend-asset-hub-rpc.polkadot.io",
+    );
+    let rpc = frame_trace_replay::rpc::Rpc::new(&url).unwrap();
     let result = frame_trace_replay::online(&rpc, "best").unwrap();
     assert!(result.root_check);
     assert_eq!(result.measured_rpc_count, 0);
+}
+#[test]
+#[ignore = "requires public network and recent parent state (FRAME_TRACE_WESTEND_RPC)"]
+fn public_relay_network() {
+    let url = endpoint("FRAME_TRACE_WESTEND_RPC", "wss://westend-rpc.polkadot.io");
+    let rpc = frame_trace_replay::rpc::Rpc::new(&url).unwrap();
+    let result = frame_trace_replay::online(&rpc, "finalized").unwrap();
+    assert!(result.root_check);
+    assert_eq!(result.measured_rpc_count, 0);
+    let block = TracedBlock::from_replay(&result.capture).unwrap();
+    let metadata = frame_trace_decode::Metadata::from_hex(&result.artifact.metadata).unwrap();
+    let annotated = frame_trace_decode::annotate(&block, Some(&metadata));
+    assert!(annotated.all_phases().all(|p| p.call_error.is_none()));
+    let labels: Vec<_> = annotated.all_phases().map(|p| p.label.as_str()).collect();
+    assert_eq!(
+        labels[..3],
+        [
+            "initialization",
+            "extrinsic 0: Timestamp.set",
+            "extrinsic 1: ParaInherent.enter",
+        ]
+    );
+    // Every relay block records the on-chain dispute and backing votes.
+    assert!(
+        annotated.phases[2]
+            .ops
+            .iter()
+            .any(|o| o.op == "put" && o.item == "ParaInherent::OnChainVotes")
+    );
 }
 
 #[test]
