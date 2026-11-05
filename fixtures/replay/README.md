@@ -18,6 +18,7 @@ Westend Wasm as raw blob bytes also reduces the original public block artifact.
 | `people-traced` | 4 / `06618995…` | E2 traced People, three-transfer batch | 4,116,156 |
 | `westend-asset-hub` | 18,558,320 / `4c0d1d57…` | Public Westend Asset Hub, two inherents | 275,788 |
 | `westend-asset-hub-after-upgrade` | 18,985,170 / `1ccb4c8c…` | Public Westend Asset Hub, first block on spec 1025004 | 242,461 |
+| `paseo-asset-hub-contract` | 15,366,850 / `e6b71b09…` | Public Paseo Asset Hub, a contract call with child trie reads and writes | 101,226 |
 
 The local `oracle.json.zst` files are E2's independent `state_traceBlock` RPC
 recordings of the exact same blocks. Tests compare the entire ordered keyed
@@ -39,7 +40,8 @@ E1's stable2606-2 People Wasms and public `westmint` spec 1025002. Root tamperin
 is tested after recomputing the header hash, so rejection reaches the runtime's
 actual final root assertion. Missing nodes and changed parent headers also fail.
 Remote child-proof loading is tested separately against SDK-generated child
-proofs served over loopback HTTP; these four chain blocks do not touch child state.
+proofs served over loopback HTTP. `paseo-asset-hub-contract` is the only chain block
+fixture that touches child state.
 
 ## State call fixtures
 
@@ -117,3 +119,22 @@ replays both blocks from an archive endpoint instead (`FRAME_TRACE_WESTEND_AH_RP
 Fixture blobs were made from the `--save` output by moving every hex value of at least
 100,000 bytes into `blobs/<blake2-256>.zst` (`zstd -19`) and writing `blob:<hash>` in its
 place; the artifact itself is recompressed with `zstd -19`.
+
+## Child trie fixture
+
+`paseo-asset-hub-contract` is Paseo Asset Hub #15,366,850
+(`0xe6b71b09271e2dc4ce72ced4f9b7287aa0763e65ddd75e48cf90519693d8e3f5`, spec 2005004),
+recorded 2026-11-06 from `wss://asset-hub-paseo-rpc.n.dwellir.com` with `block --save`.
+Extrinsic 2 is a `Revive.eth_transact` to contract
+`0x0d78e5414aa8c45f40e4c40b0c862ff0486e3262` (Ethereum transaction
+`0x5936d008…b2ec`, found with `eth_getBlockTransactionCountByNumber` on
+`https://eth-rpc-testnet.polkadot.io`). pallet-revive stores the contract's storage in
+default child trie `0xefdd7b91…5a2d`, the trie id in its `Revive::AccountInfoOf` entry.
+The call makes 14 child trie reads and 4 child trie writes. Root check PASS, 113 RPC calls,
+101,420 execution-proof bytes. The runtime (`d85bfdb1…`) and V16 metadata (`25dcaa7e…`)
+are blobs.
+
+That endpoint took about 35 seconds to return the `:code` proof, longer than
+frame-trace's 10-second per-attempt RPC limit. The recording used a local build with
+longer limits; the replay itself is unchanged. Westend Asset Hub had one Ethereum
+transaction (#19,008,649) in the 40,000 blocks before #19,021,000.
