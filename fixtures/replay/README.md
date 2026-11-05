@@ -7,8 +7,8 @@ and complete discovery proof nodes. The shared People/Westend Wasm nodes and met
 once under `blobs/<blake2-256>.zst`; fixture metadata/node strings use `blob:<hash>`.
 The loader bounds decompression and verifies each blob's content hash before
 rehydrating hex. No arbitrary reference paths are accepted. `Artifact::save`
-always writes self-contained artifacts. The seventeen compressed files, including call artifacts, blobs,
-oracles and the public reference, total 11,153,408 bytes (10.63 MiB). Sharing the
+always writes self-contained artifacts. The 19 compressed files, including call artifacts, blobs,
+oracles and the public reference, total 13,818,269 bytes (13.18 MiB). Sharing the
 Westend Wasm as raw blob bytes also reduces the original public block artifact.
 
 | Directory | Block | Source | Artifact bytes |
