@@ -165,7 +165,7 @@ pub(crate) fn load(
             return Err(error);
         }
         Err(error) if session.rpc_metadata_fallback => {
-            eprintln!(
+            note!(
                 "warning: local metadata unavailable ({}); UNAUTHENTICATED METADATA (unverified names from the node or saved replay)",
                 unavailable_reason(&error)
             );
@@ -175,7 +175,7 @@ pub(crate) fn load(
             };
         }
         Err(error) => {
-            eprintln!(
+            note!(
                 "notice: local metadata unavailable ({}); using unnamed storage and hex results",
                 unavailable_reason(&error)
             );
