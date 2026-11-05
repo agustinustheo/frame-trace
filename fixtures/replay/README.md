@@ -19,6 +19,7 @@ Westend Wasm as raw blob bytes also reduces the original public block artifact.
 | `westend-asset-hub` | 18,558,320 / `4c0d1d57…` | Public Westend Asset Hub, two inherents | 275,788 |
 | `westend-asset-hub-after-upgrade` | 18,985,170 / `1ccb4c8c…` | Public Westend Asset Hub, first block on spec 1025004 | 242,461 |
 | `paseo-asset-hub-contract` | 15,366,850 / `e6b71b09…` | Public Paseo Asset Hub, a contract call with child trie reads and writes | 101,226 |
+| `westend-relay` | 33,614,892 / `a7ab2bf3…` | Public Westend relay chain, `ParaInherent.enter` | 90,893 |
 
 The local `oracle.json.zst` files are E2's independent `state_traceBlock` RPC
 recordings of the exact same blocks. Tests compare the entire ordered keyed
@@ -138,3 +139,15 @@ That endpoint took about 35 seconds to return the `:code` proof, longer than
 frame-trace's 10-second per-attempt RPC limit. The recording used a local build with
 longer limits; the replay itself is unchanged. Westend Asset Hub had one Ethereum
 transaction (#19,008,649) in the 40,000 blocks before #19,021,000.
+
+## Relay chain fixture
+
+`westend-relay` is Westend relay chain #33,614,892
+(`0xa7ab2bf3de7abcdc97740fc6a1187288e61490f174f4146a9a0b05e81596ff07`), recorded
+2026-11-06 from `wss://westend-rpc.polkadot.io` with `block --save`. The relay runtime
+imports only the standard Substrate host functions. Extrinsic 1 is
+`ParaInherent.enter`; it reads `Paras::Heads` 14 times and writes it 11 times. Root
+check PASS, 309 RPC calls in 293 proof request rounds, 107,322 execution-proof bytes.
+The runtime (`b5723ec5…`, 1,552,297 bytes compressed) and V16 metadata (`6e63addd…`) are
+blobs. The ignored live test `public_relay_network` replays the finalized block from
+`FRAME_TRACE_WESTEND_RPC` (default `wss://westend-rpc.polkadot.io`).

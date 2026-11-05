@@ -85,6 +85,7 @@ See [Trace a runtime API call](trace-a-runtime-api-call.md#replay-a-call-offline
 | `people-traced` | People chain #4, a `Utility.batch` of three transfers, with a runtime built with tracing. |
 | `westend-asset-hub` | Westend Asset Hub #18,558,320, two required extrinsics. |
 | `westend-asset-hub-after-upgrade` | Westend Asset Hub #18,985,170, the first block after a runtime upgrade. |
+| `westend-relay` | Westend relay chain #33,614,892, with the parachain inherent `ParaInherent.enter`. |
 | `paseo-asset-hub-contract` | Paseo Asset Hub #15,366,850, a smart contract call that reads and writes the contract's child trie. |
 
 The repository's saved blocks share large files through `fixtures/replay/blobs/`.
