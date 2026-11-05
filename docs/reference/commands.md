@@ -152,8 +152,8 @@ frame-trace follow --rpc URL --best
 | Status line | on change, and every 60 s | Printed at once when `retrying`, `stopped`, `skipped`, `reverted`, `export-rejected` or `export-failed` changes. A check for new blocks that waits on the node delays it. |
 | Repeated failure lines | first, then at most once a minute | For failed checks, failed exports and a full queue. A failure that comes back within the minute is not logged again. |
 | Traces waiting for export | 32 | Held while the receiver is down. Each holds all spans of one block in memory. When full, the oldest is dropped. |
-| Spans per export request | 512 | An accepted request is never sent again. A retry sends only the requests not yet accepted. |
-| Wait between export tries | 1 s, doubling to 30 s | Each try can itself take up to the OTLP timeout, because the exporter retries within it. The block is not replayed again. |
+| Spans per export request | 512 | An acknowledged request is never sent again. A retry sends only the others. A lost acknowledgement can deliver the same spans twice. |
+| Wait between export tries | 1 s, doubling to 30 s | Each request of a try, with the exporter's own retries, takes at most the OTLP timeout. The block is not replayed again. |
 | Wait at stop | 10 s for replays, then 10 s for exports | See below. |
 
 `follow` stops on Ctrl-C, `SIGTERM` or `SIGHUP`. `SIGHUP` does not reload anything.
@@ -177,7 +177,7 @@ These standard OpenTelemetry variables change how `--otlp` sends traces.
 | --- | --- | --- |
 | `OTEL_EXPORTER_OTLP_HEADERS` | none | Headers sent with every export, as `key=value` pairs separated by commas. Values are URL-decoded, so write a space as `%20`. |
 | `OTEL_EXPORTER_OTLP_TRACES_HEADERS` | none | The same. Replaces `OTEL_EXPORTER_OTLP_HEADERS` when both are set. |
-| `OTEL_EXPORTER_OTLP_TIMEOUT` | 10000 | How long to wait for the receiver, in milliseconds. |
+| `OTEL_EXPORTER_OTLP_TIMEOUT` | 10000 | Longest time for one export request, in milliseconds. Covers connecting, the whole response and the exporter's own retries. A trace of several requests can take several times this. |
 | `OTEL_EXPORTER_OTLP_TRACES_TIMEOUT` | 10000 | The same. Wins over `OTEL_EXPORTER_OTLP_TIMEOUT`. |
 
 `--otlp` always sets the URL, so `OTEL_EXPORTER_OTLP_ENDPOINT` has no effect.
