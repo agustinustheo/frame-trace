@@ -166,7 +166,7 @@ impl Rpc {
             let id = self.calls.fetch_add(1, Ordering::SeqCst) + 1;
             let request = json!({"jsonrpc":"2.0", "id":id, "method":method, "params":params});
             let attempt_deadline = (self.inner.deadline / 4).min(Duration::from_secs(10));
-            let response = tokio::time::timeout(attempt_deadline, self.once(&request))
+            let response = tokio::time::timeout(attempt_deadline, self.once(&request, id))
                 .await
                 .unwrap_or_else(|_| Err(("attempt deadline exceeded".into(), true)));
             match response {
@@ -236,7 +236,7 @@ impl Rpc {
         ))
         .await;
     }
-    async fn once(&self, request: &Value) -> std::result::Result<Value, (String, bool)> {
+    async fn once(&self, request: &Value, id: usize) -> std::result::Result<Value, (String, bool)> {
         if self.inner.url.starts_with("http") {
             let response = self
                 .inner
@@ -308,8 +308,15 @@ impl Rpc {
         while let Some(message) = socket.next().await {
             match message.map_err(|e| (e.to_string(), true))? {
                 Message::Text(text) => {
-                    let value = serde_json::from_str(&text)
+                    let value: Value = serde_json::from_str(&text)
                         .map_err(|e| (format!("malformed response: {e}"), false))?;
+                    // A frame for another ID (a stray notification or a buggy node) is skipped,
+                    // so it cannot fail this call or leave our answer queued for the next one.
+                    if value.get("id").is_some_and(|got| *got != id)
+                        || value.get("id").is_none() && value.get("method").is_some()
+                    {
+                        continue;
+                    }
                     *slot = Some(socket);
                     return Ok(value);
                 }
@@ -545,6 +552,33 @@ mod tests {
             );
             worker.join().unwrap();
         }
+    }
+    #[test]
+    fn websocket_frames_for_other_ids_are_skipped_and_the_socket_stays_in_step() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("ws://{}", listener.local_addr().unwrap());
+        let worker = thread::spawn(move || {
+            let mut socket = tungstenite::accept(listener.accept().unwrap().0).unwrap();
+            for result in [1, 2] {
+                let request: Value =
+                    serde_json::from_str(socket.read().unwrap().to_text().unwrap()).unwrap();
+                for frame in [
+                    json!({"jsonrpc":"2.0", "id":9999, "result":"stray"}),
+                    json!({"jsonrpc":"2.0", "method":"note", "params":{}}),
+                    json!({"jsonrpc":"2.0", "id":request["id"], "result":result}),
+                ] {
+                    socket
+                        .send(tungstenite::Message::Text(frame.to_string().into()))
+                        .unwrap();
+                }
+            }
+        });
+        let rpc = Rpc::new(&url).unwrap();
+        assert_eq!(rpc.call("chain_getHeader", json!([])).unwrap(), 1);
+        // The same socket is reused; no frame from the first call is left behind.
+        assert_eq!(rpc.call("chain_getHeader", json!([])).unwrap(), 2);
+        assert_eq!(rpc.count(), 2);
+        worker.join().unwrap();
     }
     #[test]
     fn dropped_websocket_connection_reconnects() {
