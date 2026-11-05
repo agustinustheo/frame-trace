@@ -142,6 +142,25 @@ frame-trace follow --rpc URL --best
 | Limit | Value | Meaning |
 | --- | --- | --- |
 | Waiting blocks | 4 × `--workers`, at least 8 | Blocks queued for replay. A block older than this many recent heights is skipped. |
+| Check for new blocks | every 2 s | How often `follow` asks the node for its newest block. |
+| Wait after a failed check | 2 s, doubling to 60 s | Resets after the next check that works. |
+| Attempts per block | 4 | For failures that can pass, such as a timeout. Other failures stop the block at once. |
+| Status line | on change, and every 60 s | Printed at once when `retrying`, `stopped`, `skipped`, `reverted` or `export-rejected` changes. |
+| Repeated failure lines | first, then once a minute | For failed checks, failed exports and a full queue. |
+| Traces waiting for export | 32 | Held while the collector is down. When full, the oldest is dropped. |
+| Wait between export tries | 1 s, doubling to 30 s | The block is not replayed again; only the export is retried. |
+| Wait at stop | 10 s for replays, then 10 s for exports | Replays still running after this are counted as `cancelled`. |
+
+`follow` stops on Ctrl-C, `SIGTERM` or `SIGHUP`.
+It finishes the blocks it is replaying, sends waiting traces, and prints a summary.
+A second signal exits at once.
+
+| Exit code | Meaning |
+| --- | --- |
+| 0 | Stopped by a signal. Failed blocks and exports are counted in the summary, not in the exit code. |
+| 1 | `follow` could not start, for example a malformed `--rpc` URL. |
+| 2 | The command line was wrong. |
+| 130 | A second signal arrived during the stop. |
 
 ## Environment variables
 
