@@ -60,6 +60,13 @@ When the root check fails, frame-trace stops with an error and exports nothing.
 - The block's writes lead to exactly the state root the chain recorded.
   So the list of reads and writes in the trace is complete and in the real order.
 
+## Runtime upgrades
+
+A block always runs with the runtime stored in its parent's state.
+A block that upgrades the runtime runs on the old code and writes the new `:code`.
+The next block is the first to run the new code.
+Storage and extrinsic names in each trace come from the runtime that ran that block.
+
 ## What a pass does not mean
 
 - It does not check consensus.
