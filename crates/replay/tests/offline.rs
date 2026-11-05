@@ -431,3 +431,47 @@ fn concurrent_artifact_saves_are_atomic_and_leave_no_temporary_files() {
     assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
     std::fs::remove_dir_all(dir).unwrap();
 }
+
+/// A runtime that imports a host function frame-trace lacks fails with the function's name,
+/// not as a generic execution failure.
+#[test]
+fn missing_host_function_is_named_through_runtime_override() {
+    let wasm = wat::parse_str(
+        r#"(module
+        (import "env" "ext_frame_trace_missing_version_1" (func))
+        (import "env" "ext_frame_trace_also_missing_version_2" (func (param i32)))
+        (memory (export "memory") 1)
+        (global (export "__heap_base") i32 (i32.const 1024))
+        (func (export "Core_execute_block") (param i32 i32) (result i64) i64.const 0))"#,
+    )
+    .unwrap();
+    let session = frame_trace_replay::ReplaySession::new(None)
+        .unwrap()
+        .with_runtime_override(Some(wasm));
+    let error = frame_trace_replay::replay_with_session(
+        Artifact::load(&fixture("westend-asset-hub")).unwrap(),
+        None,
+        &session,
+    )
+    .unwrap_err();
+    let Error::MissingHostFunctions { functions, hint } = &error else {
+        panic!("{error}");
+    };
+    assert_eq!(
+        functions,
+        "env:ext_frame_trace_also_missing_version_2, env:ext_frame_trace_missing_version_1"
+    );
+    assert!(hint.contains("runtime override may be the cause"), "{hint}");
+    let text = error.to_string();
+    assert!(
+        text.starts_with("the runtime needs host functions frame-trace does not have: env:ext_frame_trace_also_missing_version_2, "),
+        "{text}"
+    );
+    assert!(text.contains("fixed when it is built"), "{text}");
+    assert!(
+        text.contains(
+            "troubleshooting.html#the-runtime-needs-host-functions-frame-trace-does-not-have"
+        ),
+        "{text}"
+    );
+}

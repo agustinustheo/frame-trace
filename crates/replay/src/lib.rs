@@ -66,10 +66,43 @@ pub enum Error {
     Execution(String),
     #[error("runtime rejected the call input: {0}")]
     CallExecution(String),
+    /// The runtime imports host functions that this build's `HostFunctions` lacks.
+    #[error(
+        "the runtime needs host functions frame-trace does not have: {functions}{hint}. \
+         frame-trace's host functions are fixed when it is built, so this chain needs a \
+         frame-trace build that adds them. See {MISSING_HOST_FUNCTIONS_DOCS}"
+    )]
+    MissingHostFunctions {
+        /// The missing imports as the executor names them, for example `env:ext_foo_version_1`.
+        functions: String,
+        /// Empty, or `; ` and a note that a runtime override was executed.
+        hint: String,
+    },
     #[error("artifact I/O: {0}")]
     Io(#[from] std::io::Error),
     #[error("artifact JSON: {0}")]
     Json(#[from] serde_json::Error),
+}
+
+const MISSING_HOST_FUNCTIONS_DOCS: &str = "https://agustinustheodorus.com/frame-trace/troubleshooting.html#the-runtime-needs-host-functions-frame-trace-does-not-have";
+
+/// The executor's message when the runtime imports a function the host does not provide.
+const MISSING_IMPORTS: &str =
+    "runtime requires function imports which are not present on the host: ";
+
+/// The missing imports named by the executor's error text, if that is what it reports.
+fn missing_host_functions(text: &str) -> Option<String> {
+    let (_, rest) = text.split_once(MISSING_IMPORTS)?;
+    let line = rest.lines().next().unwrap_or_default();
+    // The executor lists them in hash-map order; sort for stable output.
+    let mut functions: Vec<_> = line
+        .split(", ")
+        .map(|name| name.trim().trim_matches('\''))
+        .filter(|name| !name.is_empty())
+        .collect();
+    functions.sort_unstable();
+    let functions = functions.join(", ");
+    (!functions.is_empty()).then_some(functions)
 }
 
 impl Error {
@@ -285,6 +318,10 @@ pub(crate) fn override_hint(session: &ReplaySession, error: Error) -> Error {
         Error::Execution(text) => Error::Execution(format!("{text}; {HINT}")),
         Error::CallExecution(text) => Error::CallExecution(format!("{text}; {HINT}")),
         Error::Invalid(text) => Error::Invalid(format!("{text}; {HINT}")),
+        Error::MissingHostFunctions { functions, hint } => Error::MissingHostFunctions {
+            functions,
+            hint: format!("{hint}; {HINT}"),
+        },
         other => other,
     }
 }
@@ -620,7 +657,12 @@ fn execute_method(
         return Err(db.take_error(failure));
     }
     let execution_error = |text: String| {
-        if method == "Core_execute_block" {
+        if let Some(functions) = missing_host_functions(&text) {
+            Error::MissingHostFunctions {
+                functions,
+                hint: String::new(),
+            }
+        } else if method == "Core_execute_block" {
             Error::Execution(text)
         } else {
             Error::CallExecution(

@@ -445,10 +445,10 @@ fn unknown_host_import_error_names_the_import() {
         &block,
         &Capture::new(),
     )
-    .unwrap_err()
-    .to_string();
+    .unwrap_err();
     assert!(
-        error.contains("ext_frame_trace_unknown_version_1"),
+        matches!(&error, Error::MissingHostFunctions { functions, .. }
+            if functions == "env:ext_frame_trace_unknown_version_1"),
         "{error}"
     );
 }
