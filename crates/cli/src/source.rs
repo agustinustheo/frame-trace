@@ -107,7 +107,7 @@ pub fn read_runtime_override(path: Option<&Path>) -> Result<Option<Vec<u8>>> {
     );
     frame_trace_replay::check_runtime_wasm(&wasm)
         .with_context(|| format!("--runtime-override {}", path.display()))?;
-    eprintln!(
+    say!(
         "RUNTIME OVERRIDE: {} will execute instead of the chain's authenticated :code",
         path.display()
     );
@@ -154,7 +154,7 @@ pub fn load(args: &SourceArgs) -> Result<Loaded> {
             })
             .map_err(|e| anyhow::anyhow!("{}: {e}", dir.join("artifact.json.zst").display()))
             .inspect_err(|_| {
-                eprintln!("root check: NOT VERIFIED; RPC calls: 0");
+                say!("root check: NOT VERIFIED; RPC calls: 0");
             })?;
         return replay_loaded(replay, args.save.as_deref());
     }
@@ -168,7 +168,7 @@ pub fn load(args: &SourceArgs) -> Result<Loaded> {
                 Default::default(),
             )
             .inspect_err(|_| {
-                eprintln!("root check: NOT VERIFIED; RPC calls: 0");
+                say!("root check: NOT VERIFIED; RPC calls: 0");
             })?;
             let replay = frame_trace_replay::online_with_session(
                 &rpc,
@@ -181,7 +181,7 @@ pub fn load(args: &SourceArgs) -> Result<Loaded> {
                 .with_runtime_override(runtime_override),
             )
             .inspect_err(|_| {
-                eprintln!("root check: NOT VERIFIED; RPC calls: {}", rpc.count());
+                say!("root check: NOT VERIFIED; RPC calls: {}", rpc.count());
             })?;
             replay_loaded(replay, args.save.as_deref())
         }
@@ -237,7 +237,7 @@ mod file {
 
 /// Both block and summary consume the same faithful measured result.
 pub fn replay_loaded(replay: frame_trace_replay::Replay, save: Option<&Path>) -> Result<Loaded> {
-    eprintln!(
+    say!(
         "root check: {}{}; RPC calls: {} (timed replay: {}); execution proof: {} bytes",
         if replay.root_check { "PASS" } else { "FAIL" },
         if replay.runtime_override.is_some() {
@@ -252,13 +252,16 @@ pub fn replay_loaded(replay: frame_trace_replay::Replay, save: Option<&Path>) ->
     if let Some(dir) = save {
         replay.artifact.save(dir)?;
     }
-    eprintln!(
+    say!(
         "fetching state #{}: {} proof request rounds; {} RPC calls",
-        replay.block_number, replay.proof_round_trips, replay.rpc_count
+        replay.block_number,
+        replay.proof_round_trips,
+        replay.rpc_count
     );
-    eprintln!(
+    say!(
         "state root: computed {:?}; header {:?}",
-        replay.computed_state_root, replay.expected_state_root
+        replay.computed_state_root,
+        replay.expected_state_root
     );
     let metadata = if replay.artifact.metadata.is_empty() {
         None
@@ -266,7 +269,7 @@ pub fn replay_loaded(replay: frame_trace_replay::Replay, save: Option<&Path>) ->
         match Metadata::from_hex(&replay.artifact.metadata) {
             Ok(metadata) => Some(metadata),
             Err(error) => {
-                eprintln!(
+                say!(
                     "warning: metadata decoding failed: {error}; continuing with undecoded names (names require metadata V14+)"
                 );
                 None

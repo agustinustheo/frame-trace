@@ -19,7 +19,7 @@ async-trait = "0.1"
 futures-executor = "0.3"
 prost = "0.14"
 reqwest = { version = "0.13", default-features = false }
-tokio = { version = "1", features = ["rt", "time"] }
+tokio = { version = "1", features = ["rt", "time", "sync"] }
 serde_json.workspace = true
 thiserror.workspace = true
 

@@ -1,4 +1,7 @@
 //! Faithful block replay using safe RPC and SDK authenticated trie execution.
+#[macro_use]
+mod log;
+pub use log::set_log_hook;
 mod artifact;
 pub mod call;
 mod metadata;
@@ -302,19 +305,24 @@ fn select_runtime(session: &ReplaySession, chain: Vec<u8>) -> (Vec<u8>, Option<R
         version_differences,
     };
     let mut announced = session.announced_override.lock();
-    if announced.as_ref() != Some(&info) {
-        eprintln!(
+    let announce = announced.as_ref() != Some(&info);
+    if announce {
+        *announced = Some(info.clone());
+    }
+    // Logged after the lock is released: a blocked log must not stall other replays.
+    drop(announced);
+    if announce {
+        note!(
             "RUNTIME OVERRIDE: executing {override_code_hash:?} INSTEAD OF the authenticated \
              :code {chain_code_hash:?}; code-hash check BYPASSED (state proofs and any root \
              check still apply)"
         );
         if info.version_differences.is_empty() {
-            eprintln!("runtime override: RuntimeVersion matches the chain's :code");
+            note!("runtime override: RuntimeVersion matches the chain's :code");
         }
         for difference in &info.version_differences {
-            eprintln!("warning: runtime override RuntimeVersion: {difference}");
+            note!("warning: runtime override RuntimeVersion: {difference}");
         }
-        *announced = Some(info.clone());
     }
     (wasm.to_vec(), Some(info))
 }
@@ -476,7 +484,7 @@ fn with_maintenance<T>(session: &ReplaySession, run: impl FnOnce() -> Result<T>)
         }
         Err(error) => {
             if let Err(cache_error) = maintenance {
-                eprintln!("warning: cache cleanup: {cache_error}");
+                note!("warning: cache cleanup: {cache_error}");
             }
             Err(error)
         }
@@ -501,7 +509,7 @@ fn replay_inner(
         .retain(|d| !matches!(d, generic::DigestItem::Seal(_, _)));
     let db = open_db(&artifact, rpc.clone(), session, &parent)?;
     if rpc.is_some() {
-        eprintln!(
+        note!(
             "replay #{number}: fetching state (shared limit: {} concurrent RPC requests)",
             rpc.as_ref().map_or(1, Rpc::parallelism)
         );
@@ -518,7 +526,7 @@ fn replay_inner(
     metadata::load(&mut artifact, &db, &wasm, heap_pages, session, &parent)?;
     let executor = session.executor_for(&wasm);
     db.mark_bootstrap();
-    eprintln!("replay #{number}: loading runtime and preparing state");
+    note!("replay #{number}: loading runtime and preparing state");
     if rpc.is_some() && session.speculative_discovery {
         db.speculative.store(true, Ordering::SeqCst);
         for _ in 0..8 {

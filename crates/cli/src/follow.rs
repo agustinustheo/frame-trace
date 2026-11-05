@@ -26,65 +26,6 @@ const SHUTDOWN_WAIT: Duration = Duration::from_secs(10);
 // How long the summary may wait for earlier lines to reach stderr before `follow` exits.
 const LOG_FLUSH_WAIT: Duration = Duration::from_secs(2);
 
-/// `follow` logs through one writer thread. Writing to stderr blocks when nobody reads it,
-/// for example a full pipe; then only that thread waits. Signals, locks and the stop never
-/// wait for a write. Lines beyond the buffer are dropped and counted.
-mod log {
-    use std::{
-        sync::{
-            OnceLock,
-            atomic::{AtomicU64, AtomicUsize, Ordering},
-            mpsc::{SyncSender, sync_channel},
-        },
-        time::{Duration, Instant},
-    };
-    static SENDER: OnceLock<SyncSender<String>> = OnceLock::new();
-    static DROPPED: AtomicU64 = AtomicU64::new(0);
-    static PENDING: AtomicUsize = AtomicUsize::new(0);
-
-    pub fn start() {
-        let (sender, lines) = sync_channel::<String>(4096);
-        if SENDER.set(sender).is_ok() {
-            let _ = std::thread::Builder::new()
-                .name("log".into())
-                .spawn(move || {
-                    for line in lines {
-                        let dropped = DROPPED.swap(0, Ordering::SeqCst);
-                        if dropped > 0 {
-                            eprintln!(
-                                "follow: {dropped} log line(s) dropped while stderr was blocked"
-                            );
-                        }
-                        eprintln!("{line}");
-                        PENDING.fetch_sub(1, Ordering::SeqCst);
-                    }
-                });
-        }
-    }
-    /// Queues a line without waiting. Before [`start`], as in unit tests, writes it directly.
-    pub fn line(text: String) {
-        let Some(sender) = SENDER.get() else {
-            eprintln!("{text}");
-            return;
-        };
-        PENDING.fetch_add(1, Ordering::SeqCst);
-        if sender.try_send(text).is_err() {
-            PENDING.fetch_sub(1, Ordering::SeqCst);
-            DROPPED.fetch_add(1, Ordering::SeqCst);
-        }
-    }
-    /// Waits up to `timeout` for queued lines to be written.
-    pub fn flush(timeout: Duration) {
-        let deadline = Instant::now() + timeout;
-        while PENDING.load(Ordering::SeqCst) > 0 && Instant::now() < deadline {
-            std::thread::sleep(Duration::from_millis(10));
-        }
-    }
-}
-macro_rules! say {
-    ($($arg:tt)*) => { log::line(format!($($arg)*)) };
-}
-
 /// An error `follow` has already logged; the caller exits 1 without writing it again.
 #[derive(Debug)]
 pub struct Reported;
@@ -558,9 +499,22 @@ fn report_reorg(pending: &[(String, u64)], tip: u64, entries: &mut BTreeMap<Stri
     reverted
 }
 
+/// Runs `follow`. Its log, including a startup or fatal error, goes through the log queue, so
+/// a blocked stderr cannot keep it from exiting.
 pub fn run(args: FollowArgs) -> Result<()> {
+    crate::log::start();
+    frame_trace_replay::set_log_hook(|line| crate::log::line(line, false));
+    std::panic::set_hook(Box::new(|info| shout!("{info}")));
+    let result = follow(args);
+    if let Err(error) = &result {
+        shout!("Error: {error:#}");
+    }
+    crate::log::flush(LOG_FLUSH_WAIT);
+    result.map_err(|_| Reported.into())
+}
+
+fn follow(args: FollowArgs) -> Result<()> {
     let started = Instant::now();
-    log::start();
     // Wasmtime uses Rayon's global pool to compile functions. Using every CPU here retains
     // hundreds of MiB of compiler allocations on macOS, despite network-bound replay.
     // This is a CLI process policy; the replay library does not change its caller's pool.
@@ -579,7 +533,7 @@ pub fn run(args: FollowArgs) -> Result<()> {
         }
         signal.cancel();
         // Queued without waiting, ahead of the lines from replays that the cancel ends.
-        say!("follow: stopping (signal again to exit now)");
+        shout!("follow: stopping (signal again to exit now)");
     })?;
     let rpc = source::rpc(
         &args.rpc,
@@ -751,7 +705,7 @@ pub fn run(args: FollowArgs) -> Result<()> {
             fatal = Some("the OTLP export thread stopped");
         }
         if let Some(reason) = fatal {
-            say!("follow: {reason}; stopping");
+            shout!("follow: {reason}; stopping");
             break;
         }
         let result = (|| -> Result<()> {
@@ -897,7 +851,7 @@ pub fn run(args: FollowArgs) -> Result<()> {
         .filter(|e| e.state == State::InFlight)
         .count();
     if busy > 0 {
-        say!(
+        shout!(
             "follow: waiting up to {} for {busy} block(s) still being replayed",
             duration_text(SHUTDOWN_WAIT)
         );
@@ -907,7 +861,7 @@ pub fn run(args: FollowArgs) -> Result<()> {
     // later is counted once, as cancelled.
     shared.lock().closed = true;
     if unfinished != 0 {
-        say!(
+        shout!(
             "follow shutdown: {unfinished} of {} worker(s) still replaying after {}; their blocks count as cancelled",
             args.workers,
             duration_text(SHUTDOWN_WAIT)
@@ -926,7 +880,7 @@ pub fn run(args: FollowArgs) -> Result<()> {
     if let Some(exporter) = exporter {
         let waiting = shared.lock().waiting.len();
         if waiting > 0 {
-            say!(
+            shout!(
                 "follow shutdown: exporting {waiting} waiting trace(s), up to {}",
                 duration_text(SHUTDOWN_WAIT)
             );
@@ -934,7 +888,7 @@ pub fn run(args: FollowArgs) -> Result<()> {
         shared.draining.store(true, Ordering::SeqCst);
         shared.ready.notify_all();
         if join_workers(vec![exporter], SHUTDOWN_WAIT) != 0 {
-            say!("follow shutdown: OTLP export still running; remaining traces not sent");
+            shout!("follow shutdown: OTLP export still running; remaining traces not sent");
         }
     }
     // One snapshot: every traced block is in exactly one of the export counts.
@@ -951,22 +905,19 @@ pub fn run(args: FollowArgs) -> Result<()> {
     } else {
         String::new()
     };
-    say!(
-        "follow stopped after {}: traced={}{export_summary} stopped={} skipped={} reverted={} cancelled={} poll-failures={}",
+    let traced = state.traced;
+    drop(state);
+    shout!(
+        "follow stopped after {}: traced={traced}{export_summary} stopped={} skipped={} reverted={} cancelled={} poll-failures={}",
         duration_text(started.elapsed()),
-        state.traced,
         totals.stopped,
         totals.skipped,
         totals.reverted,
         totals.cancelled,
         totals.poll_failures
     );
-    if let Some(reason) = fatal {
-        say!("Error: follow stopped because {reason}");
-    }
-    log::flush(LOG_FLUSH_WAIT);
     match fatal {
-        Some(_) => Err(Reported.into()),
+        Some(reason) => anyhow::bail!("follow stopped because {reason}"),
         None => Ok(()),
     }
 }

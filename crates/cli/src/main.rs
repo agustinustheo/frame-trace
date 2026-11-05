@@ -6,6 +6,8 @@ use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
 use frame_trace_decode::AnnotatedBlock;
 
+#[macro_use]
+mod log;
 mod call;
 mod follow;
 mod report;
