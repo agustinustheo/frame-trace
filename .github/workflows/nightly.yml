@@ -1,0 +1,57 @@
+name: Nightly live check
+
+# Replays real blocks from a public Westend Asset Hub node. Failures here can
+# come from the public endpoint as well as from frame-trace.
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: nightly-${{ github.workflow }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  RPC_URL: wss://westend-asset-hub-rpc.polkadot.io
+
+jobs:
+  live:
+    name: Public network
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      # The hosted /tmp is small; tests and builds write temporary files here instead.
+      - name: Use the runner temp directory
+        run: echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
+
+      - name: Install Rust 1.93.0
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.93.0
+
+      - name: Cache Cargo build
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run ignored public-network tests
+        run: cargo +1.93.0 test --workspace --locked -- --ignored
+
+      - name: Build release binary
+        run: cargo +1.93.0 build --release --locked -p frame-trace
+
+      - name: Trace the latest finalized block
+        run: |
+          json="$RUNNER_TEMP/block.json"
+          target/release/frame-trace block --rpc "$RPC_URL" --block finalized --json "$json"
+          jq -e '.execution.root_check == true' "$json" > /dev/null || {
+            echo "::error::root check did not pass for block $(jq -r .block_number "$json")"
+            exit 1
+          }
+          echo "root check passed for block $(jq -r .block_number "$json")"
