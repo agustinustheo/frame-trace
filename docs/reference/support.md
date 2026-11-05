@@ -45,19 +45,34 @@ frame-trace runs the runtime with the host functions of Polkadot SDK release `po
 | Elliptic curves | BLS12-381, Ed-on-BLS12-381-Bandersnatch, Pallas and Vesta. |
 
 A runtime that imports any other host function cannot be replayed.
-The error says `runtime requires function imports which are not present on the host`.
-See [Troubleshooting](../troubleshooting.md#runtime-requires-function-imports-which-are-not-present-on-the-host).
+The error says `the runtime needs host functions frame-trace does not have` and names them.
+See [Troubleshooting](../troubleshooting.md#the-runtime-needs-host-functions-frame-trace-does-not-have).
 
 ## Tested chains
 
 | Chain | How |
 | --- | --- |
-| [Westend Asset Hub](glossary.md#westend-asset-hub) | Public endpoint `wss://westend-asset-hub-rpc.polkadot.io`, with `block`, `report` and `follow`. [Analyse many blocks](../guides/analyse-many-blocks.md) shows a `report` run. |
+| [Westend Asset Hub](glossary.md#westend-asset-hub) | Public endpoint `wss://westend-asset-hub-rpc.polkadot.io`, with `block`, `report` and `follow`. [Analyse many blocks](../guides/analyse-many-blocks.md) shows a `report` run. A nightly test replays the best block. |
+| Westend Asset Hub runtime upgrade | A nightly test replays the upgrade block #18,985,169 and the next block #18,985,170, the first on the new code, from the public endpoint. |
+| Westend relay chain | A nightly test replays the finalized block from `wss://westend-rpc.polkadot.io`, with the parachain inherent `ParaInherent.enter`. Block #33,614,892 also passed. |
+| Paseo Asset Hub | Block #15,366,850 is a saved block replayed offline. It holds a smart-contract call that reads and writes the contract's child trie. |
 | Paseo People Next | Public endpoint `wss://paseo-people-next-system-rpc.polkadot.io`, 20 blocks with `block` and `summary`. Each passed the root check. |
-| A local [People chain](glossary.md#people-chain) | The saved blocks in `fixtures/replay/`, replayed offline. |
+| A local [People chain](glossary.md#people-chain) | Saved blocks replayed offline. |
+
+Every block in this table passed the root check.
+A block that upgrades the runtime runs on the old code.
+The next block is the first on the new code, see [What a replay proves](../concepts/what-a-replay-proves.md#runtime-upgrades).
 
 Other chains that meet the requirements above should work.
 If one does not, open an issue with the chain, the block number and the error.
+
+## Slow nodes
+
+Some nodes take longer to answer one request than `--rpc-timeout` allows by default.
+The replay then fails with `overall request deadline exceeded`.
+Raise `--rpc-timeout`, see [defaults and limits](commands.md#block).
+Dwellir's Paseo Asset Hub endpoint, `wss://asset-hub-paseo-rpc.n.dwellir.com`, needed `--rpc-timeout 120`.
+See [Troubleshooting](../troubleshooting.md#overall-request-deadline-exceeded) for that run.
 
 ## Versioning
 
