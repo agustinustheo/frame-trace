@@ -319,7 +319,11 @@ fn a_retry_sends_only_the_batches_not_yet_accepted_with_the_same_span_ids() {
     );
     assert_eq!(trace.unsent(), 490);
     assert_eq!(sender.send(&mut trace).unwrap(), 1002);
-    std::thread::sleep(Duration::from_millis(200));
+    // The receiver records a request just after answering it.
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while seen.lock().unwrap().len() < 3 && std::time::Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(10));
+    }
     let seen = seen.lock().unwrap();
     assert_eq!(seen.len(), 3);
     assert_eq!(
@@ -352,6 +356,117 @@ fn a_timed_out_request_is_not_sent_again_after_the_retry() {
     let seen = seen.lock().unwrap();
     assert_eq!(seen.len(), 2, "exactly the timed-out request and the retry");
     assert_eq!(seen[0].1, seen[1].1, "the retry carries the same span IDs");
+}
+
+/// Serves each connection with `respond(index, stream)` after reading the request.
+fn raw_receiver(
+    respond: impl Fn(usize, &mut std::net::TcpStream) + Send + Sync + 'static,
+) -> String {
+    use std::io::{BufRead, BufReader, Read};
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    let respond = std::sync::Arc::new(respond);
+    std::thread::spawn(move || {
+        for (index, stream) in listener.incoming().enumerate() {
+            let Ok(mut stream) = stream else { return };
+            let respond = respond.clone();
+            std::thread::spawn(move || {
+                let mut reader = BufReader::new(stream.try_clone().unwrap());
+                let mut length = 0;
+                loop {
+                    let mut line = String::new();
+                    if reader.read_line(&mut line).unwrap_or(0) == 0 || line == "\r\n" {
+                        break;
+                    }
+                    if let Some(v) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+                        length = v.trim().parse().unwrap_or(0);
+                    }
+                }
+                if reader.read_exact(&mut vec![0; length]).is_ok() {
+                    respond(index, &mut stream);
+                }
+            });
+        }
+    });
+    url
+}
+
+#[test]
+fn a_slowly_sent_response_body_cannot_outlast_the_timeout() {
+    use std::io::Write;
+    // Headers at once, then one body byte every 150 ms: each read is quick, the whole is not.
+    let url = raw_receiver(|_, stream| {
+        let _ = stream.write_all(b"HTTP/1.1 200 OK\r\ncontent-type: application/x-protobuf\r\ncontent-length: 40\r\n\r\n");
+        for _ in 0..40 {
+            if stream.write_all(&[0]).is_err() {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(150));
+        }
+    });
+    let sender =
+        frame_trace_otel::OtlpSender::with_timeout(&url, Duration::from_millis(400)).unwrap();
+    let mut trace = frame_trace_otel::prepare(&synthetic_block(10), Timing::default());
+    let start = std::time::Instant::now();
+    assert!(sender.send(&mut trace).is_err());
+    let took = start.elapsed();
+    assert!(took < Duration::from_millis(700), "{took:?}");
+}
+
+#[test]
+fn the_exporters_own_retries_stay_within_the_timeout() {
+    use std::io::Write;
+    // A slow 503 makes the exporter retry by itself; the retry then gets no answer at all.
+    let url = raw_receiver(|index, stream| {
+        if index == 0 {
+            std::thread::sleep(Duration::from_millis(500));
+            let _ = stream.write_all(
+                b"HTTP/1.1 503 Service Unavailable\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
+            );
+        } else {
+            std::thread::sleep(Duration::from_secs(10));
+        }
+    });
+    let sender =
+        frame_trace_otel::OtlpSender::with_timeout(&url, Duration::from_millis(800)).unwrap();
+    let mut trace = frame_trace_otel::prepare(&synthetic_block(10), Timing::default());
+    let start = std::time::Instant::now();
+    assert!(sender.send(&mut trace).is_err());
+    let took = start.elapsed();
+    assert!(took < Duration::from_millis(1000), "{took:?}");
+}
+
+#[test]
+fn a_rejection_message_belongs_to_the_trace_it_came_with() {
+    use opentelemetry_proto::tonic::collector::trace::v1::{
+        ExportTracePartialSuccess, ExportTraceServiceResponse,
+    };
+    use prost::Message;
+    use std::io::Write;
+    let url = raw_receiver(|index, stream| {
+        let body = ExportTraceServiceResponse {
+            partial_success: Some(ExportTracePartialSuccess {
+                rejected_spans: 1,
+                error_message: if index == 0 { "quota" } else { "invalid label" }.into(),
+            }),
+        }
+        .encode_to_vec();
+        let _ = write!(
+            stream,
+            "HTTP/1.1 200 OK\r\ncontent-type: application/x-protobuf\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
+            body.len()
+        );
+        let _ = stream.write_all(&body);
+    });
+    let sender = frame_trace_otel::OtlpSender::new(&url).unwrap();
+    for message in ["quota", "invalid label"] {
+        let mut trace = frame_trace_otel::prepare(&synthetic_block(10), Timing::default());
+        let error = sender.send(&mut trace).unwrap_err().to_string();
+        assert_eq!(
+            error,
+            format!("1 of 12 spans rejected by the receiver: {message}")
+        );
+    }
 }
 
 #[test]
