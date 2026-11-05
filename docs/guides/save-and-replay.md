@@ -84,6 +84,7 @@ See [Trace a runtime API call](trace-a-runtime-api-call.md#replay-a-call-offline
 | `people-kill-prefix` | People chain #8, a `Sudo.sudo` call that deletes a storage prefix. |
 | `people-traced` | People chain #4, a `Utility.batch` of three transfers, with a runtime built with tracing. |
 | `westend-asset-hub` | Westend Asset Hub #18,558,320, two required extrinsics. |
+| `paseo-asset-hub-contract` | Paseo Asset Hub #15,366,850, a smart contract call that reads and writes the contract's child trie. |
 
 The repository's saved blocks share large files through `fixtures/replay/blobs/`.
 frame-trace looks for that folder next to the block's directory, so copy both together.
