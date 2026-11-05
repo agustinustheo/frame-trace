@@ -155,6 +155,14 @@ pub fn otlp_http_exporter(endpoint: &str) -> Result<HttpExporter, Error> {
     HttpExporter::new(traces_url(endpoint), None)
 }
 
+/// Like [`otlp_http_exporter`], with at most `timeout` for each batch, retries included.
+pub fn otlp_http_exporter_with_timeout(
+    endpoint: &str,
+    timeout: Duration,
+) -> Result<HttpExporter, Error> {
+    HttpExporter::new(traces_url(endpoint), Some(timeout))
+}
+
 fn traces_url(endpoint: &str) -> String {
     let base = endpoint.trim_end_matches('/');
     if base.ends_with("/v1/traces") {
