@@ -5,7 +5,7 @@ It checks that the tag matches the `frame-trace` version in `Cargo.toml`, runs r
 The repository and the pushed tag are public, but no release is public until you publish the draft.
 
 1. Set the new version in `[workspace.package]` in `Cargo.toml`, then run `cargo build` so `Cargo.lock` follows.
-2. In `CHANGELOG.md`, rename `## [X.Y.Z] - Unreleased` to `## [X.Y.Z] - YYYY-MM-DD` and check the entries. The release notes are this section. The workflow fails while the heading still says `Unreleased`.
+2. In `CHANGELOG.md`, rename `## [X.Y.Z] - Unreleased` to `## [X.Y.Z] - YYYY-MM-DD` and check the entries. The release notes are this section. The workflow fails while the heading still says `Unreleased` or the date is not a calendar date.
 3. Commit, and merge to `main`.
 4. Tag the merged commit and push the tag:
 
