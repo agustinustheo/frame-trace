@@ -102,7 +102,7 @@ Key flags and options:
 15. `--unauthenticated-metadata` (alias `--rpc-metadata-fallback`) — allow unverified RPC metadata when local execution cannot produce it; output is labelled.
 16. `--metadata FILE` — supply metadata for a recorded trace (`.scale` or hex).
 17. `--cache-dir DIR` and `--cache-max-bytes N` — persist proof nodes and compiled Wasm; default cap 1 GiB; active runtimes stay pinned.
-18. `--proof-concurrency N` — parallel proof requests (1 to 64, default 8, batches of 32 keys each).
+18. `--proof-concurrency N` — parallel RPC requests (1 to 64, default 8; each proof request asks for up to 32 keys). Earlier text said "proof requests"; the limit covers every RPC request.
 
 Outputs:
 
