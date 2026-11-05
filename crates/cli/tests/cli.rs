@@ -1075,10 +1075,63 @@ fn follow_sigterm_stops_gracefully_with_a_summary() {
     let text = std::fs::read_to_string(&log).unwrap();
     std::fs::remove_file(log).unwrap();
     assert!(status.success(), "{status:?}: {text}");
-    assert!(text.contains("follow: stopping;"), "{text}");
+    assert!(text.contains("follow: stopping"), "{text}");
     assert!(text.contains("follow stopped after "), "{text}");
     assert!(text.contains(" traced=0 "), "{text}");
     node.join().unwrap();
+}
+
+/// Kills the child on drop, so a failed assertion cannot leave `follow` running.
+struct Child(std::process::Child);
+impl Drop for Child {
+    fn drop(&mut self) {
+        if self.0.try_wait().ok().flatten().is_none() {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+}
+
+/// An OTLP/HTTP receiver that answers `503` while `down` is set and `200` otherwise, and
+/// counts the requests it accepted.
+fn switchable_receiver(
+    down: std::sync::Arc<std::sync::atomic::AtomicBool>,
+) -> (String, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
+    use std::sync::atomic::Ordering;
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    let accepted = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let count = accepted.clone();
+    std::thread::spawn(move || {
+        for stream in listener.incoming() {
+            let Ok(mut stream) = stream else { return };
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut len = 0;
+            loop {
+                let mut line = String::new();
+                if reader.read_line(&mut line).unwrap_or(0) == 0 || line == "\r\n" {
+                    break;
+                }
+                if let Some(v) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+                    len = v.trim().parse().unwrap_or(0);
+                }
+            }
+            if reader.read_exact(&mut vec![0; len]).is_err() {
+                continue;
+            }
+            let status = if down.load(Ordering::SeqCst) {
+                "503 Service Unavailable"
+            } else {
+                count.fetch_add(1, Ordering::SeqCst);
+                "200 OK"
+            };
+            let _ = write!(
+                stream,
+                "HTTP/1.1 {status}\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"
+            );
+        }
+    });
+    (url, accepted)
 }
 
 #[test]
@@ -1088,7 +1141,7 @@ fn follow_retries_only_the_export_while_the_collector_is_down() {
         process::Stdio,
         sync::{
             Arc,
-            atomic::{AtomicUsize, Ordering},
+            atomic::{AtomicBool, AtomicUsize, Ordering},
         },
     };
     let artifact = frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
@@ -1103,66 +1156,43 @@ fn follow_retries_only_the_export_while_the_collector_is_down() {
         }
         artifact_rpc(&artifact, request)
     });
-    // Reserve a port, then close it: the collector is down until we listen again.
-    let port = TcpListener::bind("127.0.0.1:0")
-        .unwrap()
-        .local_addr()
-        .unwrap()
-        .port();
+    let down = Arc::new(AtomicBool::new(true));
+    let (otlp, accepted) = switchable_receiver(down.clone());
     let log = std::env::temp_dir().join(format!(
         "frame-trace-follow-otlp-{}.log",
         std::process::id()
     ));
-    let mut child = Command::new(BIN)
-        .args([
-            "follow",
-            "--rpc",
-            &node.url,
-            "--otlp",
-            &format!("http://127.0.0.1:{port}"),
-        ])
-        .stdout(Stdio::null())
-        .stderr(std::fs::File::create(&log).unwrap())
-        .spawn()
-        .unwrap();
+    let mut child = Child(
+        Command::new(BIN)
+            .args(["follow", "--rpc", &node.url, "--otlp", &otlp])
+            // Keep each failed try short; the exporter retries 503 within this time.
+            .env("OTEL_EXPORTER_OTLP_TIMEOUT", "500")
+            .stdout(Stdio::null())
+            .stderr(std::fs::File::create(&log).unwrap())
+            .spawn()
+            .unwrap(),
+    );
     let text = wait_for_log(&log, "OTLP export failed", 120);
-    if !text.contains("OTLP export failed (1 attempt(s) in a row)") {
-        stop_child(&mut child, "-KILL");
-        panic!("{text}");
-    }
-    // The collector comes back and accepts everything.
-    let listener = TcpListener::bind(("127.0.0.1", port)).unwrap();
-    let receiver = std::thread::spawn(move || {
-        let (mut stream, _) = listener.accept().unwrap();
-        let mut reader = BufReader::new(stream.try_clone().unwrap());
-        let mut len = 0;
-        loop {
-            let mut line = String::new();
-            if reader.read_line(&mut line).unwrap_or(0) == 0 || line == "\r\n" {
-                break;
-            }
-            if let Some(v) = line.to_ascii_lowercase().strip_prefix("content-length:") {
-                len = v.trim().parse().unwrap_or(0);
-            }
-        }
-        reader.read_exact(&mut vec![0; len]).unwrap();
-        stream
-            .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 0\r\nconnection: close\r\n\r\n")
-            .unwrap();
-    });
+    assert!(
+        text.contains("OTLP export failed (1 attempt(s) in a row)"),
+        "{text}"
+    );
+    down.store(false, Ordering::SeqCst);
     wait_for_log(&log, "OTLP export recovered", 30);
-    let status = stop_child(&mut child, "-TERM");
+    let status = stop_child(&mut child.0, "-TERM");
     let text = std::fs::read_to_string(&log).unwrap();
     std::fs::remove_file(log).unwrap();
     assert!(status.success(), "{status:?}: {text}");
     assert!(text.contains("OTLP export recovered after "), "{text}");
-    receiver.join().unwrap();
     assert!(
-        text.contains("traced=1 exported=1 export-rejected=0 export-dropped=0 export-unsent=0"),
+        text.contains(
+            "traced=1 exported=1 export-rejected=0 export-failed=0 export-dropped=0 export-unsent=0"
+        ),
         "{text}"
     );
-    // The block was replayed once; only the export was retried.
+    // The block was replayed once and its one batch accepted once.
     assert_eq!(blocks.load(Ordering::SeqCst), 1, "{text}");
+    assert_eq!(accepted.load(Ordering::SeqCst), 1, "{text}");
 }
 
 #[test]
