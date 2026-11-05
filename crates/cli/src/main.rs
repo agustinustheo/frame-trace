@@ -72,6 +72,9 @@ struct SummaryArgs {
 fn main() -> std::process::ExitCode {
     match run() {
         Ok(()) => std::process::ExitCode::SUCCESS,
+        Err(error) if error.downcast_ref::<follow::Reported>().is_some() => {
+            std::process::ExitCode::FAILURE
+        }
         Err(error) => {
             eprintln!("Error: {error:#}");
             std::process::ExitCode::from(if error.downcast_ref::<OracleMismatch>().is_some() {
