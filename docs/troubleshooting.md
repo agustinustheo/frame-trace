@@ -115,7 +115,7 @@ Error: exporting to http://127.0.0.1:4999: 428 of 428 spans were not exported (f
 
 **Fix.**
 
-- Check that Jaeger or your collector is running: `docker ps`.
+- Check that Jaeger or your OTLP receiver is running: `docker ps`.
 - Check the port. OTLP/HTTP is usually 4318. The Jaeger web page, 16686, does not accept traces.
 - Map the port when you start Jaeger: `-p 4318:4318`.
 
@@ -158,7 +158,7 @@ OTLP export failed (1 attempt(s) in a row): 578 of 578 spans were not exported (
 ```
 
 **What it means.** `follow` replayed a block but could not send its trace.
-It keeps the trace and tries again. It does not replay the block again.
+It keeps the trace and tries again. It does not replay the block again, and it does not resend spans the receiver already accepted.
 It logs `OTLP export recovered` when the receiver is back.
 
 **Fix.** Start the receiver again, or fix the `--otlp` URL. The fixes for [`<N> of <M> spans were not exported`](#n-of-m-spans-were-not-exported) apply.
@@ -174,7 +174,8 @@ To make room for a new trace, it drops the oldest one. The status line counts it
 While this goes on, the line repeats once a minute.
 
 **Fix.** Start the receiver again. Dropped traces are not sent later.
-To trace those blocks, run [`block`](reference/commands.md#block) for each one.
+To trace a dropped block, run `frame-trace block --rpc <URL> --block <hash> --otlp` with the hash from the line.
+This works while the node still has the state before that block.
 
 ## No traces in Jaeger, but no error
 
@@ -213,6 +214,27 @@ Keys show as `<unknown>` or raw hex, and call results as hex.
 **Fix.** For a live block, `--unauthenticated-metadata` lets frame-trace use the node's metadata.
 It is not checked, and the output says so.
 For a call, use `--data` instead of `--args`.
+
+## `overall request deadline exceeded`
+
+```text
+replay #15366850: fetching state (shared limit: 8 concurrent RPC requests)
+root check: NOT VERIFIED; RPC calls: 8
+Error: RPC error: state_getReadProof: overall request deadline exceeded
+```
+
+This run used `wss://asset-hub-paseo-rpc.n.dwellir.com`.
+
+**What it means.** The node took too long to answer one request.
+Some nodes take more than half a minute to send a large proof, such as the one for the runtime code.
+
+**Fix.** Raise `--rpc-timeout`. With `--rpc-timeout 120`, the same command passed:
+
+```text
+root check: PASS; RPC calls: 113 (timed replay: 0); execution proof: 101420 bytes
+```
+
+See [defaults and limits](reference/commands.md#block).
 
 ## The first run is slow
 

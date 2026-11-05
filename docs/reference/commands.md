@@ -40,6 +40,7 @@ frame-trace block --offline fixtures/replay/people-traced --json block.json
 | `--otlp [<URL>]` | `http://127.0.0.1:4318` when given without a URL | Send the trace over OTLP/HTTP. |
 | `--json <FILE>` | | Write the trace as JSON. `-` writes to stdout. |
 | `--proof-concurrency <N>` | 8 | RPC requests sent at once, 1 to 64. Each proof request asks for up to 32 keys. |
+| `--rpc-timeout <SECONDS>` | 7.5 | Longest wait for one RPC response. A request gets four tries, so it can take four times this. Raise it for a slow or distant node. |
 | `--cache-dir <DIR>` | | Keep fetched state and compiled runtimes in this directory between runs. |
 | `--cache-max-bytes <N>` | 1073741824 (1 GiB) | Size limit for the disk cache, in bytes. A runtime in use is kept even above the limit. |
 | `--unauthenticated-metadata` | off | If the runtime's own metadata cannot be loaded, use the node's (or the saved) metadata unchecked. Output says so. |
@@ -47,7 +48,7 @@ frame-trace block --offline fixtures/replay/people-traced --json block.json
 
 Without `--otlp` or `--json`, `block` prints a one-line count of phases and operations.
 
-Flags that do not apply to the chosen source are refused, with exit code 2: `--block` and `--proof-concurrency` need `--rpc`, `--metadata` needs `--from-file`, and the cache and metadata flags do not work with `--from-file` or `--from-json`.
+Flags that do not apply to the chosen source are refused, with exit code 2: `--block`, `--proof-concurrency` and `--rpc-timeout` need `--rpc`, `--metadata` needs `--from-file`, and the cache and metadata flags do not work with `--from-file` or `--from-json`.
 
 Without `--cache-dir`, compiled runtimes are still kept in `$XDG_CACHE_HOME/frame-trace/wasm` (or `~/.cache/frame-trace/wasm`), and fetched state stays in memory only.
 
@@ -58,7 +59,7 @@ frame-trace summary --rpc URL --block finalized
 frame-trace summary --from-json block.json
 ```
 
-`summary` takes the same source flags as `block`, plus `--save`, `--proof-concurrency`, `--cache-dir`, `--cache-max-bytes`, `--unauthenticated-metadata` and `--runtime-override`.
+`summary` takes the same source flags as `block`, plus `--save`, `--proof-concurrency`, `--rpc-timeout`, `--cache-dir`, `--cache-max-bytes`, `--unauthenticated-metadata` and `--runtime-override`.
 
 | Flag | Default | Meaning |
 | --- | --- | --- |
@@ -88,6 +89,7 @@ frame-trace call --offline fixtures/replay/call-people-nonce --summary
 | `--json <FILE>` | | Write the trace and result as JSON. `-` writes to stdout and sends tables to stderr. |
 | `--otlp [<URL>]` | `http://127.0.0.1:4318` when given without a URL | Send the trace over OTLP/HTTP. |
 | `--proof-concurrency <N>` | 8 | RPC requests sent at once, 1 to 64. Each proof request asks for up to 32 keys. |
+| `--rpc-timeout <SECONDS>` | 7.5 | Longest wait for one RPC response. A request gets four tries, so it can take four times this. Raise it for a slow or distant node. |
 | `--cache-dir <DIR>` | | As for `block`. |
 | `--cache-max-bytes <N>` | 1073741824 (1 GiB) | As for `block`. |
 | `--unauthenticated-metadata` | off | As for `block`. |
@@ -112,6 +114,7 @@ frame-trace report --rpc URL --last 10
 | `--last <K>` | | The K most recent finalized blocks. |
 | `--concurrency <N>` | 2 | Blocks replayed at once, 1 to 4. |
 | `--proof-concurrency <N>` | 8 | RPC requests at once across all blocks, 1 to 64. Each proof request asks for up to 32 keys. |
+| `--rpc-timeout <SECONDS>` | 7.5 | Longest wait for one RPC response. A request gets four tries, so it can take four times this. Raise it for a slow or distant node. |
 | `--cache-dir <DIR>` | | Keep fetched state and compiled runtimes in this directory. |
 | `--cache-max-bytes <N>` | 1073741824 (1 GiB) | Size limit for the disk cache, in bytes. |
 | `--top <N>` | 15 | Rows in each ranked table. JSON is always complete. |
@@ -119,7 +122,7 @@ frame-trace report --rpc URL --last 10
 | `--json <FILE>` | | Write the report as JSON. `-` writes it to stdout and the tables to stderr. |
 
 A range holds at most 10,000 blocks.
-`--concurrency`, `--proof-concurrency`, `--cache-dir` and `--cache-max-bytes` need `--rpc`; with saved files they are refused.
+`--concurrency`, `--proof-concurrency`, `--rpc-timeout`, `--cache-dir` and `--cache-max-bytes` need `--rpc`; with saved files they are refused.
 
 ## follow
 
@@ -135,6 +138,7 @@ frame-trace follow --rpc URL --best
 | `--otlp [<URL>]` | `http://127.0.0.1:4318` when given without a URL | Send each trace over OTLP/HTTP. |
 | `--workers <N>` | 8 | Blocks replayed at once, 1 to 16. |
 | `--proof-concurrency <N>` | 16 | RPC requests at once across all workers, 1 to 64. Each proof request asks for up to 32 keys. |
+| `--rpc-timeout <SECONDS>` | 7.5 | Longest wait for one RPC response. A request gets four tries, so it can take four times this. Raise it for a slow or distant node. |
 | `--cache-dir <DIR>` | | Keep fetched state and compiled runtimes in this directory. |
 | `--cache-max-bytes <N>` | 1073741824 (1 GiB) | Size limit for the disk cache, in bytes. |
 | `--unauthenticated-metadata` | off | As for `block`. |
@@ -145,20 +149,23 @@ frame-trace follow --rpc URL --best
 | Check for new blocks | every 2 s | How often `follow` asks the node for its newest block. |
 | Wait after a failed check | 2 s, doubling to 60 s | Resets after the next check that works. |
 | Attempts per block | 4 | For failures that can pass, such as a timeout. Other failures stop the block at once. |
-| Status line | on change, and every 60 s | Printed at once when `retrying`, `stopped`, `skipped`, `reverted` or `export-rejected` changes. |
-| Repeated failure lines | first, then once a minute | For failed checks, failed exports and a full queue. |
-| Traces waiting for export | 32 | Held while the collector is down. When full, the oldest is dropped. |
-| Wait between export tries | 1 s, doubling to 30 s | The block is not replayed again; only the export is retried. |
-| Wait at stop | 10 s for replays, then 10 s for exports | Replays still running after this are counted as `cancelled`. |
+| Status line | on change, and every 60 s | Printed at once when `retrying`, `stopped`, `skipped`, `reverted`, `export-rejected` or `export-failed` changes. A check for new blocks that waits on the node delays it. |
+| Repeated failure lines | first, then at most once a minute | For failed checks, failed exports and a full queue. A failure that comes back within the minute is not logged again. |
+| Traces waiting for export | 32 | Held while the receiver is down. Each holds all spans of one block in memory. When full, the oldest is dropped. |
+| Spans per export request | 512 | An accepted request is never sent again. A retry sends only the requests not yet accepted. |
+| Wait between export tries | 1 s, doubling to 30 s | Each try can itself take up to the OTLP timeout, because the exporter retries within it. The block is not replayed again. |
+| Wait at stop | 10 s for replays, then 10 s for exports | See below. |
 
-`follow` stops on Ctrl-C, `SIGTERM` or `SIGHUP`.
-It finishes the blocks it is replaying, sends waiting traces, and prints a summary.
+`follow` stops on Ctrl-C, `SIGTERM` or `SIGHUP`. `SIGHUP` does not reload anything.
+At the stop, replays waiting on the node end at once and count as `cancelled`.
+Replays running on the CPU get the stop wait to finish. Those still running after it count as `cancelled`.
+Then `follow` sends waiting traces and prints a summary.
 A second signal exits at once.
 
 | Exit code | Meaning |
 | --- | --- |
 | 0 | Stopped by a signal. Failed blocks and exports are counted in the summary, not in the exit code. |
-| 1 | `follow` could not start, for example a malformed `--rpc` URL. |
+| 1 | `follow` could not start, for example a malformed `--rpc` or `--otlp` URL, or its replay or export threads stopped unexpectedly. |
 | 2 | The command line was wrong. |
 | 130 | A second signal arrived during the stop. |
 
@@ -180,10 +187,11 @@ See [Send traces through Grafana Alloy to Tempo](../guides/send-traces-through-a
 
 | Code | Meaning |
 | --- | --- |
-| 0 | Success. |
-| 1 | The replay, an input or the export failed. For `report`, at least one input failed. |
+| 0 | Success. `follow` also exits 0 when a signal stops it. |
+| 1 | The replay, an input or the export failed. For `report`, at least one input failed. For `follow`, see [its exit codes](#follow). |
 | 2 | The command line was wrong, for example a missing or unknown flag. |
 | 3 | `call --check-state-call` found a different result from the node's. JSON, save and export still ran. |
+| 130 | `follow` got a second stop signal and exited at once. |
 
 ## Older flag names
 
