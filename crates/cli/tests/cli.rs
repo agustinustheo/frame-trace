@@ -1268,6 +1268,79 @@ fn follow_stops_on_signals_while_nobody_reads_its_stderr() {
     }
 }
 
+/// Waits up to `secs` seconds for `child` to exit and returns its exit code.
+fn exit_code_within(child: &mut Child, secs: u64) -> Option<i32> {
+    let start = std::time::Instant::now();
+    loop {
+        if let Some(status) = child.0.try_wait().unwrap() {
+            return status.code();
+        }
+        if start.elapsed() > std::time::Duration::from_secs(secs) {
+            return None;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+}
+
+#[test]
+fn follow_startup_errors_and_replays_do_not_wait_for_a_blocked_stderr() {
+    let _serial = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    use std::{
+        process::Stdio,
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+    };
+    // A startup error is queued like every other line, then `follow` exits 1.
+    let (_reader, writer) = full_pipe();
+    let mut child = Child(
+        Command::new(BIN)
+            .args(["follow", "--rpc", "invalid"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::from(writer))
+            .spawn()
+            .unwrap(),
+    );
+    assert_eq!(exit_code_within(&mut child, 10), Some(1));
+    // Replays write progress lines from worker threads; a stop must not wait for them.
+    let artifact = frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
+        "replay/people-transfer",
+    )))
+    .unwrap();
+    let proofs = Arc::new(AtomicUsize::new(0));
+    let seen = proofs.clone();
+    let node = MockNode::new(move |request| {
+        if request["method"] == "state_getReadProof" {
+            seen.fetch_add(1, Ordering::SeqCst);
+        }
+        artifact_rpc(&artifact, request)
+    });
+    let (_reader, writer) = full_pipe();
+    let mut child = Child(
+        Command::new(BIN)
+            .args(["follow", "--rpc", &node.url])
+            .stdout(Stdio::null())
+            .stderr(Stdio::from(writer))
+            .spawn()
+            .unwrap(),
+    );
+    let start = std::time::Instant::now();
+    while proofs.load(Ordering::SeqCst) == 0 && start.elapsed().as_secs() < 60 {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    assert!(
+        proofs.load(Ordering::SeqCst) > 0,
+        "the replay never started"
+    );
+    Command::new("kill")
+        .args(["-TERM", &child.0.id().to_string()])
+        .status()
+        .unwrap();
+    // The stop waits at most 10 s for replays and 2 s for the log.
+    assert_eq!(exit_code_within(&mut child, 20), Some(0));
+}
+
 #[test]
 fn follow_exits_1_with_a_summary_when_its_threads_die() {
     use std::{process::Stdio, time::Duration};
