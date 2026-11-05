@@ -1738,3 +1738,29 @@ fn bad_runtime_override_files_are_rejected_by_name_before_replay() {
     }
     std::fs::remove_file(wasm).unwrap();
 }
+
+#[test]
+fn missing_host_function_fails_with_its_name_and_no_metadata_notice() {
+    let _serial = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    let out = run(&[
+        "block",
+        "--offline",
+        &fixture("replay/westend-asset-hub"),
+        "--runtime-override",
+        &fixture("wasm/missing-host-function.wasm"),
+    ]);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!out.status.success(), "{stderr}");
+    assert!(
+        stderr.contains(
+            "the runtime needs host functions frame-trace does not have: \
+             env:ext_frame_trace_missing_version_1; a runtime override was executed"
+        ),
+        "{stderr}"
+    );
+    // Metadata loading runs the same runtime first. It must stop with this error, not print
+    // a notice that sends the reader after metadata.
+    assert!(!stderr.contains("local metadata unavailable"), "{stderr}");
+    assert!(!stderr.contains("runtime execution failed"), "{stderr}");
+    assert!(stderr.contains("root check: NOT VERIFIED"), "{stderr}");
+}

@@ -157,7 +157,11 @@ pub(crate) fn load(
             );
             artifact.metadata = metadata;
         }
-        Err(error) if error.is_transient() || matches!(error, Error::Cancelled) => {
+        // The block cannot run either; say why now instead of after a metadata notice.
+        Err(error)
+            if error.is_transient()
+                || matches!(error, Error::Cancelled | Error::MissingHostFunctions { .. }) =>
+        {
             return Err(error);
         }
         Err(error) if session.rpc_metadata_fallback => {

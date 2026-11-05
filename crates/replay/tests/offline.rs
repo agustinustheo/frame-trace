@@ -227,13 +227,85 @@ fn artifact_round_trip_and_version_rejection() {
             .contains("unsupported artifact version")
     );
 }
+/// A public endpoint, overridable for CI: `FRAME_TRACE_WESTEND_AH_RPC`, `FRAME_TRACE_WESTEND_RPC`.
+fn endpoint(var: &str, default: &str) -> String {
+    std::env::var(var).unwrap_or_else(|_| default.into())
+}
 #[test]
-#[ignore = "requires public network and recent parent state"]
+#[ignore = "requires public network and recent parent state (FRAME_TRACE_WESTEND_AH_RPC)"]
 fn public_network() {
-    let rpc = frame_trace_replay::rpc::Rpc::new("wss://westend-asset-hub-rpc.polkadot.io").unwrap();
+    let url = endpoint(
+        "FRAME_TRACE_WESTEND_AH_RPC",
+        "wss://westend-asset-hub-rpc.polkadot.io",
+    );
+    let rpc = frame_trace_replay::rpc::Rpc::new(&url).unwrap();
     let result = frame_trace_replay::online(&rpc, "best").unwrap();
     assert!(result.root_check);
     assert_eq!(result.measured_rpc_count, 0);
+}
+#[test]
+#[ignore = "requires public network and recent parent state (FRAME_TRACE_WESTEND_RPC)"]
+fn public_relay_network() {
+    let url = endpoint("FRAME_TRACE_WESTEND_RPC", "wss://westend-rpc.polkadot.io");
+    let rpc = frame_trace_replay::rpc::Rpc::new(&url).unwrap();
+    let result = frame_trace_replay::online(&rpc, "finalized").unwrap();
+    assert!(result.root_check);
+    assert_eq!(result.measured_rpc_count, 0);
+    let block = TracedBlock::from_replay(&result.capture).unwrap();
+    let metadata = frame_trace_decode::Metadata::from_hex(&result.artifact.metadata).unwrap();
+    let annotated = frame_trace_decode::annotate(&block, Some(&metadata));
+    assert!(
+        annotated
+            .phases
+            .iter()
+            .any(|p| p.call.as_deref() == Some("ParaInherent.enter"))
+    );
+}
+
+/// Westend relay chain #33,614,892: the relay runtime, with its parachain inherent.
+#[test]
+fn westend_relay_block_with_para_inherent() {
+    let result = replay(Artifact::load(&fixture("westend-relay")).unwrap(), None).unwrap();
+    assert_eq!(result.block_number, 33_614_892);
+    // Blake2-256 of the stored `:code`, the name of the runtime's fixture blob.
+    assert_eq!(
+        result.runtime_code_hash,
+        "0xb5723ec53e943ee8a038e1bcbefee0132fb93900b394a1c41990aef203aeb8ba"
+            .parse()
+            .unwrap()
+    );
+    assert!(result.root_check);
+    assert_eq!((result.rpc_count, result.measured_rpc_count), (0, 0));
+    let block = TracedBlock::from_replay(&result.capture).unwrap();
+    let metadata = frame_trace_decode::Metadata::from_hex(&result.artifact.metadata).unwrap();
+    let annotated = frame_trace_decode::annotate(&block, Some(&metadata));
+    assert!(annotated.all_phases().all(|p| p.call_error.is_none()));
+    let labels: Vec<_> = annotated.all_phases().map(|p| p.label.as_str()).collect();
+    assert_eq!(
+        labels,
+        [
+            "initialization",
+            "extrinsic 0: Timestamp.set",
+            "extrinsic 1: ParaInherent.enter",
+            "post inherents (on_poll)",
+            "finalization",
+        ]
+    );
+    let enter = &annotated.phases[2];
+    let heads = |op: &str| {
+        enter
+            .ops
+            .iter()
+            .filter(|o| o.op == op && o.item == "Paras::Heads")
+            .count()
+    };
+    assert_eq!((heads("get"), heads("put")), (14, 11), "parachain heads");
+    assert!(
+        enter
+            .ops
+            .iter()
+            .any(|o| o.op == "put" && o.item == "ParaInherent::OnChainVotes")
+    );
 }
 
 #[test]
@@ -393,4 +465,61 @@ fn concurrent_artifact_saves_are_atomic_and_leave_no_temporary_files() {
     assert_eq!(artifact.proof_nodes, original.proof_nodes);
     assert_eq!(std::fs::read_dir(&dir).unwrap().count(), 1);
     std::fs::remove_dir_all(dir).unwrap();
+}
+
+/// A runtime that imports a host function frame-trace lacks fails with the function's name,
+/// not as a generic execution failure.
+#[test]
+fn missing_host_function_is_named_through_runtime_override() {
+    let wasm = wat::parse_str(
+        r#"(module
+        (import "env" "ext_frame_trace_missing_version_1" (func))
+        (import "env" "ext_frame_trace_also_missing_version_2" (func (param i32)))
+        (memory (export "memory") 1)
+        (global (export "__heap_base") i32 (i32.const 1024))
+        (func (export "Core_execute_block") (param i32 i32) (result i64) i64.const 0))"#,
+    )
+    .unwrap();
+    let session = frame_trace_replay::ReplaySession::new(None)
+        .unwrap()
+        .with_runtime_override(Some(wasm));
+    let error = frame_trace_replay::replay_with_session(
+        Artifact::load(&fixture("westend-asset-hub")).unwrap(),
+        None,
+        &session,
+    )
+    .unwrap_err();
+    let Error::MissingHostFunctions { functions, hint } = &error else {
+        panic!("{error}");
+    };
+    assert_eq!(
+        functions,
+        "env:ext_frame_trace_also_missing_version_2, env:ext_frame_trace_missing_version_1"
+    );
+    assert!(hint.contains("runtime override may be the cause"), "{hint}");
+    let text = error.to_string();
+    assert!(
+        text.starts_with("the runtime needs host functions frame-trace does not have: env:ext_frame_trace_also_missing_version_2, "),
+        "{text}"
+    );
+    assert!(text.contains("fixed when it is built"), "{text}");
+    assert!(
+        text.contains(
+            "troubleshooting.html#the-runtime-needs-host-functions-frame-trace-does-not-have"
+        ),
+        "{text}"
+    );
+}
+
+/// `fixtures/wasm/missing-host-function.wasm` is the committed build of its `.wat` source.
+/// Regenerate it with `FRAME_TRACE_REGENERATE_WASM=1` on this test.
+#[test]
+fn missing_host_function_wasm_matches_its_source() {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/wasm");
+    let built = wat::parse_file(dir.join("missing-host-function.wat")).unwrap();
+    let path = dir.join("missing-host-function.wasm");
+    if std::env::var_os("FRAME_TRACE_REGENERATE_WASM").is_some() {
+        std::fs::write(&path, &built).unwrap();
+    }
+    assert_eq!(std::fs::read(&path).unwrap(), built);
 }

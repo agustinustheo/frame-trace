@@ -67,23 +67,35 @@ See [What a replay proves](concepts/what-a-replay-proves.md).
 - If you used `--runtime-override`, the error ends with `the runtime override may be the cause`.
   Build the override from exactly the source of the runtime on chain.
 - If you used `--offline`, the saved block may have been changed. Save it again.
-- If the text after the colon names missing imports, see the next section.
 - Otherwise, the block itself may need something frame-trace does not support. Open an issue with the block number and chain.
 
-## `runtime requires function imports which are not present on the host`
+## `the runtime needs host functions frame-trace does not have`
 
-```text
-Error: fixtures/replay/people-transfer/artifact.json.zst: runtime execution failed (root mismatch, unsupported host function, or invalid block): Other error happened while constructing the runtime: runtime requires function imports which are not present on the host: 'env:ext_frame_trace_missing_version_1'; a runtime override was executed instead of the authenticated :code; the runtime override may be the cause
+This output comes from a test runtime in the repository that imports one made-up host function, `ext_frame_trace_missing_version_1`.
+Run this from the repository root to see it:
+
+```sh
+frame-trace block --offline fixtures/replay/westend-asset-hub \
+  --runtime-override fixtures/wasm/missing-host-function.wasm
 ```
 
-This run used a test runtime that imports a made-up host function.
+```text
+...
+root check: NOT VERIFIED; RPC calls: 0
+Error: fixtures/replay/westend-asset-hub/artifact.json.zst: the runtime needs host functions frame-trace does not have: env:ext_frame_trace_missing_version_1; a runtime override was executed instead of the authenticated :code; the runtime override may be the cause. frame-trace's host functions are fixed when it is built, so this chain needs a frame-trace build that adds them. See https://agustinustheodorus.com/frame-trace/troubleshooting.html#the-runtime-needs-host-functions-frame-trace-does-not-have
+```
 
-**What it means.** The runtime calls a host function that frame-trace does not provide.
+Without `--runtime-override`, the error has no part about the runtime override.
+
+**What it means.** The runtime calls host functions that frame-trace does not provide.
+The list after the colon names each one.
 frame-trace provides the same host functions as a stable2609 Polkadot SDK omni-node.
-A chain with its own custom host functions cannot be replayed.
+They are fixed when frame-trace is built, so no flag adds more.
+frame-trace stops before it runs the block and exports nothing.
 
-**Fix.** None in frame-trace for custom host functions.
-If the missing function is a standard Polkadot SDK one, open an issue with its name.
+**Fix.** frame-trace needs a new build that includes these host functions.
+Open an issue with the chain name and the list of names from the error.
+If you build frame-trace yourself, [the developer notes](https://github.com/agustinustheo/frame-trace/blob/main/dev/README.md#add-host-functions-for-a-chain) describe how to add them.
 
 ## `--runtime-override <file>: … not a Wasm module`
 

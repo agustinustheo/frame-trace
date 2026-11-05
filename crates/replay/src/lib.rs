@@ -66,10 +66,55 @@ pub enum Error {
     Execution(String),
     #[error("runtime rejected the call input: {0}")]
     CallExecution(String),
+    /// The runtime imports host functions that this build's `HostFunctions` lacks.
+    #[error(
+        "the runtime needs host functions frame-trace does not have: {functions}{hint}. \
+         frame-trace's host functions are fixed when it is built, so this chain needs a \
+         frame-trace build that adds them. See {MISSING_HOST_FUNCTIONS_DOCS}"
+    )]
+    MissingHostFunctions {
+        /// The missing imports as the executor names them, for example `env:ext_foo_version_1`.
+        functions: String,
+        /// Empty, or `; ` and a note that a runtime override was executed.
+        hint: String,
+    },
     #[error("artifact I/O: {0}")]
     Io(#[from] std::io::Error),
     #[error("artifact JSON: {0}")]
     Json(#[from] serde_json::Error),
+}
+
+const MISSING_HOST_FUNCTIONS_DOCS: &str = "https://agustinustheodorus.com/frame-trace/troubleshooting.html#the-runtime-needs-host-functions-frame-trace-does-not-have";
+
+/// The executor's message when the runtime imports a function the host does not provide.
+const MISSING_IMPORTS: &str =
+    "runtime requires function imports which are not present on the host: ";
+
+/// The missing imports named by the executor's error text, if that is what it reports.
+/// sc-executor-wasmtime lists them as `'module:name', 'module:name'`; the list ends at the
+/// first token that does not continue it, so trailing context is never part of a name.
+fn missing_host_functions(text: &str) -> Option<String> {
+    let (_, mut rest) = text.split_once(MISSING_IMPORTS)?;
+    let mut functions = Vec::new();
+    while let Some((name, after)) = rest
+        .strip_prefix('\'')
+        .and_then(|quoted| quoted.split_once('\''))
+    {
+        functions.push(name.trim());
+        match after.strip_prefix(", ") {
+            Some(next) => rest = next,
+            None => break,
+        }
+    }
+    if functions.is_empty() {
+        // Unquoted: the list ends at the first `;`, `.` or line end.
+        let end = rest.find([';', '.', '\n', '\r']).unwrap_or(rest.len());
+        functions = rest[..end].split(',').map(str::trim).collect();
+    }
+    functions.retain(|name| !name.is_empty());
+    // The executor lists them in hash-map order; sort for stable output.
+    functions.sort_unstable();
+    (!functions.is_empty()).then(|| functions.join(", "))
 }
 
 impl Error {
@@ -285,6 +330,10 @@ pub(crate) fn override_hint(session: &ReplaySession, error: Error) -> Error {
         Error::Execution(text) => Error::Execution(format!("{text}; {HINT}")),
         Error::CallExecution(text) => Error::CallExecution(format!("{text}; {HINT}")),
         Error::Invalid(text) => Error::Invalid(format!("{text}; {HINT}")),
+        Error::MissingHostFunctions { functions, hint } => Error::MissingHostFunctions {
+            functions,
+            hint: format!("{hint}; {HINT}"),
+        },
         other => other,
     }
 }
@@ -302,6 +351,12 @@ pub struct Replay {
     /// Sequential proof acquisition waves, excluding context RPC and retries.
     pub proof_round_trips: usize,
     pub proof_bytes: usize,
+    /// Blake2-256 of the runtime code that executed the block. Without an override this is
+    /// the hash of the raw `:code` value stored in the parent state, in its stored form (usually
+    /// SDK-compressed), not of the decompressed Wasm. With an override it is the hash of the
+    /// override file's bytes, equal to [`RuntimeOverride::override_code_hash`].
+    /// Library only: the CLI's `--json` output does not include it.
+    pub runtime_code_hash: H256,
     pub artifact: Artifact,
     /// Set only when the session executed a substitute runtime.
     pub runtime_override: Option<RuntimeOverride>,
@@ -510,6 +565,7 @@ fn replay_inner(
         measured_rpc_count,
         proof_round_trips: db.round_trips.load(Ordering::Relaxed),
         proof_bytes,
+        runtime_code_hash: H256::from(sp_io::hashing::blake2_256(&wasm)),
         artifact,
         runtime_override,
     })
@@ -617,7 +673,12 @@ fn execute_method(
         return Err(db.take_error(failure));
     }
     let execution_error = |text: String| {
-        if method == "Core_execute_block" {
+        if let Some(functions) = missing_host_functions(&text) {
+            Error::MissingHostFunctions {
+                functions,
+                hint: String::new(),
+            }
+        } else if method == "Core_execute_block" {
             Error::Execution(text)
         } else {
             Error::CallExecution(
