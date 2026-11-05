@@ -29,7 +29,7 @@ pub struct ReportArgs {
     /// Most recent K blocks anchored to one finalized head.
     #[arg(long, requires="rpc", conflicts_with_all=["from", "to", "files", "from_json"], value_parser=clap::value_parser!(u32).range(1..=10000))]
     last: Option<u32>,
-    /// Concurrent block replays (proof request concurrency is separate).
+    /// Concurrent block replays (--proof-concurrency limits their RPC requests).
     #[arg(long, default_value_t=2, requires = "rpc", conflicts_with_all = ["files", "from_json"], value_parser=clap::value_parser!(u8).range(1..=4))]
     concurrency: u8,
     /// Maximum concurrent RPC requests across all blocks (1–64; up to 32 proof keys per request).
