@@ -28,9 +28,11 @@ To support such a chain:
 
 1. Find the crate that defines the functions. A `#[runtime_interface]` module exports a
    `HostFunctions` type; the names in the error are `ext_<interface>_<function>_version_<n>`.
-2. Add the crate to `crates/replay/Cargo.toml`, pinned with `=` to the version that matches
-   the SDK release of the other `sp-*`/`sc-*` pins there, and update `Cargo.lock` (builds
-   use `--locked`).
+2. Add the crate to `crates/replay/Cargo.toml` and update `Cargo.lock` (builds use
+   `--locked`). Most SDK crates there are pinned with `=` to one SDK release; pin the new one
+   the same way, to the version from that release. Two are not pinned exactly:
+   `sp-panic-handler = "13.0.2"` and `sp-crypto-hashing` (workspace `"0.1.0"`) use caret
+   ranges.
 3. Append its `HostFunctions` type to the tuple.
 4. Replay a real block of that chain with `frame-trace block --rpc <url> --block <n>` and
    check `root check: PASS`. Save it with `--save` if it should become a fixture
@@ -38,8 +40,11 @@ To support such a chain:
 
 Every added function is offered to every chain. Only add functions that the node of that
 chain also provides, so frame-trace never accepts a runtime the chain itself could not run.
-The unit test `unknown_host_import_error_names_the_import` and the integration test
-`missing_host_function_is_named_through_runtime_override` cover the error path.
+The unit tests `unknown_host_import_error_names_the_import` and
+`missing_host_function_names_stop_at_the_end_of_the_list`, the integration test
+`missing_host_function_is_named_through_runtime_override` and the CLI test
+`missing_host_function_fails_with_its_name_and_no_metadata_notice` cover the error path.
+`fixtures/wasm/missing-host-function.wasm` reproduces it from the command line.
 
 ## Live tests
 

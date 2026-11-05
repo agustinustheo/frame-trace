@@ -267,6 +267,13 @@ fn public_relay_network() {
 fn westend_relay_block_with_para_inherent() {
     let result = replay(Artifact::load(&fixture("westend-relay")).unwrap(), None).unwrap();
     assert_eq!(result.block_number, 33_614_892);
+    // Blake2-256 of the stored `:code`, the name of the runtime's fixture blob.
+    assert_eq!(
+        result.runtime_code_hash,
+        "0xb5723ec53e943ee8a038e1bcbefee0132fb93900b394a1c41990aef203aeb8ba"
+            .parse()
+            .unwrap()
+    );
     assert!(result.root_check);
     assert_eq!((result.rpc_count, result.measured_rpc_count), (0, 0));
     let block = TracedBlock::from_replay(&result.capture).unwrap();
@@ -502,4 +509,17 @@ fn missing_host_function_is_named_through_runtime_override() {
         ),
         "{text}"
     );
+}
+
+/// `fixtures/wasm/missing-host-function.wasm` is the committed build of its `.wat` source.
+/// Regenerate it with `FRAME_TRACE_REGENERATE_WASM=1` on this test.
+#[test]
+fn missing_host_function_wasm_matches_its_source() {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/wasm");
+    let built = wat::parse_file(dir.join("missing-host-function.wat")).unwrap();
+    let path = dir.join("missing-host-function.wasm");
+    if std::env::var_os("FRAME_TRACE_REGENERATE_WASM").is_some() {
+        std::fs::write(&path, &built).unwrap();
+    }
+    assert_eq!(std::fs::read(&path).unwrap(), built);
 }
