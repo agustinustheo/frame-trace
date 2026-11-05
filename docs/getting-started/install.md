@@ -6,6 +6,8 @@ You need:
 - Docker, to run Jaeger. Any other trace viewer that accepts [OTLP](../reference/glossary.md#otlp) over HTTP also works.
 - The RPC URL of a node of the chain you want to trace. It must serve `state_getReadProof`. See [Choose an endpoint](../guides/trace-a-block.md#choose-an-endpoint) before tracing many blocks.
 
+[What frame-trace supports](../reference/support.md) lists the chains and nodes frame-trace works with.
+
 ## Build and install
 
 Run these commands in a terminal:

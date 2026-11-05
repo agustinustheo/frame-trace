@@ -75,6 +75,8 @@ The [documentation](https://agustinustheodorus.com/frame-trace/) has a [glossary
 - A Polkadot SDK chain with Blake2 headers and `u32` block numbers. Decoded names need metadata V14 or newer.
 - Docker, or any trace viewer that accepts OTLP over HTTP. JSON output needs neither.
 
+The full list of supported chains, node methods and host functions is in [What frame-trace supports](docs/reference/support.md).
+
 ## Contributing
 
 Internal notes, research and design documents are in [`dev/`](dev/README.md).
