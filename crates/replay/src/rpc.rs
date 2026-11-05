@@ -58,7 +58,8 @@ fn runtime() -> Result<&'static Runtime> {
 }
 impl Rpc {
     /// Lazy connections. DNS, TCP, TLS and WS handshake share a ten-second connect deadline;
-    /// the logical call (including retries) has a thirty-second deadline after a slot is acquired.
+    /// the logical call (including retries) has a thirty-second deadline after a slot is acquired,
+    /// and each of its four attempts a quarter of that.
     pub fn new(url: &str) -> Result<Self> {
         Self::with_options(url, 8, Duration::from_secs(30), CancellationToken::new())
     }
@@ -165,13 +166,15 @@ impl Rpc {
         for attempt in 0..4 {
             let id = self.calls.fetch_add(1, Ordering::SeqCst) + 1;
             let request = json!({"jsonrpc":"2.0", "id":id, "method":method, "params":params});
-            let attempt_deadline = (self.inner.deadline / 4).min(Duration::from_secs(10));
-            let response = tokio::time::timeout(attempt_deadline, self.once(&request))
+            // A quarter of the call's deadline, so four attempts fit. A slow node needs a longer
+            // deadline, not more attempts: a large proof can take tens of seconds to arrive.
+            let attempt_deadline = self.inner.deadline / 4;
+            let response = tokio::time::timeout(attempt_deadline, self.once(&request, id))
                 .await
                 .unwrap_or_else(|_| Err(("attempt deadline exceeded".into(), true)));
             match response {
                 Ok(body) => {
-                    if body["jsonrpc"] != "2.0" || body["id"] != id {
+                    if body["jsonrpc"] != "2.0" || body["id"] != id && !null_id_error(&body) {
                         return Err(Error::Rpc(format!(
                             "{method}: malformed response or response ID mismatch"
                         )));
@@ -236,7 +239,7 @@ impl Rpc {
         ))
         .await;
     }
-    async fn once(&self, request: &Value) -> std::result::Result<Value, (String, bool)> {
+    async fn once(&self, request: &Value, id: usize) -> std::result::Result<Value, (String, bool)> {
         if self.inner.url.starts_with("http") {
             let response = self
                 .inner
@@ -308,8 +311,19 @@ impl Rpc {
         while let Some(message) = socket.next().await {
             match message.map_err(|e| (e.to_string(), true))? {
                 Message::Text(text) => {
-                    let value = serde_json::from_str(&text)
+                    let value: Value = serde_json::from_str(&text)
                         .map_err(|e| (format!("malformed response: {e}"), false))?;
+                    // A frame for another ID (a stray notification or a buggy node) is skipped,
+                    // so it cannot fail this call or leave our answer queued for the next one.
+                    // An error with a null ID answers the one request on this socket: the node
+                    // could not read it.
+                    if value
+                        .get("id")
+                        .is_some_and(|got| *got != id && !null_id_error(&value))
+                        || value.get("id").is_none() && value.get("method").is_some()
+                    {
+                        continue;
+                    }
                     *slot = Some(socket);
                     return Ok(value);
                 }
@@ -325,6 +339,10 @@ impl Rpc {
     pub fn count(&self) -> usize {
         self.calls.load(Ordering::SeqCst)
     }
+}
+/// A JSON-RPC error the node sent without an ID, because it could not read the request.
+fn null_id_error(body: &Value) -> bool {
+    body["id"].is_null() && body.get("error").is_some_and(|e| !e.is_null())
 }
 pub fn unhex(s: &str) -> Result<Vec<u8>> {
     hex::decode(s.strip_prefix("0x").unwrap_or(s))
@@ -545,6 +563,105 @@ mod tests {
             );
             worker.join().unwrap();
         }
+    }
+    #[test]
+    fn websocket_frames_for_other_ids_are_skipped_and_the_socket_stays_in_step() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("ws://{}", listener.local_addr().unwrap());
+        let worker = thread::spawn(move || {
+            let mut socket = tungstenite::accept(listener.accept().unwrap().0).unwrap();
+            for result in [1, 2] {
+                let request: Value =
+                    serde_json::from_str(socket.read().unwrap().to_text().unwrap()).unwrap();
+                for frame in [
+                    json!({"jsonrpc":"2.0", "id":9999, "result":"stray"}),
+                    json!({"jsonrpc":"2.0", "method":"note", "params":{}}),
+                    json!({"jsonrpc":"2.0", "id":request["id"], "result":result}),
+                ] {
+                    socket
+                        .send(tungstenite::Message::Text(frame.to_string().into()))
+                        .unwrap();
+                }
+            }
+        });
+        let rpc = Rpc::new(&url).unwrap();
+        assert_eq!(rpc.call("chain_getHeader", json!([])).unwrap(), 1);
+        // The same socket is reused; no frame from the first call is left behind.
+        assert_eq!(rpc.call("chain_getHeader", json!([])).unwrap(), 2);
+        assert_eq!(rpc.count(), 2);
+        worker.join().unwrap();
+    }
+    #[test]
+    fn websocket_error_with_a_null_id_fails_the_call_at_once() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("ws://{}", listener.local_addr().unwrap());
+        let worker = thread::spawn(move || {
+            let mut socket = tungstenite::accept(listener.accept().unwrap().0).unwrap();
+            socket.read().unwrap();
+            let error = json!({"jsonrpc":"2.0", "id":null, "error":{"code":-32700, "message":"Parse error"}});
+            socket
+                .send(tungstenite::Message::Text(error.to_string().into()))
+                .unwrap();
+            let _ = socket.read();
+        });
+        let start = std::time::Instant::now();
+        let error = Rpc::new(&url)
+            .unwrap()
+            .call("chain_getHeader", json!([]))
+            .unwrap_err();
+        assert!(error.to_string().contains("Parse error"), "{error}");
+        assert!(
+            start.elapsed() < Duration::from_secs(5),
+            "{:?}",
+            start.elapsed()
+        );
+        drop(worker);
+    }
+    #[test]
+    fn a_longer_deadline_waits_for_a_slow_response() {
+        // The node answers after 1.5 s: a 1 s deadline gives up, a 8 s one (2 s tries) waits.
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        let worker = thread::spawn(move || {
+            for stream in listener.incoming().take(5) {
+                let mut stream = stream.unwrap();
+                thread::spawn(move || {
+                    let mut reader = BufReader::new(stream.try_clone().unwrap());
+                    let mut len = 0;
+                    loop {
+                        let mut line = String::new();
+                        if reader.read_line(&mut line).unwrap_or(0) == 0 || line == "\r\n" {
+                            break;
+                        }
+                        if let Some(v) = line.to_lowercase().strip_prefix("content-length:") {
+                            len = v.trim().parse().unwrap();
+                        }
+                    }
+                    let mut bytes = vec![0; len];
+                    if reader.read_exact(&mut bytes).is_err() {
+                        return;
+                    }
+                    let request: Value = serde_json::from_slice(&bytes).unwrap();
+                    thread::sleep(Duration::from_millis(1500));
+                    let body =
+                        json!({"jsonrpc":"2.0", "id":request["id"], "result":"slow"}).to_string();
+                    let _ = write!(
+                        stream,
+                        "HTTP/1.1 200 OK\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                        body.len()
+                    );
+                });
+            }
+        });
+        let short =
+            Rpc::with_options(&url, 1, Duration::from_secs(1), CancellationToken::new()).unwrap();
+        let error = short.call("chain_getHeader", json!([])).unwrap_err();
+        assert!(error.is_transient(), "{error}");
+        assert!(error.to_string().contains("deadline exceeded"), "{error}");
+        let long =
+            Rpc::with_options(&url, 1, Duration::from_secs(8), CancellationToken::new()).unwrap();
+        assert_eq!(long.call("chain_getHeader", json!([])).unwrap(), "slow");
+        drop(worker);
     }
     #[test]
     fn dropped_websocket_connection_reconnects() {

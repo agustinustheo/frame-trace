@@ -94,7 +94,7 @@ Saved files need no network.
 | `--top N` | Rows per table in the terminal. JSON always has every row. |
 | `--sort-by proof\|ops\|time` | Rank items, extrinsics and hooks by proof bytes, operations or storage time. |
 | `--concurrency N` | Blocks replayed at once, 1 to 4. |
-| `--proof-concurrency N` | Proof requests at once, shared by all blocks. |
+| `--proof-concurrency N` | RPC requests at once, shared by all blocks. |
 | `--cache-dir DIR` | Keep fetched state and compiled runtimes between blocks and runs. |
 | `--json FILE` | Write the full report as JSON. `-` writes it to stdout and the tables to stderr. |
 

@@ -1,6 +1,9 @@
 //! Where a block trace and its metadata come from.
 
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    time::Duration,
+};
 
 use anyhow::{Context, Result, bail};
 use clap::{ArgGroup, Args};
@@ -41,9 +44,12 @@ pub struct SourceArgs {
     /// Save the replay context and proofs for offline use.
     #[arg(long, value_name = "DIR", conflicts_with = "from_file")]
     pub save: Option<PathBuf>,
-    /// Maximum concurrent proof requests (1–64; up to 32 keys per request).
+    /// Maximum concurrent RPC requests (1–64; up to 32 proof keys per request).
     #[arg(long, default_value_t = 8, requires = "rpc", conflicts_with_all = ["from_file", "from_json", "offline"], value_parser = clap::value_parser!(u8).range(1..=64))]
     pub proof_concurrency: u8,
+    /// Longest wait in seconds for one RPC response; each request gets four tries.
+    #[arg(long, value_name = "SECONDS", default_value = "7.5", value_parser = rpc_timeout, requires = "rpc", conflicts_with_all = ["from_file", "from_json", "offline"])]
+    pub rpc_timeout: Duration,
     /// Persistent authenticated proof nodes and compiled Wasm cache directory.
     #[arg(long, value_name = "DIR", conflicts_with_all = ["from_file", "from_json"])]
     pub cache_dir: Option<PathBuf>,
@@ -59,6 +65,32 @@ pub struct SourceArgs {
     /// combined with --save.
     #[arg(long, value_name = "WASM", conflicts_with_all = ["from_file", "from_json", "save"])]
     pub runtime_override: Option<PathBuf>,
+}
+
+/// Parses `--rpc-timeout`, in seconds.
+pub fn rpc_timeout(text: &str) -> std::result::Result<Duration, String> {
+    let secs: f64 = text
+        .parse()
+        .map_err(|_| format!("{text} is not a number of seconds"))?;
+    if !(secs > 0.0 && secs <= 3600.0) {
+        return Err("must be more than 0 and at most 3600 seconds".into());
+    }
+    Ok(Duration::from_secs_f64(secs))
+}
+
+/// A node client. `timeout` bounds each try; a request gets four tries within four times it.
+pub fn rpc(
+    url: &str,
+    concurrency: u8,
+    timeout: Duration,
+    cancel: frame_trace_replay::rpc::CancellationToken,
+) -> Result<frame_trace_replay::rpc::Rpc> {
+    Ok(frame_trace_replay::rpc::Rpc::with_options(
+        url,
+        usize::from(concurrency),
+        timeout * 4,
+        cancel,
+    )?)
 }
 
 /// Read a `--runtime-override` Wasm (plain or SDK-compressed) before any network work.
@@ -129,10 +161,10 @@ pub fn load(args: &SourceArgs) -> Result<Loaded> {
     match (&args.from_file, &args.rpc) {
         (Some(trace), _) => file::load(trace, args.metadata.as_deref()),
         (None, Some(url)) => {
-            let rpc = frame_trace_replay::rpc::Rpc::with_options(
+            let rpc = rpc(
                 url,
-                args.proof_concurrency as usize,
-                std::time::Duration::from_secs(30),
+                args.proof_concurrency,
+                args.rpc_timeout,
                 Default::default(),
             )
             .inspect_err(|_| {

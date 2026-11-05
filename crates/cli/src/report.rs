@@ -29,12 +29,15 @@ pub struct ReportArgs {
     /// Most recent K blocks anchored to one finalized head.
     #[arg(long, requires="rpc", conflicts_with_all=["from", "to", "files", "from_json"], value_parser=clap::value_parser!(u32).range(1..=10000))]
     last: Option<u32>,
-    /// Concurrent block replays (proof request concurrency is separate).
+    /// Concurrent block replays (--proof-concurrency limits their RPC requests).
     #[arg(long, default_value_t=2, requires = "rpc", conflicts_with_all = ["files", "from_json"], value_parser=clap::value_parser!(u8).range(1..=4))]
     concurrency: u8,
-    /// Maximum concurrent proof requests across all blocks (1–64).
+    /// Maximum concurrent RPC requests across all blocks (1–64; up to 32 proof keys per request).
     #[arg(long, default_value_t=8, requires = "rpc", conflicts_with_all = ["files", "from_json"], value_parser=clap::value_parser!(u8).range(1..=64))]
     proof_concurrency: u8,
+    /// Longest wait in seconds for one RPC response; each request gets four tries.
+    #[arg(long, value_name = "SECONDS", default_value = "7.5", value_parser = crate::source::rpc_timeout, requires = "rpc", conflicts_with_all = ["files", "from_json"])]
+    rpc_timeout: std::time::Duration,
     /// Persist authenticated proof nodes and compiled Wasm in this directory.
     #[arg(long, requires = "rpc", conflicts_with_all = ["files", "from_json"])]
     cache_dir: Option<PathBuf>,
@@ -108,11 +111,11 @@ pub fn read_trace(path: &Path) -> Result<AnnotatedBlock> {
 pub fn run(args: ReportArgs) -> Result<()> {
     let mut accumulator = Accumulator::default();
     if let Some(url) = &args.rpc {
-        use frame_trace_replay::{ReplaySession, rpc::Rpc};
-        let rpc = Rpc::with_options(
+        use frame_trace_replay::ReplaySession;
+        let rpc = crate::source::rpc(
             url,
-            args.proof_concurrency as usize,
-            std::time::Duration::from_secs(30),
+            args.proof_concurrency,
+            args.rpc_timeout,
             Default::default(),
         )?;
         let session =

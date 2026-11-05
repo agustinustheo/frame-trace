@@ -127,7 +127,7 @@ Error: exporting to http://127.0.0.1:4999: 428 of 428 spans were not exported (f
 
 **Fix.**
 
-- Check that Jaeger or your collector is running: `docker ps`.
+- Check that Jaeger or your OTLP receiver is running: `docker ps`.
 - Check the port. OTLP/HTTP is usually 4318. The Jaeger web page, 16686, does not accept traces.
 - Map the port when you start Jaeger: `-p 4318:4318`.
 
@@ -146,6 +146,48 @@ frame-trace exits with code 1, because the trace in your viewer is incomplete.
 **Fix.** Read the receiver's reason and its logs.
 Common causes are limits on attributes per span, span size or spans per request.
 Raise the limit in the receiver's configuration, or send to a receiver without it, such as a local Jaeger.
+
+## `follow poll failed`
+
+```text
+follow poll failed: RPC error: chain_getFinalizedHead: connect ws://127.0.0.1:9: IO error: Connection refused (os error 61); retrying in 2s
+follow poll still failing after 6 attempts over 1m06s: RPC error: chain_getFinalizedHead: connect ws://127.0.0.1:9: IO error: Connection refused (os error 61); retrying in 1m00s
+```
+
+**What it means.** `follow` could not ask the node for its newest block.
+It keeps running and tries again, waiting longer after each failure.
+While it fails, the log repeats the line once a minute with the count so far.
+
+**Fix.**
+
+- Check that the node is running and that the `--rpc` URL and port are right.
+- Wait for `follow poll recovered after <N> failed attempt(s)`. Nothing else is needed.
+
+## `OTLP export failed`
+
+```text
+OTLP export failed (1 attempt(s) in a row): 578 of 578 spans were not exported (first error: Operation failed: HTTP export failed: network error); retrying in 1s, 10 trace(s) waiting
+```
+
+**What it means.** `follow` replayed a block but could not send its trace.
+It keeps the trace and tries again. It does not replay the block again, and it does not resend spans the receiver already accepted.
+It logs `OTLP export recovered` when the receiver is back.
+
+**Fix.** Start the receiver again, or fix the `--otlp` URL. The fixes for [`<N> of <M> spans were not exported`](#n-of-m-spans-were-not-exported) apply.
+
+## `OTLP export queue full`
+
+```text
+OTLP export queue full (32 traces); dropped the oldest, block #19025706 0x4c91709d161faccb5df6c0561e7a745f7b27d8d9b6e472c8d60f5e19dd2538ed (1 dropped so far)
+```
+
+**What it means.** The receiver has been down long enough that `follow` holds the most traces it keeps.
+To make room for a new trace, it drops the oldest one. The status line counts it as `export-dropped`.
+While this goes on, the line repeats once a minute.
+
+**Fix.** Start the receiver again. Dropped traces are not sent later.
+To trace a dropped block, run `frame-trace block --rpc <URL> --block <hash> --otlp` with the hash from the line.
+This works while the node still has the state before that block.
 
 ## No traces in Jaeger, but no error
 
@@ -184,6 +226,27 @@ Keys show as `<unknown>` or raw hex, and call results as hex.
 **Fix.** For a live block, `--unauthenticated-metadata` lets frame-trace use the node's metadata.
 It is not checked, and the output says so.
 For a call, use `--data` instead of `--args`.
+
+## `overall request deadline exceeded`
+
+```text
+replay #15366850: fetching state (shared limit: 8 concurrent RPC requests)
+root check: NOT VERIFIED; RPC calls: 8
+Error: RPC error: state_getReadProof: overall request deadline exceeded
+```
+
+This run used `wss://asset-hub-paseo-rpc.n.dwellir.com`.
+
+**What it means.** The node took too long to answer one request.
+Some nodes take more than half a minute to send a large proof, such as the one for the runtime code.
+
+**Fix.** Raise `--rpc-timeout`. With `--rpc-timeout 120`, the same command passed:
+
+```text
+root check: PASS; RPC calls: 113 (timed replay: 0); execution proof: 101420 bytes
+```
+
+See [defaults and limits](reference/commands.md#block).
 
 ## The first run is slow
 

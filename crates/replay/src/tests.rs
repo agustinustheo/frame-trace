@@ -353,6 +353,56 @@ fn online_acquisition_pins_context_and_measures_with_zero_rpc() {
 }
 
 #[test]
+fn a_failed_root_check_records_no_hints_and_writes_no_disk_cache() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/replay/people-transfer");
+    let artifact = Artifact::load(&path).unwrap();
+    let mut memory = sp_trie::MemoryDB::<Blake2Hasher>::default();
+    for node in &artifact.proof_nodes {
+        HashDB::insert(&mut memory, EMPTY_PREFIX, &unhex(node).unwrap());
+    }
+    let parent_header: Header = serde_json::from_value(artifact.parent_header.clone()).unwrap();
+    let trie =
+        sp_state_machine::TrieBackendBuilder::new(memory, *parent_header.state_root()).build();
+    let parent = artifact.block["header"]["parentHash"].clone();
+    // Same block with a wrong state root in its header: replay must fail the root check.
+    let mut block = artifact.block.clone();
+    block["header"]["stateRoot"] = json!(format!("0x{}", "ee".repeat(32)));
+    let hash = header_hash(&block["header"]).unwrap();
+    let (rpc, _, halt, worker) = server(move |request| match request["method"].as_str().unwrap() {
+        "chain_getBlock" => json!({ "block": block }),
+        "chain_getHeader" => artifact.parent_header.clone(),
+        "state_getRuntimeVersion" => artifact.runtime_version.clone(),
+        "state_getMetadata" => json!(""),
+        "state_getReadProof" => {
+            let keys: Vec<_> = request["params"][0]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| unhex(v.as_str().unwrap()).unwrap())
+                .collect();
+            match sp_state_machine::prove_read_on_trie_backend(&trie, &keys) {
+                Ok(proof) => {
+                    json!({"at":parent,"proof":proof.into_iter_nodes().map(|n| rpc::hex0(&n)).collect::<Vec<_>>()})
+                }
+                Err(_) => json!({"at":parent,"proof":[]}),
+            }
+        }
+        method => panic!("unexpected RPC {method}"),
+    });
+    let dir = std::env::temp_dir().join(format!("frame-trace-root-fail-{}", std::process::id()));
+    let session = ReplaySession::new(Some(&dir))
+        .unwrap()
+        .with_speculative_discovery(false);
+    let error = online_with_session(&rpc, &hash, &session).unwrap_err();
+    assert!(matches!(error, Error::Execution(_)), "{error}");
+    assert!(session.predicted_keys().is_empty(), "hints recorded");
+    let written = std::fs::read_dir(dir.join("nodes")).unwrap().count();
+    assert_eq!(written, 0, "proof nodes written to the disk cache");
+    stop(halt, worker);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
 fn measured_run_rpc_guard_detects_network_activity() {
     let (rpc, requests, halt, worker) = server(|_| json!(null));
     assert_eq!(without_rpc(Some(&rpc), || Ok(())).unwrap(), ((), 0));

@@ -502,7 +502,7 @@ endpoint and host variance.
 Default completion ranges were **#18615397–#18615445** and
 **#18615607–#18615644**, both consecutive. The 12-worker run completed
 **#18615456–#18615502** except **#18615501**, which was still in flight at Ctrl-C.
-That run's shutdown line was `follow shutdown: skipped=0 cancelled=8`: #18615501
+That run's shutdown line was `follow shutdown: skipped=0 cancelled=8` (later releases end with a `follow stopped after …` summary instead): #18615501
 and seven other queued or in-flight heights were cancelled, not expired or rejected. Before windows had both explicit expiry
 skips and missing completed heights. Shutdown cancellations are not counted as
 successful replays. All seven clients exited successfully on one Ctrl-C.
@@ -677,7 +677,7 @@ A short `follow` probe on the same binary at host load 4.2 traced its first bloc
 (#18616911) in **26.969 s**, inside the before range. The slower first blocks in
 the final windows are therefore attributed to host load and block/endpoint
 variance, not to the cap or the slot count. That probe also exited **55 ms** after
-SIGINT (`follow shutdown: skipped=0 cancelled=12`), with workers still waiting at
+SIGINT (`follow shutdown: skipped=0 cancelled=12`, the shutdown format of that time), with workers still waiting at
 the cold-start gate. Raw output: `/tmp/ft-perf/rayon/` (`summary.txt`, per-run
 `.log` with `/usr/bin/time -l`, `-host.txt` uptime captures, `follow-probe.log`).
 

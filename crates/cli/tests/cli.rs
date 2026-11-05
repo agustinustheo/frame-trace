@@ -978,7 +978,7 @@ fn follow_mock_node_retries_failed_blocks_observes_new_heads_and_cancels() {
     assert!(
         text.contains("in-flight=")
             && text.contains("stopped=")
-            && text.contains("follow stopped")
+            && text.contains("follow stopped after ")
             && !text.contains("panicked at")
     );
 }
@@ -1019,6 +1019,239 @@ fn follow_ctrl_c_interrupts_a_stalled_websocket_handshake() {
     node.join().unwrap();
 }
 
+/// Sends `signal` to `child` and waits up to ten seconds for it to exit.
+fn stop_child(child: &mut std::process::Child, signal: &str) -> std::process::ExitStatus {
+    use std::{
+        thread,
+        time::{Duration, Instant},
+    };
+    let start = Instant::now();
+    Command::new("kill")
+        .args([signal, &child.id().to_string()])
+        .status()
+        .unwrap();
+    while child.try_wait().unwrap().is_none() && start.elapsed() < Duration::from_secs(10) {
+        thread::sleep(Duration::from_millis(20));
+    }
+    if child.try_wait().unwrap().is_none() {
+        child.kill().unwrap();
+    }
+    let status = child.wait().unwrap();
+    assert!(start.elapsed() < Duration::from_secs(10), "{status:?}");
+    status
+}
+
+/// Waits up to `secs` seconds for the log to contain `text`.
+fn wait_for_log(log: &std::path::Path, text: &str, secs: u64) -> String {
+    let start = std::time::Instant::now();
+    loop {
+        let current = std::fs::read_to_string(log).unwrap();
+        if current.contains(text) || start.elapsed() > std::time::Duration::from_secs(secs) {
+            return current;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+}
+
+#[test]
+fn follow_sigterm_stops_gracefully_with_a_summary() {
+    use std::process::Stdio;
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("ws://{}", listener.local_addr().unwrap());
+    let log = std::env::temp_dir().join(format!("frame-trace-sigterm-{}.log", std::process::id()));
+    let mut child = Command::new(BIN)
+        .args(["follow", "--rpc", &url])
+        .stdout(Stdio::null())
+        .stderr(std::fs::File::create(&log).unwrap())
+        .spawn()
+        .unwrap();
+    // A stalled handshake keeps the first poll waiting, as on an unresponsive node.
+    let (mut stream, _) = listener.accept().unwrap();
+    stream.set_nonblocking(false).unwrap();
+    let node = std::thread::spawn(move || {
+        let _ = stream.read_to_end(&mut Vec::new());
+    });
+    let status = stop_child(&mut child, "-TERM");
+    let text = std::fs::read_to_string(&log).unwrap();
+    std::fs::remove_file(log).unwrap();
+    assert!(status.success(), "{status:?}: {text}");
+    assert!(text.contains("follow: stopping"), "{text}");
+    assert!(text.contains("follow stopped after "), "{text}");
+    assert!(text.contains(" traced=0 "), "{text}");
+    node.join().unwrap();
+}
+
+/// Kills the child on drop, so a failed assertion cannot leave `follow` running.
+struct Child(std::process::Child);
+impl Drop for Child {
+    fn drop(&mut self) {
+        if self.0.try_wait().ok().flatten().is_none() {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+}
+
+/// An OTLP/HTTP receiver that answers `503` while `down` is set and `200` otherwise, and
+/// counts the requests it accepted.
+fn switchable_receiver(
+    down: std::sync::Arc<std::sync::atomic::AtomicBool>,
+) -> (String, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
+    use std::sync::atomic::Ordering;
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    let accepted = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let count = accepted.clone();
+    std::thread::spawn(move || {
+        for stream in listener.incoming() {
+            let Ok(mut stream) = stream else { return };
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut len = 0;
+            loop {
+                let mut line = String::new();
+                if reader.read_line(&mut line).unwrap_or(0) == 0 || line == "\r\n" {
+                    break;
+                }
+                if let Some(v) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+                    len = v.trim().parse().unwrap_or(0);
+                }
+            }
+            if reader.read_exact(&mut vec![0; len]).is_err() {
+                continue;
+            }
+            let status = if down.load(Ordering::SeqCst) {
+                "503 Service Unavailable"
+            } else {
+                count.fetch_add(1, Ordering::SeqCst);
+                "200 OK"
+            };
+            let _ = write!(
+                stream,
+                "HTTP/1.1 {status}\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"
+            );
+        }
+    });
+    (url, accepted)
+}
+
+#[test]
+fn follow_retries_only_the_export_while_the_collector_is_down() {
+    let _serial = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    use std::{
+        process::Stdio,
+        sync::{
+            Arc,
+            atomic::{AtomicBool, AtomicUsize, Ordering},
+        },
+    };
+    let artifact = frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
+        "replay/people-transfer",
+    )))
+    .unwrap();
+    let blocks = Arc::new(AtomicUsize::new(0));
+    let fetched = blocks.clone();
+    let node = MockNode::new(move |request| {
+        if request["method"] == "chain_getBlock" {
+            fetched.fetch_add(1, Ordering::SeqCst);
+        }
+        artifact_rpc(&artifact, request)
+    });
+    let down = Arc::new(AtomicBool::new(true));
+    let (otlp, accepted) = switchable_receiver(down.clone());
+    let log = std::env::temp_dir().join(format!(
+        "frame-trace-follow-otlp-{}.log",
+        std::process::id()
+    ));
+    let mut child = Child(
+        Command::new(BIN)
+            .args(["follow", "--rpc", &node.url, "--otlp", &otlp])
+            // Keep each failed try short; the exporter retries 503 within this time.
+            .env("OTEL_EXPORTER_OTLP_TIMEOUT", "500")
+            .stdout(Stdio::null())
+            .stderr(std::fs::File::create(&log).unwrap())
+            .spawn()
+            .unwrap(),
+    );
+    let text = wait_for_log(&log, "OTLP export failed", 120);
+    assert!(
+        text.contains("OTLP export failed (1 attempt(s) in a row)"),
+        "{text}"
+    );
+    down.store(false, Ordering::SeqCst);
+    wait_for_log(&log, "OTLP export recovered", 30);
+    let status = stop_child(&mut child.0, "-TERM");
+    let text = std::fs::read_to_string(&log).unwrap();
+    std::fs::remove_file(log).unwrap();
+    assert!(status.success(), "{status:?}: {text}");
+    assert!(text.contains("OTLP export recovered after "), "{text}");
+    assert!(
+        text.contains(
+            "traced=1 exported=1 export-rejected=0 export-failed=0 export-dropped=0 export-unsent=0"
+        ),
+        "{text}"
+    );
+    // The block was replayed once and its one batch accepted once.
+    assert_eq!(blocks.load(Ordering::SeqCst), 1, "{text}");
+    assert_eq!(accepted.load(Ordering::SeqCst), 1, "{text}");
+}
+
+#[test]
+fn rpc_timeout_lets_a_slow_node_answer() {
+    let _serial = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    let artifact = frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
+        "replay/people-transfer",
+    )))
+    .unwrap();
+    // The block takes 1.5 s to arrive, as a large response from a far node does.
+    let node = MockNode::new(move |request| {
+        if request["method"] == "chain_getBlock" {
+            std::thread::sleep(std::time::Duration::from_millis(1500));
+        }
+        artifact_rpc(&artifact, request)
+    });
+    let out = run(&[
+        "block",
+        "--rpc",
+        &node.url,
+        "--block",
+        "2",
+        "--rpc-timeout",
+        "0.5",
+    ]);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(1), "{stderr}");
+    assert!(
+        stderr.contains("chain_getBlock") && stderr.contains("deadline exceeded"),
+        "{stderr}"
+    );
+    let out = run(&[
+        "block",
+        "--rpc",
+        &node.url,
+        "--block",
+        "2",
+        "--rpc-timeout",
+        "3",
+    ]);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "{stderr}");
+    assert!(stderr.contains("root check: PASS"), "{stderr}");
+    for bad in ["0", "-1", "soon", "3601"] {
+        let out = run(&[
+            "block",
+            "--rpc",
+            &node.url,
+            "--block",
+            "2",
+            "--rpc-timeout",
+            bad,
+        ]);
+        assert_eq!(out.status.code(), Some(2), "{bad}");
+    }
+    let out = run(&["block", "--offline", "missing", "--rpc-timeout", "3"]);
+    assert_eq!(out.status.code(), Some(2));
+}
+
 #[test]
 fn help_describes_best_concurrency_cache_and_otlp_default() {
     let output = run(&["block", "--help"]);
@@ -1038,7 +1271,7 @@ fn help_describes_best_concurrency_cache_and_otlp_default() {
         "stdout",
         "--json",
         "OTLP/HTTP",
-        "32 keys",
+        "32 proof keys",
         "compiled Wasm",
         "cache limit",
         "--unauthenticated-metadata",
@@ -1051,6 +1284,7 @@ fn help_describes_best_concurrency_cache_and_otlp_default() {
         text.contains("http://127.0.0.1:4318")
             && text.contains("--best")
             && text.contains("finalized")
+            && text.contains("--rpc-timeout <SECONDS>")
     );
 }
 
@@ -1469,7 +1703,7 @@ fn report_help_and_write_errors_explain_options_and_paths() {
     for expected in [
         "First block",
         "Last block",
-        "Maximum concurrent proof requests across all blocks",
+        "Maximum concurrent RPC requests across all blocks",
         "compiled Wasm",
         "disk cache",
         "Maximum rows",
