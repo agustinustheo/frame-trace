@@ -31,7 +31,7 @@ Then open http://127.0.0.1:16686.
 | Research (`research/01`–`04`) | Nobody exports Substrate storage traces to OpenTelemetry. `state_traceBlock` is the closest piece. |
 | E1 (`experiments/e1`) | `state_traceBlock` is not enough: unsafe RPC only, drops keyless events, no timing or nesting, and omni-node dev mode can't replay signed blocks. Two upstream bug reports, filed as polkadot-sdk #13594 and #13595 and fixed by #13665 and #13666. |
 | E2 (`experiments/e2`) | Self-replay from safe RPC works, with the real root check. Became the main path. |
-| Code | 5 crates, 165 tests, seven review rounds (GPT 6.1 Sol High + Haiku 5.5 High), each verified by Opus 5.5 Medium. |
+| Code | 5 crates, 165 tests at the time, seven review rounds (GPT 6.1 Sol High + Haiku 5.5 High), each verified by Opus 5.5 Medium. |
 | First findings (`research/05-first-findings.md`) | 65 blocks traced. Most storage work is block initialization and finalization, not user extrinsics. `System::BlockWeight` is touched 100–143 times per block. In a 3-transfer batch, Alice's account is read 48 times: 42 from the overlay, 5 warm, 1 cold. |
 
 ## Limits
@@ -63,5 +63,5 @@ frame-trace does not depend on either fix: it replays blocks itself from safe RP
 - The repository is public.
 - The docs are an mdBook site, with a [support page](../docs/reference/support.md).
 - Both upstream bugs are filed and fixed.
-- CI runs rustfmt, clippy and the tests on Linux and macOS. A nightly job replays a live Westend Asset Hub block. Tagging `v*` builds a draft release for four targets. Dependabot groups the Polkadot SDK crates.
-- `cargo test --workspace` on 6 November 2026: 187 tests pass offline, and 1 public-network test is ignored by default.
+- CI runs rustfmt and clippy on Linux, and the tests on Linux and macOS. A nightly job replays a live Westend Asset Hub block. Tagging `v*` builds a draft release for four targets. Dependabot groups the Polkadot SDK crates.
+- On 6 November 2026, `cargo test --workspace` on `main` passed 187 tests offline and ignored 1 public-network test. The nightly job runs the ignored tests.
