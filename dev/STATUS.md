@@ -1,6 +1,6 @@
 # Status
 
-Last updated 25 October 2026.
+Last updated 6 November 2026.
 
 ## What works
 
@@ -29,9 +29,9 @@ Then open http://127.0.0.1:16686.
 | Step | Result |
 | --- | --- |
 | Research (`research/01`–`04`) | Nobody exports Substrate storage traces to OpenTelemetry. `state_traceBlock` is the closest piece. |
-| E1 (`experiments/e1`) | `state_traceBlock` is not enough: unsafe RPC only, drops keyless events, no timing or nesting, and omni-node dev mode can't replay signed blocks. Two upstream bug reports drafted in `upstream/` (not filed). |
+| E1 (`experiments/e1`) | `state_traceBlock` is not enough: unsafe RPC only, drops keyless events, no timing or nesting, and omni-node dev mode can't replay signed blocks. Two upstream bug reports, filed as polkadot-sdk #13594 and #13595 and fixed by #13665 and #13666. |
 | E2 (`experiments/e2`) | Self-replay from safe RPC works, with the real root check. Became the main path. |
-| Code | 5 crates, 165 tests, seven review rounds (GPT 6.1 Sol High + Haiku 5.5 High), each verified by Opus 5.5 Medium. |
+| Code | 5 crates, 165 tests at the time, seven review rounds (GPT 6.1 Sol High + Haiku 5.5 High), each verified by Opus 5.5 Medium. |
 | First findings (`research/05-first-findings.md`) | 65 blocks traced. Most storage work is block initialization and finalization, not user extrinsics. `System::BlockWeight` is touched 100–143 times per block. In a 3-transfer batch, Alice's account is read 48 times: 42 from the overlay, 5 warm, 1 cold. |
 
 ## Limits
@@ -43,8 +43,25 @@ Then open http://127.0.0.1:16686.
 
 ## Decisions for you
 
-1. **Upstream bug reports.** `upstream/omni-node-dev-replay.md` and `upstream/trace-block-drops-keyless-events.md` are ready to file on paritytech/polkadot-sdk. File them?
-2. **Make the repo public?** It is private now.
-3. **Constants (spec phase 4).** Tracing constants needs either an opt-in macro in pallets or an instrumented runtime build. Worth designing now?
-4. **PolkaMeter integration (spec phase 5).** Attach a block trace to each load-test step. This changes the PolkaMeter repo.
-5. **Docs.** Move the README and `docs/` to an mdBook site like PolkaMeter's?
+1. **Constants (spec phase 4).** Tracing constants needs either an opt-in macro in pallets or an instrumented runtime build. Worth designing now?
+2. **PolkaMeter integration (spec phase 5).** Attach a block trace to each load-test step. This changes the PolkaMeter repo.
+3. **First release, v0.1.0.** The release workflow is ready. Change `Unreleased` to the date in `CHANGELOG.md`, push the tag `v0.1.0`, check the draft release and publish it. See [RELEASING.md](RELEASING.md).
+4. **Publish to crates.io?** Today users install from a clone. `frame-trace-replay` has `publish = false`, and `frame-trace` depends on it, so publishing needs all five crates published, or the library crates folded into one.
+
+## Upstream
+
+| Bug | Issue | Fix PR | State (6 November 2026) |
+| --- | --- | --- | --- |
+| `polkadot-omni-node --dev` can't trace blocks with signed extrinsics | [#13594](https://github.com/paritytech/polkadot-sdk/issues/13594) | [#13665](https://github.com/paritytech/polkadot-sdk/pull/13665): omni-node uses the parachain tracing executor in `--dev` mode | Merged 2 November 2026. Issue closed. |
+| `state_traceBlock` drops keyless events with an empty filter | [#13595](https://github.com/paritytech/polkadot-sdk/issues/13595) | [#13666](https://github.com/paritytech/polkadot-sdk/pull/13666): sc-tracing keeps events without the filtered field when the filter is empty | Merged 2 November 2026. Issue closed. |
+
+The first fix PRs, #13596 and #13597, were closed without merging.
+frame-trace does not depend on either fix: it replays blocks itself from safe RPC.
+
+## Done since 25 October 2026
+
+- The repository is public.
+- The docs are an mdBook site, with a [support page](../docs/reference/support.md).
+- Both upstream bugs are filed and fixed.
+- CI runs rustfmt and clippy on Linux, and the tests on Linux and macOS. A nightly job replays a live Westend Asset Hub block. Tagging `v*` builds a draft release for four targets. Dependabot groups the Polkadot SDK crates.
+- On 6 November 2026, `cargo test --workspace` on `main` passed 187 tests offline and ignored 1 public-network test. The nightly job runs the ignored tests.

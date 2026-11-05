@@ -1,6 +1,6 @@
 # `state_traceBlock` drops storage events without a `key`, even with an empty key filter
 
-DRAFT. Not filed.
+Filed as [paritytech/polkadot-sdk#13595](https://github.com/paritytech/polkadot-sdk/issues/13595). Fixed by [#13666](https://github.com/paritytech/polkadot-sdk/pull/13666), merged 2 November 2026. This is the original draft; the filed issue is the current version.
 
 ## Summary
 

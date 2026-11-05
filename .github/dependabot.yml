@@ -1,0 +1,29 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      # Polkadot SDK crates. The replay crate pins the executor and host-function
+      # crates with `=`; they must move together, to one stable release.
+      polkadot-sdk:
+        patterns:
+          - "sc-*"
+          - "sp-*"
+          - "frame-*"
+          - "cumulus-*"
+          - "polkadot-*"
+        exclude-patterns:
+          # Released on their own, not with the Polkadot SDK stable releases.
+          - "frame-metadata"
+          - "frame-decode"
+          - "frame-trace*"
+      opentelemetry:
+        patterns:
+          - "opentelemetry*"
