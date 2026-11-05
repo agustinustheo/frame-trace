@@ -21,5 +21,13 @@ First release.
 - `--save` and `--offline`: save a block or call, then replay it with no network.
 - `--runtime-override`: replay real blocks with a runtime built with tracing, to see runtime calls inside extrinsics.
 - Ready setups for Jaeger, Grafana and Grafana Alloy with Tempo, with a provisioned dashboard.
+- `--rpc-timeout`: the longest wait for one RPC response, for slow nodes. Each request gets four tries.
+- `follow` can run unattended. It stops cleanly on `SIGTERM` and `SIGHUP`, as on Ctrl-C. It waits longer after each failed check for new blocks. When the OTLP receiver is down, it keeps the traces and later resends only the requests the receiver did not accept.
+- A runtime that needs host functions frame-trace does not have fails with an error that names them.
+- Tested on relay chains and on blocks that upgrade the runtime, see [What frame-trace supports](https://agustinustheodorus.com/frame-trace/reference/support.html).
+
+### Changed
+
+- For anyone running builds from `main`: `follow` prints its status line when a problem count changes, and otherwise at a fixed interval. The status and summary lines have new fields: `done` is replaced by `traced` and `exported`, and there are export, `poll-failures` and `up` counts.
 
 [0.1.0]: https://github.com/agustinustheo/frame-trace/releases/tag/v0.1.0
