@@ -154,8 +154,8 @@ struct CheckedClient {
 #[derive(Debug)]
 struct Job {
     request: reqwest::Request,
-    left: Duration,
-    answer: tokio::sync::oneshot::Sender<Result<Response<Bytes>, HttpError>>,
+    deadline: Instant,
+    answer: std::sync::mpsc::SyncSender<Result<Response<Bytes>, HttpError>>,
 }
 
 /// Largest response body read from the receiver.
@@ -188,9 +188,16 @@ fn transport(
             };
             runtime.block_on(async {
                 while let Some(job) = queue.recv().await {
+                    // A job that waited past its deadline is refused, so work the caller has
+                    // given up on stays bounded even after this thread was held up.
+                    let left = job.deadline.saturating_duration_since(Instant::now());
+                    if left.is_zero() {
+                        let _ = job.answer.send(Err("export deadline exceeded".into()));
+                        continue;
+                    }
                     let client = client.clone();
                     tokio::spawn(async move {
-                        let result = tokio::time::timeout(job.left, exchange(&client, job.request))
+                        let result = tokio::time::timeout(left, exchange(&client, job.request))
                             .await
                             .unwrap_or_else(|_| Err("export deadline exceeded".into()));
                         let _ = job.answer.send(result);
@@ -240,17 +247,25 @@ impl CheckedClient {
         if left.is_zero() {
             return Err("export deadline exceeded".into());
         }
-        let (answer, answered) = tokio::sync::oneshot::channel();
+        let (answer, answered) = std::sync::mpsc::sync_channel(1);
         self.jobs
             .send(Job {
                 request: reqwest::Request::try_from(request)?,
-                left,
+                deadline,
                 answer,
             })
             .map_err(|_| "OTLP transport thread stopped")?;
-        answered
-            .await
-            .map_err(|_| "OTLP transport thread stopped")?
+        // The caller's own clock ends the wait, even if the transport thread is stuck. Like
+        // the upstream blocking client, this blocks the calling thread for at most `left`.
+        match answered.recv_timeout(left) {
+            Ok(result) => result,
+            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                Err("export deadline exceeded".into())
+            }
+            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                Err("OTLP transport thread stopped".into())
+            }
+        }
     }
 }
 
@@ -335,6 +350,31 @@ mod tests {
                 Err("not found".into())
             })
         }
+    }
+
+    /// Blocks the transport's own runtime thread for 2 s, as a resolver that blocks would.
+    struct WedgingResolver;
+    impl reqwest::dns::Resolve for WedgingResolver {
+        fn resolve(&self, _: reqwest::dns::Name) -> reqwest::dns::Resolving {
+            std::thread::sleep(Duration::from_secs(2));
+            Box::pin(async { Err("not found".into()) })
+        }
+    }
+
+    #[test]
+    fn a_wedged_transport_thread_cannot_hold_the_caller_past_the_deadline() {
+        let exporter = HttpExporter::with_client(
+            "http://wedged.invalid:4318/v1/traces".into(),
+            Some(Duration::from_millis(100)),
+            reqwest::Client::builder().dns_resolver(Arc::new(WedgingResolver)),
+        )
+        .unwrap();
+        let start = Instant::now();
+        assert!(exporter.send(Vec::new()).is_err());
+        let took = start.elapsed();
+        assert!(took < Duration::from_millis(500), "{took:?}");
+        drop(exporter);
+        assert!(start.elapsed() < Duration::from_millis(700));
     }
 
     #[test]
