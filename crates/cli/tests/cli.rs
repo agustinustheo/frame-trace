@@ -978,7 +978,7 @@ fn follow_mock_node_retries_failed_blocks_observes_new_heads_and_cancels() {
     assert!(
         text.contains("in-flight=")
             && text.contains("stopped=")
-            && text.contains("follow stopped")
+            && text.contains("follow stopped after ")
             && !text.contains("panicked at")
     );
 }
@@ -1017,6 +1017,152 @@ fn follow_ctrl_c_interrupts_a_stalled_websocket_handshake() {
     assert!(child.wait().unwrap().success());
     assert!(start.elapsed() < Duration::from_secs(10));
     node.join().unwrap();
+}
+
+/// Sends `signal` to `child` and waits up to ten seconds for it to exit.
+fn stop_child(child: &mut std::process::Child, signal: &str) -> std::process::ExitStatus {
+    use std::{
+        thread,
+        time::{Duration, Instant},
+    };
+    let start = Instant::now();
+    Command::new("kill")
+        .args([signal, &child.id().to_string()])
+        .status()
+        .unwrap();
+    while child.try_wait().unwrap().is_none() && start.elapsed() < Duration::from_secs(10) {
+        thread::sleep(Duration::from_millis(20));
+    }
+    if child.try_wait().unwrap().is_none() {
+        child.kill().unwrap();
+    }
+    let status = child.wait().unwrap();
+    assert!(start.elapsed() < Duration::from_secs(10), "{status:?}");
+    status
+}
+
+/// Waits up to `secs` seconds for the log to contain `text`.
+fn wait_for_log(log: &std::path::Path, text: &str, secs: u64) -> String {
+    let start = std::time::Instant::now();
+    loop {
+        let current = std::fs::read_to_string(log).unwrap();
+        if current.contains(text) || start.elapsed() > std::time::Duration::from_secs(secs) {
+            return current;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+}
+
+#[test]
+fn follow_sigterm_stops_gracefully_with_a_summary() {
+    use std::process::Stdio;
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("ws://{}", listener.local_addr().unwrap());
+    let log = std::env::temp_dir().join(format!("frame-trace-sigterm-{}.log", std::process::id()));
+    let mut child = Command::new(BIN)
+        .args(["follow", "--rpc", &url])
+        .stdout(Stdio::null())
+        .stderr(std::fs::File::create(&log).unwrap())
+        .spawn()
+        .unwrap();
+    // A stalled handshake keeps the first poll waiting, as on an unresponsive node.
+    let (mut stream, _) = listener.accept().unwrap();
+    stream.set_nonblocking(false).unwrap();
+    let node = std::thread::spawn(move || {
+        let _ = stream.read_to_end(&mut Vec::new());
+    });
+    let status = stop_child(&mut child, "-TERM");
+    let text = std::fs::read_to_string(&log).unwrap();
+    std::fs::remove_file(log).unwrap();
+    assert!(status.success(), "{status:?}: {text}");
+    assert!(text.contains("follow: stopping;"), "{text}");
+    assert!(text.contains("follow stopped after "), "{text}");
+    assert!(text.contains(" traced=0 "), "{text}");
+    node.join().unwrap();
+}
+
+#[test]
+fn follow_retries_only_the_export_while_the_collector_is_down() {
+    let _serial = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    use std::{
+        process::Stdio,
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+    };
+    let artifact = frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
+        "replay/people-transfer",
+    )))
+    .unwrap();
+    let blocks = Arc::new(AtomicUsize::new(0));
+    let fetched = blocks.clone();
+    let node = MockNode::new(move |request| {
+        if request["method"] == "chain_getBlock" {
+            fetched.fetch_add(1, Ordering::SeqCst);
+        }
+        artifact_rpc(&artifact, request)
+    });
+    // Reserve a port, then close it: the collector is down until we listen again.
+    let port = TcpListener::bind("127.0.0.1:0")
+        .unwrap()
+        .local_addr()
+        .unwrap()
+        .port();
+    let log = std::env::temp_dir().join(format!(
+        "frame-trace-follow-otlp-{}.log",
+        std::process::id()
+    ));
+    let mut child = Command::new(BIN)
+        .args([
+            "follow",
+            "--rpc",
+            &node.url,
+            "--otlp",
+            &format!("http://127.0.0.1:{port}"),
+        ])
+        .stdout(Stdio::null())
+        .stderr(std::fs::File::create(&log).unwrap())
+        .spawn()
+        .unwrap();
+    let text = wait_for_log(&log, "OTLP export failed", 120);
+    if !text.contains("OTLP export failed (1 attempt(s) in a row)") {
+        stop_child(&mut child, "-KILL");
+        panic!("{text}");
+    }
+    // The collector comes back and accepts everything.
+    let listener = TcpListener::bind(("127.0.0.1", port)).unwrap();
+    let receiver = std::thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let mut reader = BufReader::new(stream.try_clone().unwrap());
+        let mut len = 0;
+        loop {
+            let mut line = String::new();
+            if reader.read_line(&mut line).unwrap_or(0) == 0 || line == "\r\n" {
+                break;
+            }
+            if let Some(v) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+                len = v.trim().parse().unwrap_or(0);
+            }
+        }
+        reader.read_exact(&mut vec![0; len]).unwrap();
+        stream
+            .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 0\r\nconnection: close\r\n\r\n")
+            .unwrap();
+    });
+    wait_for_log(&log, "OTLP export recovered", 30);
+    let status = stop_child(&mut child, "-TERM");
+    let text = std::fs::read_to_string(&log).unwrap();
+    std::fs::remove_file(log).unwrap();
+    assert!(status.success(), "{status:?}: {text}");
+    assert!(text.contains("OTLP export recovered after "), "{text}");
+    receiver.join().unwrap();
+    assert!(
+        text.contains("traced=1 exported=1 export-rejected=0 export-dropped=0 export-unsent=0"),
+        "{text}"
+    );
+    // The block was replayed once; only the export was retried.
+    assert_eq!(blocks.load(Ordering::SeqCst), 1, "{text}");
 }
 
 #[test]
