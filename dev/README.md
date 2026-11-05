@@ -33,7 +33,7 @@ To support such a chain:
    `--locked`). Most SDK crates there are pinned with `=` to one SDK release; pin the new one
    the same way, to the version from that release. Two are not pinned exactly:
    `sp-panic-handler = "13.0.2"` and `sp-crypto-hashing` (workspace `"0.1.0"`) use caret
-   ranges.
+   ranges. See [`RELEASING.md`](RELEASING.md#polkadot-sdk-upgrades) for SDK upgrades.
 3. Append its `HostFunctions` type to the tuple.
 4. Replay a real block of that chain with `frame-trace block --rpc <url> --block <n>` and
    check `root check: PASS`. Save it with `--save` if it should become a fixture
@@ -57,3 +57,5 @@ environment variable and falls back to the public endpoint:
 | --- | --- | --- |
 | `FRAME_TRACE_WESTEND_AH_RPC` | `wss://westend-asset-hub-rpc.polkadot.io` | `public_network` (best block), `runtime_upgrade_enactment_and_next_block_live` (needs archive state for #18,985,169) |
 | `FRAME_TRACE_WESTEND_RPC` | `wss://westend-rpc.polkadot.io` | `public_relay_network` (finalized block) |
+
+The nightly workflow (`.github/workflows/nightly.yml`) runs all three with the defaults.
