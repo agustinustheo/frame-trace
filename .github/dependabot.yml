@@ -10,8 +10,8 @@ updates:
     schedule:
       interval: weekly
     groups:
-      # The replay crate pins these with `=`. They must move together, to the
-      # crate versions of one Polkadot SDK stable release.
+      # Polkadot SDK crates. The replay crate pins the executor and host-function
+      # crates with `=`; they must move together, to one stable release.
       polkadot-sdk:
         patterns:
           - "sc-*"
@@ -19,6 +19,11 @@ updates:
           - "frame-*"
           - "cumulus-*"
           - "polkadot-*"
+        exclude-patterns:
+          # Released on their own, not with the Polkadot SDK stable releases.
+          - "frame-metadata"
+          - "frame-decode"
+          - "frame-trace*"
       opentelemetry:
         patterns:
           - "opentelemetry*"
