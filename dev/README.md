@@ -40,3 +40,14 @@ Every added function is offered to every chain. Only add functions that the node
 chain also provides, so frame-trace never accepts a runtime the chain itself could not run.
 The unit test `unknown_host_import_error_names_the_import` and the integration test
 `missing_host_function_is_named_through_runtime_override` cover the error path.
+
+## Live tests
+
+Tests that need a public node are `#[ignore]`d. Run them with
+`cargo +1.93.0 test --workspace --locked -- --ignored`. Each reads its endpoint from an
+environment variable and falls back to the public endpoint:
+
+| Variable | Default | Tests |
+| --- | --- | --- |
+| `FRAME_TRACE_WESTEND_AH_RPC` | `wss://westend-asset-hub-rpc.polkadot.io` | `public_network` (best block), `runtime_upgrade_enactment_and_next_block_live` (needs archive state for #18,985,169) |
+| `FRAME_TRACE_WESTEND_RPC` | `wss://westend-rpc.polkadot.io` | `public_relay_network` (finalized block) |
