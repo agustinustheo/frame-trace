@@ -255,13 +255,16 @@ impl ReplaySession {
             .filter(|(path, _)| pinned.iter().any(|p| path.starts_with(p)))
             .map(|(_, (_, size))| size)
             .sum();
+        // Logged after the lock is released: a blocked log must not stall other replays.
+        let mut warning = None;
         if pinned_bytes > self.cache_max_bytes && !index.warned_small {
-            eprintln!(
+            warning = Some(format!(
                 "warning: --cache-max-bytes {} is smaller than active runtime modules ({} bytes); keeping runtime code in use",
                 self.cache_max_bytes, pinned_bytes
-            );
+            ));
             index.warned_small = true;
         }
+        let mut result = Ok(());
         while index.total > self.cache_max_bytes {
             let Some((time, path)) = index
                 .oldest
@@ -274,14 +277,21 @@ impl ReplaySession {
             match std::fs::remove_file(&path) {
                 Ok(()) => {}
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-                Err(e) => return Err(Error::Invalid(format!("{}: {e}", path.display()))),
+                Err(e) => {
+                    result = Err(Error::Invalid(format!("{}: {e}", path.display())));
+                    break;
+                }
             }
             if let Some((_, size)) = index.files.remove(&path) {
                 index.total = index.total.saturating_sub(size);
             }
             index.oldest.remove(&(time, path));
         }
-        Ok(())
+        drop(index);
+        if let Some(warning) = warning {
+            note!("{warning}");
+        }
+        result
     }
     pub(crate) fn shared() -> Result<&'static Self> {
         static SESSION: OnceLock<std::result::Result<ReplaySession, String>> = OnceLock::new();
