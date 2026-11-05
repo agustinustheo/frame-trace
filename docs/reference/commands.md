@@ -39,7 +39,7 @@ frame-trace block --offline fixtures/replay/people-traced --json block.json
 | `--save <DIR>` | | Save the block, its state and runtime for offline replay. |
 | `--otlp [<URL>]` | `http://127.0.0.1:4318` when given without a URL | Send the trace over OTLP/HTTP. |
 | `--json <FILE>` | | Write the trace as JSON. `-` writes to stdout. |
-| `--proof-concurrency <N>` | 8 | Proof requests sent at once, 1 to 64. Each request asks for up to 32 keys. |
+| `--proof-concurrency <N>` | 8 | RPC requests sent at once, 1 to 64. Each proof request asks for up to 32 keys. |
 | `--cache-dir <DIR>` | | Keep fetched state and compiled runtimes in this directory between runs. |
 | `--cache-max-bytes <N>` | 1073741824 (1 GiB) | Size limit for the disk cache, in bytes. A runtime in use is kept even above the limit. |
 | `--unauthenticated-metadata` | off | If the runtime's own metadata cannot be loaded, use the node's (or the saved) metadata unchecked. Output says so. |
@@ -87,7 +87,7 @@ frame-trace call --offline fixtures/replay/call-people-nonce --summary
 | `--summary` | off | Print the storage tables. |
 | `--json <FILE>` | | Write the trace and result as JSON. `-` writes to stdout and sends tables to stderr. |
 | `--otlp [<URL>]` | `http://127.0.0.1:4318` when given without a URL | Send the trace over OTLP/HTTP. |
-| `--proof-concurrency <N>` | 8 | Proof requests sent at once, 1 to 64. |
+| `--proof-concurrency <N>` | 8 | RPC requests sent at once, 1 to 64. Each proof request asks for up to 32 keys. |
 | `--cache-dir <DIR>` | | As for `block`. |
 | `--cache-max-bytes <N>` | 1073741824 (1 GiB) | As for `block`. |
 | `--unauthenticated-metadata` | off | As for `block`. |
@@ -111,7 +111,7 @@ frame-trace report --rpc URL --last 10
 | `--to <N>` | | Last block of the range, included. At most the latest finalized block. |
 | `--last <K>` | | The K most recent finalized blocks. |
 | `--concurrency <N>` | 2 | Blocks replayed at once, 1 to 4. |
-| `--proof-concurrency <N>` | 8 | Proof requests at once across all blocks, 1 to 64. |
+| `--proof-concurrency <N>` | 8 | RPC requests at once across all blocks, 1 to 64. Each proof request asks for up to 32 keys. |
 | `--cache-dir <DIR>` | | Keep fetched state and compiled runtimes in this directory. |
 | `--cache-max-bytes <N>` | 1073741824 (1 GiB) | Size limit for the disk cache, in bytes. |
 | `--top <N>` | 15 | Rows in each ranked table. JSON is always complete. |

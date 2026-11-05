@@ -32,7 +32,7 @@ pub struct ReportArgs {
     /// Concurrent block replays (proof request concurrency is separate).
     #[arg(long, default_value_t=2, requires = "rpc", conflicts_with_all = ["files", "from_json"], value_parser=clap::value_parser!(u8).range(1..=4))]
     concurrency: u8,
-    /// Maximum concurrent proof requests across all blocks (1–64).
+    /// Maximum concurrent RPC requests across all blocks (1–64; up to 32 proof keys per request).
     #[arg(long, default_value_t=8, requires = "rpc", conflicts_with_all = ["files", "from_json"], value_parser=clap::value_parser!(u8).range(1..=64))]
     proof_concurrency: u8,
     /// Persist authenticated proof nodes and compiled Wasm in this directory.

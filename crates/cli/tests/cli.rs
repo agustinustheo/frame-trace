@@ -1038,7 +1038,7 @@ fn help_describes_best_concurrency_cache_and_otlp_default() {
         "stdout",
         "--json",
         "OTLP/HTTP",
-        "32 keys",
+        "32 proof keys",
         "compiled Wasm",
         "cache limit",
         "--unauthenticated-metadata",
@@ -1469,7 +1469,7 @@ fn report_help_and_write_errors_explain_options_and_paths() {
     for expected in [
         "First block",
         "Last block",
-        "Maximum concurrent proof requests across all blocks",
+        "Maximum concurrent RPC requests across all blocks",
         "compiled Wasm",
         "disk cache",
         "Maximum rows",

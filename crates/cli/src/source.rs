@@ -41,7 +41,7 @@ pub struct SourceArgs {
     /// Save the replay context and proofs for offline use.
     #[arg(long, value_name = "DIR", conflicts_with = "from_file")]
     pub save: Option<PathBuf>,
-    /// Maximum concurrent proof requests (1–64; up to 32 keys per request).
+    /// Maximum concurrent RPC requests (1–64; up to 32 proof keys per request).
     #[arg(long, default_value_t = 8, requires = "rpc", conflicts_with_all = ["from_file", "from_json", "offline"], value_parser = clap::value_parser!(u8).range(1..=64))]
     pub proof_concurrency: u8,
     /// Persistent authenticated proof nodes and compiled Wasm cache directory.
