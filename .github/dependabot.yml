@@ -1,0 +1,24 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: cargo
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      # The replay crate pins these with `=`. They must move together, to the
+      # crate versions of one Polkadot SDK stable release.
+      polkadot-sdk:
+        patterns:
+          - "sc-*"
+          - "sp-*"
+          - "frame-*"
+          - "cumulus-*"
+          - "polkadot-*"
+      opentelemetry:
+        patterns:
+          - "opentelemetry*"
