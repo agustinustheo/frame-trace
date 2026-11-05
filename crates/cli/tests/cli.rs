@@ -1166,6 +1166,63 @@ fn follow_retries_only_the_export_while_the_collector_is_down() {
 }
 
 #[test]
+fn rpc_timeout_lets_a_slow_node_answer() {
+    let _serial = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    let artifact = frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
+        "replay/people-transfer",
+    )))
+    .unwrap();
+    // The block takes 1.5 s to arrive, as a large response from a far node does.
+    let node = MockNode::new(move |request| {
+        if request["method"] == "chain_getBlock" {
+            std::thread::sleep(std::time::Duration::from_millis(1500));
+        }
+        artifact_rpc(&artifact, request)
+    });
+    let out = run(&[
+        "block",
+        "--rpc",
+        &node.url,
+        "--block",
+        "2",
+        "--rpc-timeout",
+        "0.5",
+    ]);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(1), "{stderr}");
+    assert!(
+        stderr.contains("chain_getBlock") && stderr.contains("deadline exceeded"),
+        "{stderr}"
+    );
+    let out = run(&[
+        "block",
+        "--rpc",
+        &node.url,
+        "--block",
+        "2",
+        "--rpc-timeout",
+        "3",
+    ]);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "{stderr}");
+    assert!(stderr.contains("root check: PASS"), "{stderr}");
+    for bad in ["0", "-1", "soon", "3601"] {
+        let out = run(&[
+            "block",
+            "--rpc",
+            &node.url,
+            "--block",
+            "2",
+            "--rpc-timeout",
+            bad,
+        ]);
+        assert_eq!(out.status.code(), Some(2), "{bad}");
+    }
+    let out = run(&["block", "--offline", "missing", "--rpc-timeout", "3"]);
+    assert_eq!(out.status.code(), Some(2));
+}
+
+#[test]
 fn help_describes_best_concurrency_cache_and_otlp_default() {
     let output = run(&["block", "--help"]);
     let text = String::from_utf8_lossy(&output.stdout);
@@ -1197,6 +1254,7 @@ fn help_describes_best_concurrency_cache_and_otlp_default() {
         text.contains("http://127.0.0.1:4318")
             && text.contains("--best")
             && text.contains("finalized")
+            && text.contains("--rpc-timeout <SECONDS>")
     );
 }
 

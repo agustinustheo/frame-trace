@@ -2,10 +2,7 @@
 use crate::{FollowArgs, source};
 use anyhow::{Context, Result};
 use frame_trace_otel::Timing;
-use frame_trace_replay::{
-    ReplaySession,
-    rpc::{CancellationToken, Rpc},
-};
+use frame_trace_replay::{ReplaySession, rpc::CancellationToken};
 use std::{
     collections::{BTreeMap, VecDeque},
     sync::{
@@ -463,10 +460,10 @@ pub fn run(args: FollowArgs) -> Result<()> {
         }
         signal.cancel();
     })?;
-    let rpc = Rpc::with_options(
+    let rpc = source::rpc(
         &args.rpc,
-        args.proof_concurrency as usize,
-        Duration::from_secs(30),
+        args.proof_concurrency,
+        args.rpc_timeout,
         cancel.clone(),
     )?;
     let session =
