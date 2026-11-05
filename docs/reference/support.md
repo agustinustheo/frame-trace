@@ -44,15 +44,16 @@ frame-trace runs the runtime with the host functions of Polkadot SDK release `po
 | Statement store | The statement store runtime interface. |
 | Elliptic curves | BLS12-381, Ed-on-BLS12-381-Bandersnatch, Pallas and Vesta. |
 
-A runtime that imports any other host function fails with `runtime requires function imports which are not present on the host`.
+A runtime that imports any other host function cannot be replayed.
+The error says `runtime requires function imports which are not present on the host`.
 See [Troubleshooting](../troubleshooting.md#runtime-requires-function-imports-which-are-not-present-on-the-host).
 
 ## Tested chains
 
 | Chain | How |
 | --- | --- |
-| [Westend Asset Hub](glossary.md#westend-asset-hub) | Public endpoint `wss://westend-asset-hub-rpc.polkadot.io`, with `block`, `report` and `follow`. |
-| Paseo People Next | Public endpoint. |
+| [Westend Asset Hub](glossary.md#westend-asset-hub) | Public endpoint `wss://westend-asset-hub-rpc.polkadot.io`, with `block`, `report` and `follow`. [Analyse many blocks](../guides/analyse-many-blocks.md) shows a `report` run. |
+| Paseo People Next | Public endpoint `wss://paseo-people-next-system-rpc.polkadot.io`, 20 blocks with `block` and `summary`. Each passed the root check. |
 | A local [People chain](glossary.md#people-chain) | The saved blocks in `fixtures/replay/`, replayed offline. |
 
 Other chains that meet the requirements above should work.
