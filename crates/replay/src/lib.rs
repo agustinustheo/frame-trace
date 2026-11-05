@@ -499,6 +499,8 @@ fn replay_inner(
         })?;
     let rpc_count = rpc.as_ref().map_or(0, Rpc::count);
     let capture = captured(&capture, artifact.block_hash, parent.hash());
+    // `execute` fails on a state root mismatch, so only verified blocks reach the disk cache
+    // and the hints for the next replay.
     persist_export(&db, &mut artifact)?;
     Ok(Replay {
         capture,
