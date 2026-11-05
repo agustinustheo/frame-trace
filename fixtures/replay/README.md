@@ -94,3 +94,18 @@ kill-prefix / traced batch. Local regeneration used E1 `run-node.py`,
 runtime source/Binary/Wasm provenance remains E1’s. `--unauthenticated-metadata`
 (`--rpc-metadata-fallback` alias) explicitly allows stored metadata for older
 artifacts that still lack execution dependencies; output labels it unauthenticated.
+
+## Runtime upgrade
+
+No runtime upgrade block is committed. Westend Asset Hub #18,985,169
+(`0xd0e2fe81…ce55b`) enacted spec 1025003 -> 1025004: the
+`ParachainSystem.set_validation_data` inherent wrote the new `:code`. #18,985,170
+(`0x1ccb4c8ce07cacb802982d8b2aa1c8ceea40267c2503d1f48504fd7e6a405d8d`) is the first block
+executed with the new code; its initialization writes `System::LastRuntimeUpgrade`.
+
+Saved, #18,985,170 alone needs the new runtime (`c7a91f4a…`, 2,716,830 bytes compressed).
+The enactment block needs both runtimes, the old one as `:code` and the new one as
+`ParachainSystem::PendingValidationCode`. The pending value carries a 4-byte length prefix,
+so it cannot share the `:code` blob. Together that adds about 5.3 MB. The ignored live test
+`runtime_upgrade_enactment_and_next_block_live` replays both blocks from an archive endpoint
+instead (`FRAME_TRACE_WESTEND_AH_RPC`), in one session and each alone.
