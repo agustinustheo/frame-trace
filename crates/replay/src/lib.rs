@@ -91,18 +91,30 @@ const MISSING_IMPORTS: &str =
     "runtime requires function imports which are not present on the host: ";
 
 /// The missing imports named by the executor's error text, if that is what it reports.
+/// sc-executor-wasmtime lists them as `'module:name', 'module:name'`; the list ends at the
+/// first token that does not continue it, so trailing context is never part of a name.
 fn missing_host_functions(text: &str) -> Option<String> {
-    let (_, rest) = text.split_once(MISSING_IMPORTS)?;
-    let line = rest.lines().next().unwrap_or_default();
+    let (_, mut rest) = text.split_once(MISSING_IMPORTS)?;
+    let mut functions = Vec::new();
+    while let Some((name, after)) = rest
+        .strip_prefix('\'')
+        .and_then(|quoted| quoted.split_once('\''))
+    {
+        functions.push(name.trim());
+        match after.strip_prefix(", ") {
+            Some(next) => rest = next,
+            None => break,
+        }
+    }
+    if functions.is_empty() {
+        // Unquoted: the list ends at the first `;`, `.` or line end.
+        let end = rest.find([';', '.', '\n', '\r']).unwrap_or(rest.len());
+        functions = rest[..end].split(',').map(str::trim).collect();
+    }
+    functions.retain(|name| !name.is_empty());
     // The executor lists them in hash-map order; sort for stable output.
-    let mut functions: Vec<_> = line
-        .split(", ")
-        .map(|name| name.trim().trim_matches('\''))
-        .filter(|name| !name.is_empty())
-        .collect();
     functions.sort_unstable();
-    let functions = functions.join(", ");
-    (!functions.is_empty()).then_some(functions)
+    (!functions.is_empty()).then(|| functions.join(", "))
 }
 
 impl Error {
@@ -339,7 +351,11 @@ pub struct Replay {
     /// Sequential proof acquisition waves, excluding context RPC and retries.
     pub proof_round_trips: usize,
     pub proof_bytes: usize,
-    /// Blake2-256 of the runtime code that executed the block: the parent's `:code`, or the override.
+    /// Blake2-256 of the runtime code that executed the block. Without an override this is
+    /// the hash of the raw `:code` value stored in the parent state, in its stored form (usually
+    /// SDK-compressed), not of the decompressed Wasm. With an override it is the hash of the
+    /// override file's bytes, equal to [`RuntimeOverride::override_code_hash`].
+    /// Library only: the CLI's `--json` output does not include it.
     pub runtime_code_hash: H256,
     pub artifact: Artifact,
     /// Set only when the session executed a substitute runtime.

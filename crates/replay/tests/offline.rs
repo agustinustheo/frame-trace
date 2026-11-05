@@ -475,3 +475,16 @@ fn missing_host_function_is_named_through_runtime_override() {
         "{text}"
     );
 }
+
+/// `fixtures/wasm/missing-host-function.wasm` is the committed build of its `.wat` source.
+/// Regenerate it with `FRAME_TRACE_REGENERATE_WASM=1` on this test.
+#[test]
+fn missing_host_function_wasm_matches_its_source() {
+    let dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/wasm");
+    let built = wat::parse_file(dir.join("missing-host-function.wat")).unwrap();
+    let path = dir.join("missing-host-function.wasm");
+    if std::env::var_os("FRAME_TRACE_REGENERATE_WASM").is_some() {
+        std::fs::write(&path, &built).unwrap();
+    }
+    assert_eq!(std::fs::read(&path).unwrap(), built);
+}

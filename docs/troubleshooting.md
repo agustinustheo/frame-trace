@@ -71,12 +71,21 @@ See [What a replay proves](concepts/what-a-replay-proves.md).
 
 ## `the runtime needs host functions frame-trace does not have`
 
+This output comes from a test runtime in the repository that imports one made-up host function, `ext_frame_trace_missing_version_1`.
+Run this from the repository root to see it:
+
+```sh
+frame-trace block --offline fixtures/replay/westend-asset-hub \
+  --runtime-override fixtures/wasm/missing-host-function.wasm
+```
+
 ```text
+...
+root check: NOT VERIFIED; RPC calls: 0
 Error: fixtures/replay/westend-asset-hub/artifact.json.zst: the runtime needs host functions frame-trace does not have: env:ext_frame_trace_missing_version_1; a runtime override was executed instead of the authenticated :code; the runtime override may be the cause. frame-trace's host functions are fixed when it is built, so this chain needs a frame-trace build that adds them. See https://agustinustheodorus.com/frame-trace/troubleshooting.html#the-runtime-needs-host-functions-frame-trace-does-not-have
 ```
 
-This run used a test runtime that imports a made-up host function.
-Without `--runtime-override`, the part about the runtime override is absent.
+Without `--runtime-override`, the error has no part about the runtime override.
 
 **What it means.** The runtime calls host functions that frame-trace does not provide.
 The list after the colon names each one.
