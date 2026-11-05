@@ -779,11 +779,7 @@ pub fn run(args: FollowArgs) -> Result<()> {
             pause(Duration::from_millis(100), || cancel.is_cancelled());
         }
     }
-    cancel.cancel();
-    drop(send);
-    for event in completed.try_iter() {
-        process(event, &mut entries, &mut totals);
-    }
+    // Count before cancelling RPC: replays waiting on the node end at once after it.
     let busy = entries
         .values()
         .filter(|e| e.state == State::InFlight)
@@ -796,6 +792,8 @@ pub fn run(args: FollowArgs) -> Result<()> {
     } else {
         eprintln!("follow: stopping (signal again to exit now)");
     }
+    cancel.cancel();
+    drop(send);
     let unfinished = join_workers(workers, SHUTDOWN_WAIT);
     // Close admission, then collect everything admitted before it: a replay that finishes
     // later is counted once, as cancelled.
