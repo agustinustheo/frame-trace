@@ -26,6 +26,13 @@ fn contract_call_reads_and_writes_its_child_trie() {
     assert!(artifact.metadata.is_empty());
     let result = replay(artifact, None).unwrap();
     assert_eq!(result.block_number, 15_366_850);
+    // Blake2-256 of the stored `:code`, the name of the runtime's fixture blob.
+    assert_eq!(
+        result.runtime_code_hash,
+        "0xd85bfdb17cf421d6a75c9db9ba16cd713a840e42a02ca69becff7e3570b8debb"
+            .parse()
+            .unwrap()
+    );
     assert!(result.root_check);
     assert_eq!((result.rpc_count, result.measured_rpc_count), (0, 0));
 

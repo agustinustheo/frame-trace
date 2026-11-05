@@ -12,6 +12,13 @@ use frame_trace_replay::{Replay, ReplaySession, rpc::unhex};
 use std::collections::BTreeMap;
 
 const ENACTMENT: u64 = 18_985_169;
+/// Blake2-256 of the stored `:code` bytes.
+const SPEC_1025003: &str = "0x985f0daaaeec1ed429c305034a95dd233bdd292bef383e3d6643bb00f1c6a132";
+const SPEC_1025004: &str = "0xc7a91f4aafad7a00424bf9d5c8029f2fac2b6ea87ee7ece41fcd3825a5aa8bfd";
+
+fn code_hash(hex: &str) -> sp_core::H256 {
+    hex.parse().unwrap()
+}
 
 fn westend_asset_hub_rpc() -> String {
     std::env::var("FRAME_TRACE_WESTEND_AH_RPC")
@@ -82,6 +89,7 @@ fn keyed_events(replay: &Replay) -> Vec<BTreeMap<String, String>> {
 /// The first block after the upgrade.
 fn check_first_block_on_new_code(replay: &Replay) {
     assert_eq!(replay.block_number, ENACTMENT + 1);
+    assert_eq!(replay.runtime_code_hash, code_hash(SPEC_1025004));
     assert!(replay.root_check);
     assert_eq!(replay.measured_rpc_count, 0);
     assert_eq!(metadata_spec_version(&replay.artifact.metadata), 1_025_004);
@@ -161,7 +169,7 @@ fn runtime_upgrade_enactment_and_next_block_live() {
     );
 
     check_first_block_on_new_code(&next);
-    assert_ne!(enactment.runtime_code_hash, next.runtime_code_hash);
+    assert_eq!(enactment.runtime_code_hash, code_hash(SPEC_1025003));
 
     // Each block alone, in a fresh session, gives the same result.
     for shared in [&enactment, &next] {
