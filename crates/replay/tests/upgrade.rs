@@ -12,6 +12,14 @@ use frame_trace_replay::{Artifact, Replay, ReplaySession, replay_with_session, r
 use std::{collections::BTreeMap, path::PathBuf};
 
 const ENACTMENT: u64 = 18_985_169;
+/// Blake2-256 of the stored `:code` bytes. The fixture blobs are named by the same hash.
+const SPEC_1025002: &str = "0x57ccdb66df672638e8978d5eecce601930a6e498f6c0360a738a53cac2c2e9d9";
+const SPEC_1025003: &str = "0x985f0daaaeec1ed429c305034a95dd233bdd292bef383e3d6643bb00f1c6a132";
+const SPEC_1025004: &str = "0xc7a91f4aafad7a00424bf9d5c8029f2fac2b6ea87ee7ece41fcd3825a5aa8bfd";
+
+fn code_hash(hex: &str) -> sp_core::H256 {
+    hex.parse().unwrap()
+}
 
 fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -88,6 +96,7 @@ fn keyed_events(replay: &Replay) -> Vec<BTreeMap<String, String>> {
 /// The first block after the upgrade: its own checks, shared by the offline and live tests.
 fn check_first_block_on_new_code(replay: &Replay) {
     assert_eq!(replay.block_number, ENACTMENT + 1);
+    assert_eq!(replay.runtime_code_hash, code_hash(SPEC_1025004));
     assert!(replay.root_check);
     assert_eq!(replay.measured_rpc_count, 0);
     assert_eq!(metadata_spec_version(&replay.artifact.metadata), 1_025_004);
@@ -140,7 +149,7 @@ fn first_block_after_upgrade_runs_new_code_and_names_with_its_metadata() {
     )
     .unwrap();
     assert!(before.root_check);
-    assert_ne!(before.runtime_code_hash, after.runtime_code_hash);
+    assert_eq!(before.runtime_code_hash, code_hash(SPEC_1025002));
     assert_eq!(metadata_spec_version(&before.artifact.metadata), 1_025_002);
     let again = replay_with_session(
         Artifact::load(&fixture("westend-asset-hub-after-upgrade")).unwrap(),
@@ -202,7 +211,7 @@ fn runtime_upgrade_enactment_and_next_block_live() {
     );
 
     check_first_block_on_new_code(&next);
-    assert_ne!(enactment.runtime_code_hash, next.runtime_code_hash);
+    assert_eq!(enactment.runtime_code_hash, code_hash(SPEC_1025003));
 
     // Each block alone, in a fresh session, gives the same result.
     for shared in [&enactment, &next] {
