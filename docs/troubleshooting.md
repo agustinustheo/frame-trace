@@ -158,7 +158,8 @@ OTLP export failed (1 attempt(s) in a row): 578 of 578 spans were not exported (
 ```
 
 **What it means.** `follow` replayed a block but could not send its trace.
-It keeps the trace and tries again. It does not replay the block again, and it does not resend spans the receiver already accepted.
+It keeps the trace and tries again. It does not replay the block, and it does not resend requests the receiver acknowledged.
+If an acknowledgement is lost, the receiver can get the same spans twice, with the same IDs.
 It logs `OTLP export recovered` when the receiver is back.
 
 **Fix.** Start the receiver again, or fix the `--otlp` URL. The fixes for [`<N> of <M> spans were not exported`](#n-of-m-spans-were-not-exported) apply.

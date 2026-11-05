@@ -119,7 +119,8 @@ follow poll still failing after 6 attempts over 1m06s: RPC error: chain_getFinal
 
 If the OTLP receiver stops, frame-trace keeps replaying blocks and holds their traces.
 It sends them when the receiver is back. It does not replay the blocks again.
-Each trace goes out in several requests. A request the receiver accepted is never sent again.
+Each trace goes out in several requests. A request the receiver acknowledged is never sent again.
+If an acknowledgement is lost, the receiver can get the same spans twice, with the same IDs.
 
 In the run from step 1, the receiver refused one request with a 400, then was stopped for 30 seconds:
 
