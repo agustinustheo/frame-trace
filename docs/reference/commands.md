@@ -81,7 +81,7 @@ frame-trace call --offline fixtures/replay/call-people-nonce --summary
 | `--at <AT>` | `best` | Block whose state the call reads: a number, a full hash, `best` or `finalized`. |
 | `--method <METHOD>` | | Runtime API function, for example `AccountNonceApi_account_nonce`. Required with `--rpc`. |
 | `--data <DATA>` | | SCALE-encoded arguments in hex. `0x` for none. |
-| `--args <ARGS>` | | Arguments as JSON: a positional array or a named object. Needs metadata V15 or newer. |
+| `--args <ARGS>` | | Arguments as JSON: a positional array or a named object. Needs metadata V15 or V16. |
 | `--offline <DIR>` | | Replay a saved call with no network. |
 | `--save <DIR>` | | Save the call and its state for offline replay. |
 | `--check-state-call` | off | Compare the result with the node's `state_call` at the same block. |

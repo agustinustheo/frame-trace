@@ -206,11 +206,11 @@ frame-trace printed `exported <N> spans`, but Jaeger shows nothing.
 Error: reading metadata from /tmp/ftdocs/v13.scale: unsupported metadata version V13 (need V14, V15 or V16)
 ```
 
-**What it means.** frame-trace decodes names with metadata V14 or newer.
+**What it means.** frame-trace decodes names with metadata V14, V15 or V16.
 Old runtimes only have older metadata.
 You see this error when you pass such a file with `--metadata`.
 
-**Fix.** Use metadata V14 or newer.
+**Fix.** Use metadata V14, V15 or V16.
 For a replayed block, frame-trace instead prints the notice in the next section and continues without names.
 
 ## `notice: local metadata unavailable (…); using unnamed storage and hex results`

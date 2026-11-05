@@ -50,7 +50,7 @@ In Jaeger the trace is named `call AccountNonceApi_account_nonce at #18598779`.
 Use exactly one of `--data` or `--args`.
 
 - `--data` takes the SCALE-encoded arguments in hex. Use `0x` for a call with no arguments.
-- `--args` takes JSON and encodes it with the runtime's metadata. It needs metadata V15 or newer.
+- `--args` takes JSON and encodes it with the runtime's metadata. It needs metadata V15 or V16.
 
 ```sh
 frame-trace call --rpc wss://westend-asset-hub-rpc.polkadot.io --at finalized \
