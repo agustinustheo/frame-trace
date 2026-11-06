@@ -51,7 +51,7 @@ pub struct ReplaySession {
     #[cfg(test)]
     pub(crate) executor: Arc<Executor>,
     executors: Arc<Mutex<BTreeMap<H256, Arc<Executor>>>>,
-    pub(crate) node_dir: Option<PathBuf>,
+    pub(crate) disk: Option<Arc<crate::disk::NodeStore>>,
     pub(crate) speculative_discovery: bool,
     pub(crate) metadata: Arc<Mutex<MetadataCache>>,
     pub(crate) rpc_metadata_fallback: bool,
@@ -62,7 +62,11 @@ pub struct ReplaySession {
     pub(crate) metadata_runs: Arc<std::sync::atomic::AtomicUsize>,
     cache_base: PathBuf,
     cache_max_bytes: u64,
-    disk_index: Arc<Mutex<DiskIndex>>,
+    wasm: Arc<Mutex<WasmUsage>>,
+    /// One worker at a time measures the Wasm cache; the others skip maintenance.
+    maintenance: Arc<Mutex<()>>,
+    /// The first failed node cache write is logged; later ones are not.
+    pub(crate) warned_write: Arc<std::sync::atomic::AtomicBool>,
 }
 impl ReplaySession {
     /// `cache_dir` enables persistent proof nodes and Wasmtime artifacts. Without it, only
@@ -70,7 +74,8 @@ impl ReplaySession {
     pub fn new(cache_dir: Option<&Path>) -> Result<Self> {
         Self::with_cache_max_bytes(cache_dir, 1024 * 1024 * 1024)
     }
-    /// Bound the combined node/Wasm disk cache (default 1 GiB), evicting oldest mtimes.
+    /// Bound the combined node/Wasm disk cache (default 1 GiB). Returns without reading the
+    /// node cache: its index loads in the background, and lookups miss until it is ready.
     pub fn with_cache_max_bytes(cache_dir: Option<&Path>, cache_max_bytes: u64) -> Result<Self> {
         let base = cache_dir.map(Path::to_path_buf).unwrap_or_else(|| {
             std::env::var_os("XDG_CACHE_HOME")
@@ -82,19 +87,23 @@ impl ReplaySession {
         let wasm_dir = base.join("wasm");
         std::fs::create_dir_all(&wasm_dir)
             .map_err(|e| Error::Invalid(format!("{}: {e}", wasm_dir.display())))?;
-        let node_dir = cache_dir.map(|p| p.join("nodes"));
-        if let Some(dir) = &node_dir {
-            std::fs::create_dir_all(dir)
-                .map_err(|e| Error::Invalid(format!("{}: {e}", dir.display())))?;
-        }
+        let disk = cache_dir
+            .map(|p| {
+                let dir = p.join("proof-nodes");
+                crate::disk::NodeStore::open(&dir, cache_max_bytes, Some(p.join("nodes")))
+                    .map_err(|e| Error::Invalid(format!("{}: {e}", dir.display())))
+            })
+            .transpose()?;
         let session = Self {
             nodes: Default::default(),
             hints: Default::default(),
             cold_start: Default::default(),
-            node_dir,
+            disk,
             cache_base: base,
             cache_max_bytes,
-            disk_index: Default::default(),
+            wasm: Default::default(),
+            maintenance: Default::default(),
+            warned_write: Default::default(),
             executors: Default::default(),
             speculative_discovery: true,
             metadata: Default::default(),
@@ -113,9 +122,8 @@ impl ReplaySession {
                     .build(),
             ),
         };
-        // Learn sizes once, but defer eviction until authenticated :code identifies the
-        // active runtime. Pruning here could delete the very module about to be loaded.
-        session.refresh_disk_index()?;
+        // Wasm eviction waits until authenticated :code identifies the active runtime.
+        // Pruning here could delete the very module about to be loaded.
         Ok(session)
     }
     /// Admit one cold replay at a time until successful replay paths are available.
@@ -219,77 +227,91 @@ impl ReplaySession {
                 .build(),
         );
         executors.insert(hash, executor.clone());
+        self.wasm.lock().dirty = true;
         executor
     }
-    pub(crate) fn index_write(&self, path: PathBuf, size: u64) {
-        self.disk_index
-            .lock()
-            .insert(path, std::time::SystemTime::now(), size);
-    }
-    fn refresh_disk_index(&self) -> Result<()> {
-        let mut index = self.disk_index.lock();
-        for dir in [self.node_dir.clone(), Some(self.cache_base.join("wasm"))]
-            .into_iter()
-            .flatten()
-        {
-            index
-                .refresh(&dir)
-                .map_err(|e| Error::Invalid(format!("{}: {e}", dir.display())))?;
-        }
-        Ok(())
-    }
+    /// Keeps the node and Wasm caches within `--cache-max-bytes`. Node totals are kept as
+    /// they are written, so this reads no directory. The Wasm cache is measured again only
+    /// after a new runtime was loaded, or every ten minutes because Wasmtime prunes it too.
     pub(crate) fn prune_disk_cache(&self) -> Result<()> {
-        // Entries are immutable content-addressed files. Only new directory entries need stat;
-        // proof persistence registers writes directly. Wasmtime writes are discovered by mtime.
-        let pinned: Vec<_> = self
+        let Some(_maintenance) = self.maintenance.try_lock() else {
+            return Ok(());
+        };
+        let due = {
+            let wasm = self.wasm.lock();
+            wasm.dirty
+                || wasm
+                    .measured
+                    .is_none_or(|at| at.elapsed() > std::time::Duration::from_secs(600))
+        };
+        let mut result = Ok(());
+        if due {
+            result = self.prune_wasm();
+        }
+        let wasm_bytes = self.wasm.lock().bytes;
+        if let Some(disk) = &self.disk {
+            disk.set_budget(self.cache_max_bytes.saturating_sub(wasm_bytes));
+        }
+        result
+    }
+    fn prune_wasm(&self) -> Result<()> {
+        let pinned: BTreeSet<String> = self
             .executors
             .lock()
             .keys()
-            .map(|hash| self.cache_base.join("wasm").join(format!("{hash:x}")))
+            .map(|hash| format!("{hash:x}"))
             .collect();
-        self.refresh_disk_index()?;
-        let mut index = self.disk_index.lock();
-        let pinned_bytes: u64 = index
-            .files
+        let root = self.cache_base.join("wasm");
+        let mut modules =
+            wasm_modules(&root).map_err(|e| Error::Invalid(format!("{}: {e}", root.display())))?;
+        let mut bytes: u64 = modules.iter().map(|m| m.bytes).sum();
+        let pinned_bytes: u64 = modules
             .iter()
-            .filter(|(path, _)| pinned.iter().any(|p| path.starts_with(p)))
-            .map(|(_, (_, size))| size)
+            .filter(|m| pinned.contains(&m.name))
+            .map(|m| m.bytes)
             .sum();
-        // Logged after the lock is released: a blocked log must not stall other replays.
-        let mut warning = None;
-        if pinned_bytes > self.cache_max_bytes && !index.warned_small {
-            warning = Some(format!(
-                "warning: --cache-max-bytes {} is smaller than active runtime modules ({} bytes); keeping runtime code in use",
-                self.cache_max_bytes, pinned_bytes
-            ));
-            index.warned_small = true;
-        }
+        let nodes = self.disk.as_ref().map_or(0, |d| d.total());
         let mut result = Ok(());
-        while index.total > self.cache_max_bytes {
-            let Some((time, path)) = index
-                .oldest
-                .iter()
-                .find(|(_, path)| !pinned.iter().any(|p| path.starts_with(p)))
-                .cloned()
-            else {
-                break;
-            };
-            match std::fs::remove_file(&path) {
-                Ok(()) => {}
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-                Err(e) => {
-                    result = Err(Error::Invalid(format!("{}: {e}", path.display())));
+        // Without a known runtime every module may be the next one needed: measure only.
+        if !pinned.is_empty() {
+            modules.sort_by_key(|m| m.modified);
+            for module in modules.iter().filter(|m| !pinned.contains(&m.name)) {
+                // Runtimes not in use go before any proof node.
+                if bytes + nodes <= self.cache_max_bytes {
                     break;
                 }
+                let path = root.join(&module.name);
+                let removed = if module.directory {
+                    std::fs::remove_dir_all(&path)
+                } else {
+                    std::fs::remove_file(&path)
+                };
+                match removed {
+                    Ok(()) => bytes = bytes.saturating_sub(module.bytes),
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                        bytes = bytes.saturating_sub(module.bytes)
+                    }
+                    Err(e) => {
+                        result = Err(Error::Invalid(format!("{}: {e}", path.display())));
+                        break;
+                    }
+                }
             }
-            if let Some((_, size)) = index.files.remove(&path) {
-                index.total = index.total.saturating_sub(size);
-            }
-            index.oldest.remove(&(time, path));
         }
-        drop(index);
-        if let Some(warning) = warning {
-            note!("{warning}");
+        let mut wasm = self.wasm.lock();
+        wasm.bytes = bytes;
+        wasm.dirty = false;
+        wasm.measured = Some(std::time::Instant::now());
+        // Logged after the lock is released: a blocked log must not stall other replays.
+        let warn =
+            pinned_bytes > self.cache_max_bytes && !std::mem::replace(&mut wasm.warned_small, true);
+        drop(wasm);
+        if warn {
+            note!(
+                "warning: --cache-max-bytes {} is smaller than active runtime modules ({} bytes); keeping runtime code in use",
+                self.cache_max_bytes,
+                pinned_bytes
+            );
         }
         result
     }
@@ -303,82 +325,70 @@ impl ReplaySession {
 }
 
 #[derive(Default)]
-struct DiskIndex {
-    files: BTreeMap<PathBuf, (std::time::SystemTime, u64)>,
-    oldest: BTreeSet<(std::time::SystemTime, PathBuf)>,
-    directories: BTreeMap<PathBuf, std::time::SystemTime>,
-    total: u64,
+struct WasmUsage {
+    /// Bytes the Wasm cache used on disk when last measured.
+    bytes: u64,
+    measured: Option<std::time::Instant>,
+    /// A runtime was loaded since the last measurement.
+    dirty: bool,
     warned_small: bool,
-    #[cfg(test)]
-    file_stats: usize,
 }
-impl DiskIndex {
-    fn insert(&mut self, path: PathBuf, time: std::time::SystemTime, size: u64) {
-        if let Some((old, size)) = self.files.insert(path.clone(), (time, size)) {
-            self.total = self.total.saturating_sub(size);
-            self.oldest.remove(&(old, path.clone()));
-        }
-        self.total += size;
-        self.oldest.insert((time, path));
-    }
-    fn refresh(&mut self, dir: &Path) -> std::io::Result<()> {
-        let modified = match std::fs::metadata(dir) {
-            Ok(meta) => meta.modified()?,
+
+/// One entry under `wasm/`: Wasmtime's cache for one runtime, or a stray file.
+struct WasmModule {
+    name: String,
+    directory: bool,
+    bytes: u64,
+    modified: std::time::SystemTime,
+}
+
+/// Wasmtime keeps a few files per runtime, and eviction bounds the runtimes, so this walk is
+/// small. It runs only when a runtime was loaded, or every ten minutes.
+fn wasm_modules(root: &Path) -> std::io::Result<Vec<WasmModule>> {
+    fn walk(
+        path: &Path,
+        bytes: &mut u64,
+        modified: &mut std::time::SystemTime,
+    ) -> std::io::Result<()> {
+        let meta = match path.symlink_metadata() {
+            Ok(meta) => meta,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
             Err(e) => return Err(e),
         };
-        let changed = self.directories.get(dir) != Some(&modified);
-        if changed {
-            self.directories.insert(dir.to_owned(), modified);
-            let entries = match std::fs::read_dir(dir) {
+        *modified = (*modified).max(meta.modified()?);
+        if meta.is_dir() {
+            *bytes += crate::disk::disk_size(0);
+            let entries = match std::fs::read_dir(path) {
                 Ok(entries) => entries,
-                // Another session may evict a directory between metadata and read_dir.
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                    self.directories.remove(dir);
-                    return Ok(());
-                }
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
                 Err(e) => return Err(e),
             };
             for entry in entries {
-                let entry = entry?;
-                let path = entry.path();
-                if self.files.contains_key(&path) || self.directories.contains_key(&path) {
-                    continue;
-                }
-                let meta = match path.symlink_metadata() {
-                    Ok(meta) => meta,
-                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => continue,
-                    Err(e) => return Err(e),
-                };
-                #[cfg(test)]
-                {
-                    self.file_stats += usize::from(meta.is_file());
-                }
-                if meta.is_dir() {
-                    self.refresh(&path)?;
-                } else if meta.is_file() {
-                    let time = meta.modified()?;
-                    if path.extension().is_some_and(|ext| ext == "tmp")
-                        && time.elapsed().unwrap_or_default() < std::time::Duration::from_secs(300)
-                    {
-                        self.directories.remove(dir);
-                    } else {
-                        self.insert(path, time, meta.len());
-                    }
-                }
+                walk(&entry?.path(), bytes, modified)?;
             }
-        }
-        let children: Vec<_> = self
-            .directories
-            .keys()
-            .filter(|p| p.parent() == Some(dir))
-            .cloned()
-            .collect();
-        for child in children {
-            self.refresh(&child)?;
+        } else {
+            *bytes += crate::disk::disk_size(meta.len());
         }
         Ok(())
     }
+    let entries = match std::fs::read_dir(root) {
+        Ok(entries) => entries,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(Vec::new()),
+        Err(e) => return Err(e),
+    };
+    let mut modules = Vec::new();
+    for entry in entries {
+        let entry = entry?;
+        let (mut bytes, mut modified) = (0, std::time::SystemTime::UNIX_EPOCH);
+        walk(&entry.path(), &mut bytes, &mut modified)?;
+        modules.push(WasmModule {
+            name: entry.file_name().to_string_lossy().into_owned(),
+            directory: entry.file_type()?.is_dir(),
+            bytes,
+            modified,
+        });
+    }
+    Ok(modules)
 }
 
 #[cfg(test)]
@@ -487,32 +497,127 @@ mod disk_tests {
         assert_eq!(rpc.count(), 0);
     }
     #[test]
-    fn unchanged_files_are_not_statted_again_and_active_runtime_is_pinned() {
-        let dir = std::env::temp_dir().join(format!("frame-trace-index-{}", std::process::id()));
+    fn wasm_cache_is_measured_when_runtimes_change_and_active_runtime_is_pinned() {
+        let dir = std::env::temp_dir().join(format!("frame-trace-wasm-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
         let session = ReplaySession::with_cache_max_bytes(Some(&dir), 1).expect("session");
         let wasm = b"runtime";
         let active = session.executor_for(wasm);
         let hash = H256::from(sp_io::hashing::blake2_256(wasm));
         let module = dir.join("wasm").join(format!("{hash:x}")).join("module");
-        std::fs::create_dir_all(module.parent().expect("parent")).expect("mkdir");
-        std::fs::write(&module, [0; 32]).expect("write");
+        let unused = dir.join("wasm").join("unused").join("module");
+        for path in [&module, &unused] {
+            std::fs::create_dir_all(path.parent().expect("parent")).expect("mkdir");
+            std::fs::write(path, [0; 32]).expect("write");
+        }
         session.prune_disk_cache().expect("prune");
-        let stats = session.disk_index.lock().file_stats;
-        session.prune_disk_cache().expect("prune");
-        assert_eq!(stats, session.disk_index.lock().file_stats);
         assert!(module.exists());
-        assert!(session.disk_index.lock().warned_small);
+        assert!(!unused.exists());
+        assert!(session.wasm.lock().warned_small);
+        // Until another runtime loads, maintenance reads no directory.
+        let stray = dir.join("wasm").join("stray");
+        std::fs::write(&stray, [0; 8]).expect("write");
+        session.prune_disk_cache().expect("prune");
+        assert!(stray.exists());
         drop(active);
         drop(session);
         let restarted = ReplaySession::with_cache_max_bytes(Some(&dir), 1).expect("restart");
+        restarted.prune_disk_cache().expect("measure");
         assert!(
-            module.exists(),
-            "startup must defer eviction until the runtime is identified"
+            module.exists() && stray.exists(),
+            "eviction must wait until the runtime is identified"
         );
         let active = restarted.executor_for(wasm);
         restarted.prune_disk_cache().expect("restart prune");
         assert!(module.exists());
+        assert!(!stray.exists());
         drop(active);
         std::fs::remove_dir_all(dir).expect("cleanup");
+    }
+    /// Cache maintenance at scale. Run with
+    /// `FT_BENCH_DIR=<empty dir> cargo test --release -p frame-trace-replay --lib bench_disk_cache -- --ignored --nocapture`.
+    #[test]
+    #[ignore]
+    fn bench_disk_cache_1m_nodes() {
+        use std::time::{Duration, Instant};
+        fn rss_kib() -> u64 {
+            let out = std::process::Command::new("ps")
+                .args(["-o", "rss=", "-p", &std::process::id().to_string()])
+                .output()
+                .expect("ps");
+            String::from_utf8_lossy(&out.stdout)
+                .trim()
+                .parse()
+                .expect("rss")
+        }
+        fn node(i: u64) -> Vec<u8> {
+            let seed = sp_io::hashing::blake2_256(&i.to_le_bytes());
+            seed.iter().cycle().take(200).copied().collect()
+        }
+        let n: u64 = std::env::var("FT_BENCH_NODES")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(1_000_000);
+        let dir = PathBuf::from(std::env::var("FT_BENCH_DIR").expect("FT_BENCH_DIR"));
+        if !dir.join("proof-nodes").exists() {
+            let session =
+                ReplaySession::with_cache_max_bytes(Some(&dir), 1 << 30).expect("session");
+            let start = Instant::now();
+            for block in 0..n / 1000 {
+                let db = crate::proof::ProofDb::with_session(None, H256::zero(), session.clone());
+                db.insert_nodes((block * 1000..block * 1000 + 1000).map(node));
+                db.persist().expect("persist");
+            }
+            eprintln!("populate {n} nodes: {:?}", start.elapsed());
+        }
+        // The index alone, without the rest of a session.
+        let rss = rss_kib();
+        let store =
+            crate::disk::NodeStore::open(&dir.join("proof-nodes"), 1 << 30, None).expect("store");
+        store.wait_loaded();
+        let index_rss = rss_kib().saturating_sub(rss) / 1024;
+        drop(store);
+        let start = Instant::now();
+        let session = ReplaySession::with_cache_max_bytes(Some(&dir), 1 << 30).expect("session");
+        let startup = start.elapsed();
+        let disk = session.disk.clone().expect("disk");
+        disk.wait_loaded();
+        let loaded = start.elapsed();
+        eprintln!(
+            "startup {startup:?}; index loaded in the background after {loaded:?}; {} nodes; index RSS {} MiB (table {} MiB); {} segment files",
+            disk.node_count(),
+            index_rss,
+            disk.index_bytes() / (1024 * 1024),
+            disk.segment_count()
+        );
+        let (mut persist, mut maintenance) = (Vec::new(), Vec::new());
+        for r in 0..20u64 {
+            let db = crate::proof::ProofDb::with_session(None, H256::zero(), session.clone());
+            db.insert_nodes((0..50).map(|j| node(n + 1_000_000 + r * 50 + j)));
+            let start = Instant::now();
+            db.persist().expect("persist");
+            persist.push(start.elapsed());
+            let start = Instant::now();
+            session.prune_disk_cache().expect("prune");
+            maintenance.push(start.elapsed());
+        }
+        let median = |v: &mut Vec<Duration>| {
+            v.sort();
+            (v[v.len() / 2], v[v.len() - 1])
+        };
+        eprintln!(
+            "persist per replay (median, max): {:?}; maintenance per replay: {:?}",
+            median(&mut persist),
+            median(&mut maintenance)
+        );
+        // The rare expensive step: dropping the oldest segment walks the index once.
+        let (before, nodes) = (disk.total(), disk.node_count());
+        let start = Instant::now();
+        disk.set_budget(before - 1);
+        eprintln!(
+            "evicting one segment: {:?}, {} of {nodes} index entries removed",
+            start.elapsed(),
+            nodes - disk.node_count()
+        );
     }
 }

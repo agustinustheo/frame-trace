@@ -4,6 +4,7 @@ mod log;
 pub use log::set_log_hook;
 mod artifact;
 pub mod call;
+mod disk;
 mod metadata;
 mod session;
 pub use session::ReplaySession;
@@ -476,19 +477,11 @@ pub fn replay_with_session(
 
 fn with_maintenance<T>(session: &ReplaySession, run: impl FnOnce() -> Result<T>) -> Result<T> {
     let result = run();
-    let maintenance = session.prune_disk_cache();
-    match result {
-        Ok(value) => {
-            maintenance?;
-            Ok(value)
-        }
-        Err(error) => {
-            if let Err(cache_error) = maintenance {
-                note!("warning: cache cleanup: {cache_error}");
-            }
-            Err(error)
-        }
+    // The cache is disposable: a cleanup error never fails the replay it follows.
+    if let Err(cache_error) = session.prune_disk_cache() {
+        note!("warning: cache cleanup: {cache_error}");
     }
+    result
 }
 
 fn replay_inner(
