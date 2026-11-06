@@ -30,7 +30,7 @@ env:
 
 jobs:
   test:
-    name: Test main
+    name: Test
     runs-on: ubuntu-latest
     timeout-minutes: 120
     permissions:
@@ -41,10 +41,13 @@ jobs:
       date: ${{ steps.plan.outputs.date }}
       publish: ${{ steps.plan.outputs.publish }}
     steps:
-      - name: Checkout main
+      # Check out the run's own commit, not the current main: a queued run may start
+      # after main moved, and the provenance attestation names the run's commit.
+      # A scheduled run's commit is the head of main when it was triggered.
+      - name: Checkout the run's commit
         uses: actions/checkout@v7
         with:
-          ref: main
+          ref: ${{ github.sha }}
 
       # The hosted /tmp is small; tests and builds write temporary files here instead.
       - name: Use the runner temp directory
@@ -57,33 +60,53 @@ jobs:
           components: rustfmt, clippy
 
       # Version: 0.1.0-nightly.20261106+abc1234 (crate version, UTC date, short commit).
-      # Publish only from the main workflow file, and only if main moved since the
-      # commit the `nightly` tag points to, or if the run asks to force it.
+      # Publish only from the main workflow file. Skip publishing only if the published
+      # Nightly release is complete and its tag points to this commit, unless forced.
       - name: Plan the build
         id: plan
         env:
           FORCE: ${{ inputs.force || false }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
           sha=$(git rev-parse HEAD)
+          if [ "$sha" != "$GITHUB_SHA" ]; then
+            echo "::error::Checked out $sha, but the run is for $GITHUB_SHA"
+            exit 1
+          fi
           crate=$(cargo +1.93.0 metadata --no-deps --format-version 1 --locked \
             | jq -r '.packages[] | select(.name == "frame-trace") | .version')
           date=$(date -u +%Y%m%d)
           version="$crate-nightly.$date+${sha:0:7}"
+          # The archives build.yml makes for each target, and SHA256SUMS.
+          expected=$( { sed -n 's/^ *- target: *//p' .github/workflows/build.yml \
+            | sed 's/.*/frame-trace-nightly-&.tar.gz/'; echo SHA256SUMS; } | sort)
+          # A draft is not visible to this read-only token, so it counts as missing.
+          if release=$(gh release view nightly --json isDraft,assets 2> /dev/null) \
+            && [ "$(jq -r .isDraft <<< "$release")" = false ]; then
+            missing=$(comm -23 <(echo "$expected") <(jq -r '.assets[].name' <<< "$release" | sort) \
+              | paste -sd ' ' -)
+          else
+            release=""
+          fi
           # The peeled line (^{}) wins for an annotated tag.
           tagged=$(git ls-remote origin refs/tags/nightly 'refs/tags/nightly^{}' \
             | sort -k2 | tail -n 1 | cut -f1)
+          publish=true
           if [ "$GITHUB_REF" != "refs/heads/main" ]; then
             publish=false
             echo "Not publishing: the run uses the workflow from $GITHUB_REF, not main"
           elif [ "$FORCE" = "true" ]; then
-            publish=true
             echo "Publishing $sha: forced"
-          elif [ "$tagged" = "$sha" ]; then
-            publish=false
-            echo "Not publishing: main is still $sha, the commit of the last nightly"
-          else
-            publish=true
+          elif [ -z "$release" ]; then
+            echo "Publishing $sha: there is no published Nightly release"
+          elif [ -n "$missing" ]; then
+            echo "Publishing $sha: the Nightly release lacks $missing"
+          elif [ "$tagged" != "$sha" ]; then
             echo "Publishing $sha: the last nightly is ${tagged:-missing}"
+          else
+            publish=false
+            echo "Not publishing: the Nightly release is complete and already built from $sha"
           fi
           {
             echo "sha=$sha"
@@ -159,6 +182,14 @@ jobs:
           path: dist
           merge-multiple: true
 
+      # The attestation names the run's commit, so the archives must be built from it.
+      - name: Check the build is of the run's commit
+        run: |
+          if [ "$SHA" != "$GITHUB_SHA" ]; then
+            echo "::error::The archives are of $SHA, but the run is for $GITHUB_SHA"
+            exit 1
+          fi
+
       - name: Write checksums
         working-directory: dist
         run: |
@@ -184,10 +215,19 @@ jobs:
           EOF
           cat "$RUNNER_TEMP/notes.md"
 
+      # The new release is uploaded in full as a draft under a temporary tag name,
+      # which creates no tag. Only then is the old release deleted, the `nightly` tag
+      # moved and the draft published on it. If the upload fails, the old release and
+      # tag stay as they were.
       # Release events made with GITHUB_TOKEN start no workflows, and release.yml
       # runs only for tags matching v*, so moving `nightly` never starts a stable release.
       - name: Replace the Nightly prerelease
         run: |
+          draft="nightly-draft-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          gh release create "$draft" --draft --prerelease --latest=false \
+            --target "$SHA" --title Nightly \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            dist/*.tar.gz dist/SHA256SUMS
           if gh release view nightly > /dev/null 2>&1; then
             gh release delete nightly --yes
           fi
@@ -198,10 +238,16 @@ jobs:
             gh api --method POST "repos/$GH_REPO/git/refs" \
               -f ref=refs/tags/nightly -f sha="$SHA" > /dev/null
           fi
-          gh release create nightly --verify-tag --prerelease --latest=false \
-            --title Nightly \
-            --notes-file "$RUNNER_TEMP/notes.md" \
-            dist/*.tar.gz dist/SHA256SUMS
+          gh release edit "$draft" --tag nightly --draft=false --prerelease --latest=false
+
+      # The next nightly sees no complete Nightly release and publishes again.
+      - name: Delete the unpublished draft
+        if: failure()
+        run: |
+          draft="nightly-draft-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          if [ "$(gh release view "$draft" --json isDraft --jq .isDraft 2> /dev/null)" = true ]; then
+            gh release delete "$draft" --yes
+          fi
 
   notify:
     name: Report the result in an issue
