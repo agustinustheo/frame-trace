@@ -165,7 +165,7 @@ A second signal exits at once.
 | Exit code | Meaning |
 | --- | --- |
 | 0 | Stopped by a signal. Failed blocks and exports are counted in the summary, not in the exit code. |
-| 1 | `follow` could not start, for example a malformed `--rpc` or `--otlp` URL, or its replay or export threads stopped unexpectedly. |
+| 1 | `follow` could not start, for example a malformed `--rpc` or `--otlp` URL, or its replay or export threads stopped unexpectedly, or it could no longer write to stderr. |
 | 2 | The command line was wrong. |
 | 130 | A second signal arrived during the stop. |
 
