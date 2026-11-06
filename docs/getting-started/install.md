@@ -2,15 +2,124 @@
 
 You need:
 
-- Rust. The repository pins version 1.93.0 in `rust-toolchain.toml`, and `rustup` installs it for you.
 - Docker, to run Jaeger. Any other trace viewer that accepts [OTLP](../reference/glossary.md#otlp) over HTTP also works.
 - The RPC URL of a node of the chain you want to trace. It must serve `state_getReadProof`. See [Choose an endpoint](../guides/trace-a-block.md#choose-an-endpoint) before tracing many blocks.
 
 [What frame-trace supports](../reference/support.md) lists the chains and nodes frame-trace works with.
 
-## Build and install
+There are three ways to install frame-trace:
 
-Run these commands in a terminal:
+1. [A release binary](#install-a-release-binary), for most people.
+2. [A nightly binary](#install-a-nightly-binary), built from the newest code each night.
+3. [From source](#build-from-source), which needs Rust.
+
+## Install a release binary
+
+Each release has an archive for these systems:
+
+| System | Target in the file name |
+| --- | --- |
+| Linux, x86_64 | `x86_64-unknown-linux-gnu` |
+| Linux, ARM64 | `aarch64-unknown-linux-gnu` |
+| macOS, Apple silicon | `aarch64-apple-darwin` |
+| macOS, Intel | `x86_64-apple-darwin` |
+
+The Linux binaries need glibc 2.35 or newer, as in Ubuntu 22.04.
+
+Find the newest version on the [releases page](https://github.com/agustinustheo/frame-trace/releases/latest).
+Run these commands in a terminal, with that version and the target for your system:
+
+```sh
+VERSION=0.1.0
+TARGET=x86_64-unknown-linux-gnu
+curl -LO "https://github.com/agustinustheo/frame-trace/releases/download/v$VERSION/frame-trace-$VERSION-$TARGET.tar.gz"
+curl -LO "https://github.com/agustinustheo/frame-trace/releases/download/v$VERSION/SHA256SUMS"
+```
+
+On Linux x86_64 or ARM64, check the archive against `SHA256SUMS`:
+
+```sh
+sha256sum --check --ignore-missing SHA256SUMS
+```
+
+On macOS, use `shasum` for the same check:
+
+```sh
+shasum -a 256 --check --ignore-missing SHA256SUMS
+```
+
+You should see `OK` after the file name:
+
+```text
+frame-trace-0.1.0-x86_64-unknown-linux-gnu.tar.gz: OK
+```
+
+Unpack the archive and copy `frame-trace` to `~/.local/bin`:
+
+```sh
+tar -xzf "frame-trace-$VERSION-$TARGET.tar.gz"
+mkdir -p ~/.local/bin
+cp "frame-trace-$VERSION-$TARGET/frame-trace" ~/.local/bin/
+```
+
+If `~/.local/bin` is not on your `PATH`, add it:
+
+```sh
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+Put that line in your shell's startup file, such as `~/.bashrc` or `~/.zshrc`, to keep it.
+
+## Install a nightly binary
+
+The [Nightly](https://github.com/agustinustheo/frame-trace/releases/tag/nightly) pre-release holds binaries built from the newest code.
+It is rebuilt each night that the code changed and every check passed.
+
+> **Warning:** Nightly builds are untested between releases. They can change the command line or the JSON output without notice. Use a release binary unless you need a change that is not released yet.
+
+The archives have `nightly` in place of the version.
+Follow the steps for a release binary with these downloads:
+
+```sh
+TARGET=x86_64-unknown-linux-gnu
+curl -LO "https://github.com/agustinustheo/frame-trace/releases/download/nightly/frame-trace-nightly-$TARGET.tar.gz"
+curl -LO "https://github.com/agustinustheo/frame-trace/releases/download/nightly/SHA256SUMS"
+```
+
+Check the archive as above, then unpack it and copy the binary:
+
+```sh
+tar -xzf "frame-trace-nightly-$TARGET.tar.gz"
+mkdir -p ~/.local/bin
+cp "frame-trace-nightly-$TARGET/frame-trace" ~/.local/bin/
+```
+
+A nightly binary prints the date and commit it was built from:
+
+```sh
+frame-trace --version
+```
+
+```text
+frame-trace 0.1.0-nightly.<date>+<commit>
+```
+
+## Build from source
+
+You need Rust 1.93.0 or newer. If you do not have it, install it with [rustup](https://rustup.rs).
+The first build compiles the Polkadot SDK executor, so it takes several minutes.
+
+Build and install the newest code with Cargo:
+
+```sh
+cargo install --locked --git https://github.com/agustinustheo/frame-trace frame-trace
+```
+
+Add `--tag v<version>` to build a release instead.
+
+Or clone the repository and install from it.
+It has the saved blocks the next step replays.
+The repository pins Rust 1.93.0 in `rust-toolchain.toml`, and `rustup` installs it for you.
 
 ```sh
 git clone https://github.com/agustinustheo/frame-trace
@@ -18,7 +127,6 @@ cd frame-trace
 cargo install --locked --path crates/cli
 ```
 
-The first build compiles the Polkadot SDK executor, so it takes several minutes.
 Cargo puts the binary in `~/.cargo/bin`.
 
 ## Check it works
@@ -31,9 +139,10 @@ frame-trace --version
 frame-trace 0.1.0
 ```
 
-Then replay a block that ships with the repository, from a local [People chain](../reference/glossary.md#people-chain).
+Then replay a block saved in the repository, from a local [People chain](../reference/glossary.md#people-chain).
 It needs no network.
-Run it from the `frame-trace` directory:
+If you installed a binary, clone the repository first with `git clone https://github.com/agustinustheo/frame-trace`.
+Run the replay from the `frame-trace` directory:
 
 ```sh
 frame-trace block --offline fixtures/replay/people-transfer
