@@ -61,9 +61,12 @@ The [reference](../reference/commands.md#follow) lists the intervals.
 | `stopped` | Blocks that failed for good, such as pruned state or a failed root check. |
 | `skipped` | Blocks not replayed, or not retried, because newer blocks arrived first. |
 | `reverted` | Blocks that left the chain in a reorg, counted once whatever their state. Only with `--best`. |
+| `state-memory` | Memory used by downloaded state kept for all workers, in MiB. It stops growing at the [limit](../reference/commands.md#follow). |
+| `state-pieces` | Pieces of downloaded state kept in memory. |
+| `state-from-memory` | Share of the state replays needed that was already in memory, since the start. The rest came from the disk cache or the node. |
 | `up` | Time since `follow` started. |
 
-All counts except `queued`, `in-flight`, `retrying` and `export-waiting` are totals since the start.
+All counts except `queued`, `in-flight`, `retrying`, `export-waiting`, `state-memory` and `state-pieces` are totals since the start.
 
 When you stop `follow`, the last line sums up the run.
 It adds `cancelled` and `poll-failures`, the failed checks for new blocks.
