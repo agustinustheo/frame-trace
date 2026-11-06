@@ -23,6 +23,7 @@ The model is Sentry's docs: the README is a shop window, the first page ends wit
 3. **One term per idea, defined once.** Use these words and no others:
    - **read** and **write**, not access, hit, fetch or lookup;
    - **cache** (the value was already in memory for this block), **trie** (frame-trace had to look it up in the chain state);
+   - **disk cache** (what `--cache-dir` keeps between blocks and runs), never plain "cache" for it;
    - **proof bytes** (how much this read added to the storage proof);
    - **phase** (initialization, an extrinsic, on_poll, finalization);
    - **replay** (running the block again on your machine);
