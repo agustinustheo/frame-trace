@@ -269,7 +269,8 @@ impl ReplaySession {
         };
         let root = self.cache_base.join("wasm");
         let generation = self.wasm_generation.load(Ordering::SeqCst);
-        let due = {
+        // Without a Wasm cache folder there is nothing to measure or delete.
+        let due = self.wasm_cache && {
             let wasm = self.wasm.lock();
             wasm.generation != Some(generation)
                 || wasm
@@ -334,6 +335,12 @@ impl ReplaySession {
             })
         };
         let wasm_bytes: u64 = modules.iter().map(|m| m.bytes).sum();
+        // A runtime that could not be deleted still uses disk, in use or not.
+        let runtimes = match pinned_bytes {
+            Some(pinned) if failed.is_none() => pinned,
+            _ => wasm_bytes,
+        };
+        let floor = (64 * 1024 * 1024).min(self.cache_max_bytes / 4);
         let mut wasm = self.wasm.lock();
         wasm.modules = modules;
         if let Some(failed) = failed {
@@ -343,20 +350,20 @@ impl ReplaySession {
                 result = Err(Error::Invalid(failed));
             }
         }
-        let warn = pinned_bytes.is_some_and(|b| b > self.cache_max_bytes)
+        // The space kept for state is part of the disk cache only with a node folder.
+        let kept = if self.disk.is_some() { floor } else { 0 };
+        let warn = pinned_bytes.is_some_and(|b| b + kept > self.cache_max_bytes)
             && !std::mem::replace(&mut wasm.warned_small, true);
         // Logged after the lock is released: a blocked log must not stall other replays.
         drop(wasm);
         if warn {
             note!(
-                "warning: --cache-max-bytes {} is smaller than active runtime modules ({} bytes); keeping runtime code in use",
+                "warning: disk cache: --cache-max-bytes {} is less than the runtimes in use ({} bytes) plus {kept} bytes kept for downloaded state; the disk cache stays above the limit",
                 self.cache_max_bytes,
                 pinned_bytes.unwrap_or_default()
             );
         }
         if let Some(disk) = &self.disk {
-            let floor = (64 * 1024 * 1024).min(self.cache_max_bytes / 4);
-            let runtimes = pinned_bytes.unwrap_or(wasm_bytes);
             disk.set_budget(self.cache_max_bytes.saturating_sub(runtimes).max(floor));
         }
         result
@@ -637,6 +644,65 @@ mod disk_tests {
             );
         }
         assert!(session.disk.as_ref().expect("disk").total() <= cap / 4);
+        assert!(session.wasm.lock().warned_small);
+        std::fs::remove_dir_all(dir).expect("cleanup");
+    }
+    #[test]
+    fn a_runtime_that_cannot_be_deleted_stays_in_the_node_budget() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir =
+            std::env::temp_dir().join(format!("frame-trace-stuck-wasm-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let cap = 1024 * 1024;
+        let session = ReplaySession::with_cache_max_bytes(Some(&dir), cap).expect("session");
+        let _active = session.executor_for(b"runtime");
+        let unused = dir.join("wasm").join("unused");
+        std::fs::create_dir_all(&unused).expect("mkdir");
+        std::fs::write(unused.join("module"), vec![0; 600 * 1024]).expect("write");
+        // Its file cannot be deleted from a read-only folder.
+        std::fs::set_permissions(&unused, std::fs::Permissions::from_mode(0o555)).expect("chmod");
+        let mut errors = 0;
+        for block in 0..32 {
+            persist(&session, block * 100..block * 100 + 100);
+            errors += usize::from(session.prune_disk_cache().is_err());
+        }
+        let nodes = session.disk.as_ref().expect("disk").total();
+        std::fs::set_permissions(&unused, std::fs::Permissions::from_mode(0o755)).expect("chmod");
+        std::fs::remove_dir_all(&dir).expect("cleanup");
+        assert!(errors == 1, "{errors} errors: the failure is reported once");
+        // 600 KiB of runtime that could not go leaves under 400 KiB for state.
+        assert!(nodes <= cap - 600 * 1024, "{nodes} bytes of state");
+    }
+    #[test]
+    fn a_disabled_wasm_cache_is_not_maintained() {
+        let dir = std::env::temp_dir().join(format!("frame-trace-no-wasm-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        std::fs::write(dir.join("wasm"), b"not a folder").expect("write");
+        let session = ReplaySession::with_cache_max_bytes(Some(&dir), 1 << 20).expect("session");
+        let _active = session.executor_for(b"runtime");
+        for _ in 0..3 {
+            session
+                .prune_disk_cache()
+                .expect("no error for a folder that is not used");
+        }
+        std::fs::remove_dir_all(dir).expect("cleanup");
+    }
+    #[test]
+    fn runtimes_in_use_plus_the_node_floor_over_the_limit_warn() {
+        let dir =
+            std::env::temp_dir().join(format!("frame-trace-floor-warn-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let cap = 1024 * 1024;
+        let session = ReplaySession::with_cache_max_bytes(Some(&dir), cap).expect("session");
+        let wasm = b"runtime in use";
+        let _active = session.executor_for(wasm);
+        let hash = H256::from(sp_io::hashing::blake2_256(wasm));
+        let module = dir.join("wasm").join(format!("{hash:x}"));
+        std::fs::create_dir_all(&module).expect("mkdir");
+        // Under the limit alone, over it with the 256 KiB kept for state.
+        std::fs::write(module.join("module"), vec![0; 900 * 1024]).expect("write");
+        session.prune_disk_cache().expect("prune");
         assert!(session.wasm.lock().warned_small);
         std::fs::remove_dir_all(dir).expect("cleanup");
     }

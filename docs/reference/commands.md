@@ -217,7 +217,8 @@ They are hidden from `--help`.
 
 The disk cache can go over the limit in these cases:
 
-- the runtime in use is larger than the limit. frame-trace keeps it and logs a warning once;
+- the runtimes in use plus the space kept for state are more than the limit. frame-trace keeps both, and logs a warning once when it first sees it;
+- a file frame-trace could not delete. It keeps counting it: a runtime not in use leaves less room for state, and an old state file stops new writes until it is deleted. It logs a warning once;
 - a runtime compiled since the last check. frame-trace checks the runtime folder when it loads a new runtime, and every 10 minutes;
 - the `nodes` folder of an older version, until it is deleted;
 - the files of another frame-trace using the same directory.
