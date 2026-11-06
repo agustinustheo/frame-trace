@@ -1,5 +1,20 @@
 # Releasing
 
+frame-trace has two release channels, like Rust's stable and nightly:
+
+| Channel | Built from | Published as | `--version` prints |
+| --- | --- | --- | --- |
+| Stable | a `vX.Y.Z` tag | a GitHub release, by hand from a draft | `frame-trace X.Y.Z` |
+| Nightly | `main`, each night | the `Nightly` pre-release on the tag `nightly`, replaced each night | `frame-trace X.Y.Z-nightly.YYYYMMDD+<short commit>` |
+
+Both build the same four targets with the same packaging, in `.github/workflows/build.yml`.
+`release.yml` and `nightly.yml` call it, so the two cannot drift.
+
+frame-trace is not published on crates.io. The crate name `frame-trace` there belongs to an unrelated crate.
+Users install a release binary, a nightly binary, or build from Git; see `docs/getting-started/install.md`.
+
+## Stable releases
+
 A pushed `v*` tag runs `.github/workflows/release.yml`.
 It checks that the tag matches the `frame-trace` version in `Cargo.toml`, runs rustfmt, clippy and the tests, builds the binaries and creates a **draft** GitHub release.
 The repository and the pushed tag are public, but no release is public until you publish the draft.
@@ -16,7 +31,7 @@ The repository and the pushed tag are public, but no release is public until you
 
 5. Wait for the Release workflow. Open the draft release, check the four archives and `SHA256SUMS`, then click **Publish release**.
 
-## What the release contains
+### What the release contains
 
 | File | Built on |
 | --- | --- |
@@ -29,7 +44,7 @@ The repository and the pushed tag are public, but no release is public until you
 Each archive holds the `frame-trace` binary, `README.md` and `LICENSE`.
 Each archive also has a build provenance attestation. Check one with `gh attestation verify <archive> --repo agustinustheo/frame-trace`.
 
-## Re-running a release
+### Re-running a release
 
 `gh release create` fails if a release for the tag already exists.
 Delete the draft first, then re-run the failed run.
@@ -37,6 +52,30 @@ To start a new run, open the Release workflow in the Actions tab, click **Run wo
 A run started from a branch fails, so the provenance attestation always names the tag's commit.
 
 A version with a suffix, such as `0.2.0-rc.1`, becomes a draft pre-release.
+
+## Nightly builds
+
+`.github/workflows/nightly.yml` runs at 03:17 UTC each day, and by hand from the Actions tab with **Run workflow**.
+Only one nightly runs at a time; a second one waits for the first.
+
+1. The `test` job checks out `main` and runs rustfmt, clippy, the offline tests, the ignored live tests and a live replay of the latest finalized Westend Asset Hub block. Live failures can come from the public endpoints.
+2. If they pass and `main` is not the commit the `nightly` tag points to, the `build` job builds the four archives with `build.yml`. The archives are named `frame-trace-nightly-<target>.tar.gz`, so their download links stay the same. The version comes from `FRAME_TRACE_BUILD_VERSION`, which only this workflow sets; local builds and `release.yml` builds print the crate version.
+3. The `publish` job writes `SHA256SUMS`, attests build provenance, deletes the old `Nightly` release and its assets, moves the `nightly` tag to the built commit, and creates the new pre-release. It is never marked as the latest release. Its notes give the date, the commit, the run and a line pointing stable users to the latest `v*` release.
+
+If `main` has not changed since the last nightly, the run still tests but does not publish.
+To publish anyway, run the workflow by hand with **force** checked.
+A run started from a branch other than `main` tests but never publishes.
+
+Moving the `nightly` tag does not start `release.yml`: it runs only for tags matching `v*`, and tags pushed with `GITHUB_TOKEN` start no workflows.
+
+### When a nightly fails
+
+The `notify` job runs after every nightly.
+If any job failed or was cancelled, it comments on the open issue **Nightly build failed** with the run link, the failed jobs and the date. If no such issue is open, it opens one with the label `nightly-failure`, and creates the label if it is missing.
+The next nightly that passes comments on the issue and closes it.
+This issue is the only notification. Watch the repository's issues, or the label, to hear about failures.
+
+Each job has only the permissions it needs: `contents: read` to test and build, `contents: write`, `id-token: write` and `attestations: write` to publish, and `issues: write` to report.
 
 ## Polkadot SDK upgrades
 
