@@ -1019,54 +1019,69 @@ fn follow_ctrl_c_interrupts_a_stalled_websocket_handshake() {
     node.join().unwrap();
 }
 
+/// The background load of the disk cache index is held (debug builds only) until the test
+/// ends. A load that ran before `follow` started would never print the marker.
 #[test]
-fn follow_exits_promptly_when_signalled_while_a_large_cache_loads() {
+fn follow_exits_promptly_when_signalled_while_the_cache_index_loads() {
     use std::{
         process::Stdio,
         thread,
         time::{Duration, Instant},
     };
-    let cache = std::env::temp_dir().join(format!("frame-trace-big-cache-{}", std::process::id()));
+    let cache = std::env::temp_dir().join(format!("frame-trace-held-cache-{}", std::process::id()));
     let _ = std::fs::remove_dir_all(&cache);
-    // The one-file-per-node layout of earlier versions, and 200 MB of current segments.
-    let legacy = cache.join("nodes");
-    std::fs::create_dir_all(&legacy).unwrap();
-    for i in 0..20_000 {
-        std::fs::write(legacy.join(format!("{i:064x}")), [0; 200]).unwrap();
-    }
     let segments = cache.join("proof-nodes");
     std::fs::create_dir_all(&segments).unwrap();
     let mut record = vec![0; 32];
     record.extend(200u32.to_le_bytes());
     record.extend([7; 200]);
-    for id in 0..4 {
-        let mut file = std::io::BufWriter::new(
-            std::fs::File::create(segments.join(format!("{id:010}.seg"))).unwrap(),
-        );
-        file.write_all(b"FTNODES1").unwrap();
-        for i in 0u32..200_000 {
-            record[..4].copy_from_slice(&i.to_le_bytes());
-            file.write_all(&record).unwrap();
-        }
+    let mut file =
+        std::io::BufWriter::new(std::fs::File::create(segments.join("0000000000.seg")).unwrap());
+    file.write_all(b"FTNODES1").unwrap();
+    for i in 0u32..10_000 {
+        record[..4].copy_from_slice(&i.to_le_bytes());
+        file.write_all(&record).unwrap();
     }
+    drop(file);
+    let hold = cache.join("hold");
+    std::fs::write(&hold, b"").unwrap();
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();
     let url = format!("ws://{}", listener.local_addr().unwrap());
-    let (accepted, connected) = std::sync::mpsc::channel();
     let node = thread::spawn(move || {
         if let Ok((mut stream, _)) = listener.accept() {
-            let _ = accepted.send(());
             let _ = stream.read_to_end(&mut Vec::new());
         }
     });
     let mut child = Command::new(BIN)
         .args(["follow", "--rpc", &url, "--cache-dir"])
         .arg(&cache)
+        .env("FRAME_TRACE_TEST_HOLD_CACHE_LOAD", &hold)
+        .env("FRAME_TRACE_TEST_READY", "1")
         .stdout(Stdio::null())
         .stderr(Stdio::piped())
         .spawn()
         .unwrap();
-    // The signal handler is installed before the first connection; the cache opens after it.
-    connected.recv_timeout(Duration::from_secs(10)).unwrap();
+    // Read on a thread, so a startup that never prints cannot hang the test.
+    let (lines, received) = std::sync::mpsc::channel();
+    let stderr = BufReader::new(child.stderr.take().unwrap());
+    let reader = thread::spawn(move || {
+        for line in stderr.lines() {
+            let _ = lines.send(line.unwrap_or_default());
+        }
+    });
+    let started = loop {
+        match received.recv_timeout(Duration::from_secs(10)) {
+            Ok(line) if line.contains("follow: test: started") => break true,
+            Ok(_) => {}
+            Err(_) => break false,
+        }
+    };
+    if !started {
+        child.kill().unwrap();
+        child.wait().unwrap();
+        let _ = std::fs::remove_dir_all(&cache);
+        panic!("follow never started: the disk cache load blocked startup");
+    }
     let start = Instant::now();
     Command::new("kill")
         .args(["-HUP", &child.id().to_string()])
@@ -1080,18 +1095,15 @@ fn follow_exits_promptly_when_signalled_while_a_large_cache_loads() {
     }
     let status = child.wait().unwrap();
     let elapsed = start.elapsed();
+    reader.join().unwrap();
+    let text = received.try_iter().collect::<Vec<_>>().join("\n");
+    // The load was still held when the process exited.
+    assert!(hold.exists());
     drop(node);
     std::fs::remove_dir_all(&cache).unwrap();
-    let mut text = String::new();
-    child
-        .stderr
-        .take()
-        .unwrap()
-        .read_to_string(&mut text)
-        .unwrap();
     assert!(status.success(), "{status:?}: {text}");
     assert!(
-        elapsed < Duration::from_secs(2),
+        elapsed < Duration::from_secs(1),
         "exit took {elapsed:?}: {text}"
     );
 }

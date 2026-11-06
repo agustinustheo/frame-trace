@@ -566,6 +566,10 @@ fn follow(args: FollowArgs) -> Result<()> {
     let session =
         ReplaySession::with_cache_max_bytes(args.cache_dir.as_deref(), args.cache_max_bytes)?
             .with_rpc_metadata_fallback(args.rpc_metadata_fallback);
+    // Tests send a signal after this line: the handler is installed and the disk cache open.
+    if cfg!(debug_assertions) && std::env::var_os("FRAME_TRACE_TEST_READY").is_some() {
+        eprintln!("follow: test: started");
+    }
     let capacity = queue_capacity(args.workers);
     let (send, receive) = mpsc::sync_channel::<Job>(capacity);
     let (events, completed) = mpsc::channel();
