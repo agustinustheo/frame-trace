@@ -190,8 +190,10 @@ struct Inner {
     /// Set when the last handle is dropped. The loader stops, and the write lock is released.
     closed: AtomicBool,
     opened: std::time::Instant,
-    /// Nodes too large for a segment, or beyond a quarter of the budget in one batch.
+    /// Nodes too large for a segment, beyond a quarter of the budget in one batch, or held
+    /// back while evicted files cannot be deleted.
     skipped: AtomicU64,
+    warned_stuck: AtomicBool,
 }
 
 /// The handle sessions share. Dropping the last one releases this process's write lock at
@@ -263,6 +265,7 @@ impl NodeStore {
                 closed: AtomicBool::new(false),
                 opened: std::time::Instant::now(),
                 skipped: AtomicU64::new(0),
+                warned_stuck: AtomicBool::new(false),
             }),
         };
         store.inner.state.lock().evict();
@@ -411,10 +414,31 @@ impl NodeStore {
             buffer.extend_from_slice(&(node.len() as u32).to_le_bytes());
             buffer.extend_from_slice(node);
         }
-        self.inner.skipped.fetch_add(skipped, Ordering::Relaxed);
         if records.is_empty() {
+            self.inner.skipped.fetch_add(skipped, Ordering::Relaxed);
             return Ok(());
         }
+        // Evicted files that could not be deleted still use disk. While they and the live
+        // files do not leave room for this batch, write nothing; writing resumes once they
+        // can be deleted. Eviction alone would let each new file join them.
+        self.delete_doomed();
+        let stuck = {
+            let state = self.inner.state.lock();
+            !state.doomed.is_empty() && state.total + buffer.len() as u64 > state.budget
+        };
+        if stuck {
+            self.inner
+                .skipped
+                .fetch_add(skipped + records.len() as u64, Ordering::Relaxed);
+            if !self.inner.warned_stuck.swap(true, Ordering::Relaxed) {
+                note!(
+                    "warning: disk cache: old files in {} cannot be deleted; not writing until they can",
+                    self.inner.dir.display()
+                );
+            }
+            return Ok(());
+        }
+        self.inner.skipped.fetch_add(skipped, Ordering::Relaxed);
         let result = self.write_records(&buffer, &records);
         self.inner.state.lock().evict();
         self.delete_doomed();
@@ -893,6 +917,83 @@ mod tests {
         assert_eq!(files(&dir), 0);
         assert_eq!(store.total(), 0);
         std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// A file in the way of a deletion: removing a segment path that is a folder fails on
+    /// every Unix system, while new files can still be created.
+    #[test]
+    fn writes_stop_while_evicted_files_cannot_be_deleted_and_resume_after() {
+        let dir = dir("stuck");
+        let cap = 1024 * 1024;
+        let store = NodeStore::open(&dir, cap, None).unwrap();
+        let mut next = 0u64;
+        let mut batch = |store: &NodeStore| {
+            let nodes: Vec<_> = (next..next + 50).map(|i| node(i, 200)).collect();
+            next += 50;
+            put(store, &nodes);
+        };
+        for _ in 0..30 {
+            batch(&store);
+        }
+        // Swap the oldest segment for a folder of the same name.
+        let oldest = dir.join(segment_name(0));
+        std::fs::rename(&oldest, dir.join("moved")).unwrap();
+        std::fs::create_dir(&oldest).unwrap();
+        std::fs::write(oldest.join("inside"), b"x").unwrap();
+        let skipped = store.skipped();
+        for _ in 0..200 {
+            batch(&store);
+            assert!(
+                store.total() <= cap + 2 * MIN_SEGMENT,
+                "{} counted",
+                store.total()
+            );
+            assert!(files(&dir) <= 20, "{} files", files(&dir));
+        }
+        assert!(store.skipped() > skipped, "nothing was held back");
+        // Once the folder can go, writing resumes.
+        std::fs::remove_dir_all(&oldest).unwrap();
+        let held = store.skipped();
+        batch(&store);
+        assert_eq!(store.skipped(), held);
+        assert_eq!(
+            store.get(&node(next - 1, 200).0),
+            Some(node(next - 1, 200).1)
+        );
+        assert!(store.total() <= cap);
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// The case found in review: the folder lets files be created but not deleted.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn a_folder_that_denies_deletion_does_not_grow_the_cache() {
+        let dir = dir("acl");
+        std::fs::create_dir_all(&dir).unwrap();
+        let user = std::env::var("USER").unwrap();
+        let acl = |op: &str| {
+            assert!(
+                std::process::Command::new("chmod")
+                    .args([op, &format!("user:{user} deny delete_child")])
+                    .arg(&dir)
+                    .status()
+                    .unwrap()
+                    .success()
+            );
+        };
+        acl("+a");
+        let cap = 1024 * 1024;
+        let store = NodeStore::open(&dir, cap, None).unwrap();
+        for batch in 0..120u64 {
+            let nodes: Vec<_> = (0..50).map(|i| node(batch * 50 + i, 200)).collect();
+            put(&store, &nodes);
+        }
+        let (total, count) = (store.total(), files(&dir));
+        acl("-a");
+        drop(store);
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert!(total <= cap + 2 * MIN_SEGMENT, "{total} counted");
+        assert!(count <= 20, "{count} files");
     }
 
     #[test]
