@@ -41,8 +41,8 @@ frame-trace block --offline fixtures/replay/people-traced --json block.json
 | `--json <FILE>` | | Write the trace as JSON. `-` writes to stdout. |
 | `--proof-concurrency <N>` | 8 | RPC requests sent at once, 1 to 64. Each proof request asks for up to 32 keys. |
 | `--rpc-timeout <SECONDS>` | 7.5 | Longest wait for one RPC response. A request gets four tries, so it can take four times this. Raise it for a slow or distant node. |
-| `--cache-dir <DIR>` | | Keep fetched state and compiled runtimes in this directory between runs. |
-| `--cache-max-bytes <N>` | 1073741824 (1 GiB) | Size limit for the disk cache, in bytes. A runtime in use is kept even above the limit. |
+| `--cache-dir <DIR>` | | Keep the [disk cache](#disk-cache) in this directory between runs. |
+| `--cache-max-bytes <N>` | 1073741824 (1 GiB) | Size limit for the [disk cache](#disk-cache), as bytes used on disk. A runtime in use is kept even above the limit. |
 | `--unauthenticated-metadata` | off | If the runtime's own metadata cannot be loaded, use the node's (or the saved) metadata unchecked. Output says so. |
 | `--runtime-override <WASM>` | | Run this Wasm instead of the chain's runtime. See [See runtime calls inside extrinsics](../guides/see-runtime-calls.md). Cannot be combined with `--save`. |
 
@@ -50,14 +50,7 @@ Without `--otlp` or `--json`, `block` prints a one-line count of phases and oper
 
 Flags that do not apply to the chosen source are refused, with exit code 2: `--block`, `--proof-concurrency` and `--rpc-timeout` need `--rpc`, `--metadata` needs `--from-file`, and the cache and metadata flags do not work with `--from-file` or `--from-json`.
 
-Without `--cache-dir`, compiled runtimes are still kept in `$XDG_CACHE_HOME/frame-trace/wasm` (or `~/.cache/frame-trace/wasm`), and fetched state stays in memory only.
-
-`--cache-max-bytes` counts the space the cache takes on disk, fetched state and compiled runtimes together.
-Fetched state is kept in files of about 64 MiB, or a sixteenth of a smaller limit. The default limit means at most 17 files.
-When the cache is full, the oldest file is deleted first. State that a recent block read again is kept.
-
-A cache directory from an earlier version has a `nodes` folder with one file per piece of state.
-frame-trace deletes it in the background and logs `cache: removing <dir>/nodes, left by an older frame-trace`.
+Without `--cache-dir`, compiled runtimes are still kept in `$XDG_CACHE_HOME/frame-trace/wasm` (or `~/.cache/frame-trace/wasm`), and downloaded state stays in memory only. See [Disk cache](#disk-cache) for the limits.
 
 ## summary
 
@@ -122,8 +115,8 @@ frame-trace report --rpc URL --last 10
 | `--concurrency <N>` | 2 | Blocks replayed at once, 1 to 4. |
 | `--proof-concurrency <N>` | 8 | RPC requests at once across all blocks, 1 to 64. Each proof request asks for up to 32 keys. |
 | `--rpc-timeout <SECONDS>` | 7.5 | Longest wait for one RPC response. A request gets four tries, so it can take four times this. Raise it for a slow or distant node. |
-| `--cache-dir <DIR>` | | Keep fetched state and compiled runtimes in this directory. |
-| `--cache-max-bytes <N>` | 1073741824 (1 GiB) | Size limit for the disk cache, in bytes. |
+| `--cache-dir <DIR>` | | Keep the [disk cache](#disk-cache) in this directory. |
+| `--cache-max-bytes <N>` | 1073741824 (1 GiB) | Size limit for the [disk cache](#disk-cache), as bytes used on disk. |
 | `--top <N>` | 15 | Rows in each ranked table. JSON is always complete. |
 | `--sort-by <proof\|ops\|time>` | `proof` | Rank items, extrinsics and hooks by proof bytes, operations or storage time. |
 | `--json <FILE>` | | Write the report as JSON. `-` writes it to stdout and the tables to stderr. |
@@ -146,8 +139,8 @@ frame-trace follow --rpc URL --best
 | `--workers <N>` | 8 | Blocks replayed at once, 1 to 16. |
 | `--proof-concurrency <N>` | 16 | RPC requests at once across all workers, 1 to 64. Each proof request asks for up to 32 keys. |
 | `--rpc-timeout <SECONDS>` | 7.5 | Longest wait for one RPC response. A request gets four tries, so it can take four times this. Raise it for a slow or distant node. |
-| `--cache-dir <DIR>` | | Keep fetched state and compiled runtimes in this directory. |
-| `--cache-max-bytes <N>` | 1073741824 (1 GiB) | Size limit for the disk cache, in bytes. |
+| `--cache-dir <DIR>` | | Keep the [disk cache](#disk-cache) in this directory. |
+| `--cache-max-bytes <N>` | 1073741824 (1 GiB) | Size limit for the [disk cache](#disk-cache), as bytes used on disk. |
 | `--unauthenticated-metadata` | off | As for `block`. |
 
 | Limit | Value | Meaning |
@@ -204,3 +197,35 @@ See [Send traces through Grafana Alloy to Tempo](../guides/send-traces-through-a
 
 `--oracle` still works as `--check-state-call`, and `--rpc-metadata-fallback` as `--unauthenticated-metadata`.
 They are hidden from `--help`.
+
+## Disk cache
+
+`--cache-dir <DIR>` keeps two things between blocks and runs: chain state downloaded from the node, with its proofs, in `<DIR>/proof-nodes`, and compiled runtimes in `<DIR>/wasm`.
+`--cache-max-bytes` limits both together.
+
+| Limit | Value |
+| --- | --- |
+| What counts | Bytes on disk of both folders. Each file counts its size rounded up to 4 KiB, plus 4 KiB. |
+| State file size | The limit divided by 16, at least 64 KiB and at most 64 MiB. |
+| Largest piece of state kept | A sixteenth of the state file size: 4 MiB at the default limit. Larger pieces stay in memory only. |
+| Number of state files | At most 18 at or below 1 GiB. Above that, one more per 60 MiB. |
+| Space kept for state | At least 64 MiB, or a quarter of the limit if that is less, even when runtimes in use need more. |
+| Written by one block | At most a quarter of the space for state. |
+| What goes first when full | Compiled runtimes not in use, then the oldest state file. State in the older half that a block reads again is written again, so it stays. |
+| Memory | 30 to 40 bytes per piece of state on disk. A full 1 GiB of 200-byte pieces is 130 to 180 MB. |
+| `--cache-max-bytes 0` | Keeps no state on disk, and deletes runtimes not in use. The runtime in use is still kept. |
+
+The disk cache can go over the limit in these cases:
+
+- the runtime in use is larger than the limit. frame-trace keeps it and logs a warning once;
+- a runtime compiled since the last check. frame-trace checks the runtime folder when it loads a new runtime, and every 10 minutes;
+- the `nodes` folder of an older version, until it is deleted;
+- the files of another frame-trace using the same directory.
+
+Use one frame-trace per cache directory.
+A second one never gets wrong state, but each counts only its own files, and each one's deletions cost the other requests to the node.
+
+An older version kept state in `<DIR>/nodes`, one file per piece.
+frame-trace deletes the files it wrote there in the background, and keeps anything else in the folder.
+An older frame-trace still using the same directory can lose files it needs, and fail a replay.
+

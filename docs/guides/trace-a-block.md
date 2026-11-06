@@ -67,7 +67,7 @@ The public Parity endpoints, such as `wss://westend-asset-hub-rpc.polkadot.io`, 
 
 ## Make repeated runs faster
 
-- Add `--cache-dir <dir>` to keep fetched state and the compiled runtime between runs.
+- Add `--cache-dir <dir>` to keep a [disk cache](../reference/commands.md#disk-cache) of downloaded state and the compiled runtime between runs.
 - Raise `--proof-concurrency` on a fast connection to send more requests at once.
 
 Defaults and limits are in [Commands and flags](../reference/commands.md).

@@ -94,7 +94,7 @@ These lines mean replays are falling behind the chain.
 
 To go faster:
 
-- keep `--cache-dir`, so each block asks the node only for state that changed;
+- keep `--cache-dir`, so each block reuses state that earlier blocks downloaded, and asks the node only for the rest;
 - raise `--workers` to replay more blocks at once;
 - raise `--proof-concurrency` on a fast connection to send more requests at once;
 - use a node close to you.

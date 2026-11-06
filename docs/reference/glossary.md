@@ -10,6 +10,10 @@ A node that keeps the state of every past block. Ordinary nodes keep only recent
 
 In frame-trace, a read answered from the block's own earlier writes, held in memory. It never touches the trie. See [Cache or trie](../concepts/cache-or-trie.md).
 
+## Disk cache
+
+The directory given with `--cache-dir`. It keeps chain state frame-trace downloaded from the node, with its proofs, and compiled runtimes, so later blocks and runs ask the node less. It is not the [cache](#cache) of a read. See [Disk cache](commands.md#disk-cache).
+
 ## Extrinsic
 
 One item in a block's body: a transaction or an inherent. frame-trace names each one `extrinsic N: Pallet.call`.
