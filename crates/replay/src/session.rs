@@ -63,6 +63,10 @@ pub struct ReplaySession {
     cache_base: PathBuf,
     cache_max_bytes: u64,
     wasm: Arc<Mutex<WasmUsage>>,
+    /// Counts runtimes loaded, so maintenance knows to measure the Wasm cache again.
+    wasm_generation: Arc<std::sync::atomic::AtomicU64>,
+    /// False when the Wasm cache directory could not be created: runtimes compile each run.
+    wasm_cache: bool,
     /// One worker at a time measures the Wasm cache; the others skip maintenance.
     maintenance: Arc<Mutex<()>>,
     /// The first failed node cache write is logged; later ones are not.
@@ -84,16 +88,32 @@ impl ReplaySession {
                 .unwrap_or_else(std::env::temp_dir)
                 .join("frame-trace")
         });
+        // The disk cache is disposable: a directory that cannot be used is a warning, and
+        // frame-trace runs without it.
         let wasm_dir = base.join("wasm");
-        std::fs::create_dir_all(&wasm_dir)
-            .map_err(|e| Error::Invalid(format!("{}: {e}", wasm_dir.display())))?;
-        let disk = cache_dir
-            .map(|p| {
-                let dir = p.join("proof-nodes");
-                crate::disk::NodeStore::open(&dir, cache_max_bytes, Some(p.join("nodes")))
-                    .map_err(|e| Error::Invalid(format!("{}: {e}", dir.display())))
-            })
-            .transpose()?;
+        let wasm_cache = match std::fs::create_dir_all(&wasm_dir) {
+            Ok(()) => true,
+            Err(e) => {
+                note!(
+                    "warning: disk cache: {}: {e}; runtimes are compiled again each run",
+                    wasm_dir.display()
+                );
+                false
+            }
+        };
+        let disk = cache_dir.and_then(|p| {
+            let dir = p.join("proof-nodes");
+            match crate::disk::NodeStore::open(&dir, cache_max_bytes, Some(p.join("nodes"))) {
+                Ok(store) => Some(Arc::new(store)),
+                Err(e) => {
+                    note!(
+                        "warning: disk cache: {}: {e}; running without a disk cache for fetched state",
+                        dir.display()
+                    );
+                    None
+                }
+            }
+        });
         let session = Self {
             nodes: Default::default(),
             hints: Default::default(),
@@ -102,6 +122,8 @@ impl ReplaySession {
             cache_base: base,
             cache_max_bytes,
             wasm: Default::default(),
+            wasm_generation: Default::default(),
+            wasm_cache,
             maintenance: Default::default(),
             warned_write: Default::default(),
             executors: Default::default(),
@@ -218,100 +240,124 @@ impl ReplaySession {
         {
             executors.remove(&old);
         }
-        let executor = Arc::new(
-            Executor::builder()
-                .with_max_runtime_instances(2)
-                .with_runtime_cache_size(4)
-                .with_allow_missing_host_functions(false)
-                .with_cache_path(self.cache_base.join("wasm").join(format!("{hash:x}")))
-                .build(),
-        );
+        let builder = Executor::builder()
+            .with_max_runtime_instances(2)
+            .with_runtime_cache_size(4)
+            .with_allow_missing_host_functions(false);
+        let builder = if self.wasm_cache {
+            builder.with_cache_path(self.cache_base.join("wasm").join(format!("{hash:x}")))
+        } else {
+            builder
+        };
+        let executor = Arc::new(builder.build());
         executors.insert(hash, executor.clone());
-        self.wasm.lock().dirty = true;
+        self.wasm_generation
+            .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         executor
     }
     /// Keeps the node and Wasm caches within `--cache-max-bytes`. Node totals are kept as
     /// they are written, so this reads no directory. The Wasm cache is measured again only
     /// after a new runtime was loaded, or every ten minutes because Wasmtime prunes it too.
+    ///
+    /// Runtimes not in use are deleted before any proof node. The node budget is the limit
+    /// less the runtimes in use, but never below `min(64 MiB, limit / 4)`, so a runtime larger
+    /// than the limit does not empty the node cache at every block.
     pub(crate) fn prune_disk_cache(&self) -> Result<()> {
+        use std::sync::atomic::Ordering;
         let Some(_maintenance) = self.maintenance.try_lock() else {
             return Ok(());
         };
+        let root = self.cache_base.join("wasm");
+        let generation = self.wasm_generation.load(Ordering::SeqCst);
         let due = {
             let wasm = self.wasm.lock();
-            wasm.dirty
+            wasm.generation != Some(generation)
                 || wasm
                     .measured
                     .is_none_or(|at| at.elapsed() > std::time::Duration::from_secs(600))
         };
         let mut result = Ok(());
         if due {
-            result = self.prune_wasm();
-        }
-        let wasm_bytes = self.wasm.lock().bytes;
-        if let Some(disk) = &self.disk {
-            disk.set_budget(self.cache_max_bytes.saturating_sub(wasm_bytes));
-        }
-        result
-    }
-    fn prune_wasm(&self) -> Result<()> {
-        let pinned: BTreeSet<String> = self
-            .executors
-            .lock()
-            .keys()
-            .map(|hash| format!("{hash:x}"))
-            .collect();
-        let root = self.cache_base.join("wasm");
-        let mut modules =
-            wasm_modules(&root).map_err(|e| Error::Invalid(format!("{}: {e}", root.display())))?;
-        let mut bytes: u64 = modules.iter().map(|m| m.bytes).sum();
-        let pinned_bytes: u64 = modules
-            .iter()
-            .filter(|m| pinned.contains(&m.name))
-            .map(|m| m.bytes)
-            .sum();
-        let nodes = self.disk.as_ref().map_or(0, |d| d.total());
-        let mut result = Ok(());
-        // Without a known runtime every module may be the next one needed: measure only.
-        if !pinned.is_empty() {
-            modules.sort_by_key(|m| m.modified);
-            for module in modules.iter().filter(|m| !pinned.contains(&m.name)) {
-                // Runtimes not in use go before any proof node.
-                if bytes + nodes <= self.cache_max_bytes {
-                    break;
+            match wasm_modules(&root) {
+                Ok(modules) => {
+                    let mut wasm = self.wasm.lock();
+                    wasm.modules = modules;
+                    wasm.generation = Some(generation);
+                    wasm.measured = Some(std::time::Instant::now());
                 }
-                let path = root.join(&module.name);
-                let removed = if module.directory {
-                    std::fs::remove_dir_all(&path)
-                } else {
-                    std::fs::remove_file(&path)
-                };
-                match removed {
-                    Ok(()) => bytes = bytes.saturating_sub(module.bytes),
-                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                        bytes = bytes.saturating_sub(module.bytes)
-                    }
-                    Err(e) => {
-                        result = Err(Error::Invalid(format!("{}: {e}", path.display())));
-                        break;
-                    }
-                }
+                Err(e) => result = Err(Error::Invalid(format!("{}: {e}", root.display()))),
             }
         }
+        let mut modules = std::mem::take(&mut self.wasm.lock().modules);
+        let nodes = self.disk.as_ref().map_or(0, |d| d.total());
+        let mut failed = None;
+        let pinned_bytes = {
+            // Held while deleting, so no runtime can be loaded from a folder being deleted.
+            let executors = self.executors.lock();
+            let pinned: BTreeSet<String> = executors.keys().map(|h| format!("{h:x}")).collect();
+            // Without a known runtime every module may be the next one needed: measure only.
+            if !pinned.is_empty() {
+                modules.sort_by_key(|m| m.modified);
+                let mut bytes: u64 = modules.iter().map(|m| m.bytes).sum();
+                let mut kept = Vec::new();
+                for module in modules {
+                    if bytes + nodes <= self.cache_max_bytes
+                        || pinned.contains(&module.name)
+                        || failed.is_some()
+                    {
+                        kept.push(module);
+                        continue;
+                    }
+                    let path = root.join(&module.name);
+                    let removed = if module.directory {
+                        std::fs::remove_dir_all(&path)
+                    } else {
+                        std::fs::remove_file(&path)
+                    };
+                    match removed {
+                        Ok(()) => bytes -= module.bytes,
+                        Err(e) if e.kind() == std::io::ErrorKind::NotFound => bytes -= module.bytes,
+                        Err(e) => {
+                            failed = Some(format!("{}: {e}", path.display()));
+                            kept.push(module);
+                        }
+                    }
+                }
+                modules = kept;
+            }
+            (!pinned.is_empty()).then(|| {
+                modules
+                    .iter()
+                    .filter(|m| pinned.contains(&m.name))
+                    .map(|m| m.bytes)
+                    .sum::<u64>()
+            })
+        };
+        let wasm_bytes: u64 = modules.iter().map(|m| m.bytes).sum();
         let mut wasm = self.wasm.lock();
-        wasm.bytes = bytes;
-        wasm.dirty = false;
-        wasm.measured = Some(std::time::Instant::now());
+        wasm.modules = modules;
+        if let Some(failed) = failed {
+            // Measure and try again at the next maintenance; report it once.
+            wasm.generation = None;
+            if !std::mem::replace(&mut wasm.warned_remove, true) {
+                result = Err(Error::Invalid(failed));
+            }
+        }
+        let warn = pinned_bytes.is_some_and(|b| b > self.cache_max_bytes)
+            && !std::mem::replace(&mut wasm.warned_small, true);
         // Logged after the lock is released: a blocked log must not stall other replays.
-        let warn =
-            pinned_bytes > self.cache_max_bytes && !std::mem::replace(&mut wasm.warned_small, true);
         drop(wasm);
         if warn {
             note!(
                 "warning: --cache-max-bytes {} is smaller than active runtime modules ({} bytes); keeping runtime code in use",
                 self.cache_max_bytes,
-                pinned_bytes
+                pinned_bytes.unwrap_or_default()
             );
+        }
+        if let Some(disk) = &self.disk {
+            let floor = (64 * 1024 * 1024).min(self.cache_max_bytes / 4);
+            let runtimes = pinned_bytes.unwrap_or(wasm_bytes);
+            disk.set_budget(self.cache_max_bytes.saturating_sub(runtimes).max(floor));
         }
         result
     }
@@ -326,12 +372,13 @@ impl ReplaySession {
 
 #[derive(Default)]
 struct WasmUsage {
-    /// Bytes the Wasm cache used on disk when last measured.
-    bytes: u64,
+    /// What `wasm/` held when last measured, less what maintenance deleted since.
+    modules: Vec<WasmModule>,
+    /// The runtime count when last measured.
+    generation: Option<u64>,
     measured: Option<std::time::Instant>,
-    /// A runtime was loaded since the last measurement.
-    dirty: bool,
     warned_small: bool,
+    warned_remove: bool,
 }
 
 /// One entry under `wasm/`: Wasmtime's cache for one runtime, or a stray file.
@@ -532,6 +579,76 @@ mod disk_tests {
         assert!(module.exists());
         assert!(!stray.exists());
         drop(active);
+        std::fs::remove_dir_all(dir).expect("cleanup");
+    }
+    fn persist(session: &ReplaySession, nodes: impl Iterator<Item = u32>) {
+        let db = crate::proof::ProofDb::with_session(None, H256::zero(), session.clone());
+        db.insert_nodes(nodes.map(|i| [i.to_le_bytes().as_slice(), &[7; 200]].concat()));
+        db.persist().expect("persist");
+    }
+    fn stored(session: &ReplaySession, i: u32) -> bool {
+        let bytes = [i.to_le_bytes().as_slice(), &[7; 200]].concat();
+        let hash = H256::from(sp_io::hashing::blake2_256(&bytes));
+        session.disk.as_ref().expect("disk").get(&hash) == Some(bytes)
+    }
+    #[test]
+    fn unused_runtimes_go_before_proof_nodes() {
+        let dir = std::env::temp_dir().join(format!("frame-trace-pressure-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let cap = 1024 * 1024;
+        let session = ReplaySession::with_cache_max_bytes(Some(&dir), cap).expect("session");
+        let _active = session.executor_for(b"runtime");
+        let unused = dir.join("wasm").join("unused");
+        std::fs::create_dir_all(&unused).expect("mkdir");
+        std::fs::write(unused.join("module"), vec![0; 400 * 1024]).expect("write");
+        session.prune_disk_cache().expect("prune");
+        assert!(unused.exists(), "deleted while under the limit");
+        // About 800 KB of nodes: with the runtime, more than the limit.
+        for block in 0..32 {
+            persist(&session, block * 100..block * 100 + 100);
+        }
+        session.prune_disk_cache().expect("prune");
+        assert!(!unused.exists(), "an unused runtime outlived the limit");
+        assert!(
+            stored(&session, 0),
+            "the oldest node went before an unused runtime"
+        );
+        std::fs::remove_dir_all(dir).expect("cleanup");
+    }
+    #[test]
+    fn a_runtime_larger_than_the_limit_leaves_the_node_floor() {
+        let dir = std::env::temp_dir().join(format!("frame-trace-floor-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let cap = 1024 * 1024;
+        let session = ReplaySession::with_cache_max_bytes(Some(&dir), cap).expect("session");
+        let wasm = b"big runtime";
+        let _active = session.executor_for(wasm);
+        let hash = H256::from(sp_io::hashing::blake2_256(wasm));
+        let module = dir.join("wasm").join(format!("{hash:x}"));
+        std::fs::create_dir_all(&module).expect("mkdir");
+        std::fs::write(module.join("module"), vec![0; 2 * 1024 * 1024]).expect("write");
+        for block in 0..8 {
+            persist(&session, block * 100..block * 100 + 100);
+            session.prune_disk_cache().expect("prune");
+            // The floor is a quarter of the limit: the last block's nodes stay.
+            assert!(
+                stored(&session, block * 100),
+                "block {block} was evicted at once"
+            );
+        }
+        assert!(session.disk.as_ref().expect("disk").total() <= cap / 4);
+        assert!(session.wasm.lock().warned_small);
+        std::fs::remove_dir_all(dir).expect("cleanup");
+    }
+    #[test]
+    fn an_unusable_cache_directory_is_a_warning() {
+        let dir = std::env::temp_dir().join(format!("frame-trace-unusable-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("mkdir");
+        // A file where the node folder should be.
+        std::fs::write(dir.join("proof-nodes"), b"not a folder").expect("write");
+        let session = ReplaySession::with_cache_max_bytes(Some(&dir), 1 << 30).expect("session");
+        assert!(session.disk.is_none());
         std::fs::remove_dir_all(dir).expect("cleanup");
     }
     /// Cache maintenance at scale. Run with

@@ -303,7 +303,7 @@ impl ProofDb {
             if let Err(e) = disk.append(nodes.iter().map(|(h, n)| (h, n.as_ref())))
                 && !self.session.warned_write.swap(true, Ordering::Relaxed)
             {
-                note!("warning: cache: cannot save fetched state: {e}");
+                note!("warning: disk cache: cannot write: {e}");
             }
         }
         Ok(())
