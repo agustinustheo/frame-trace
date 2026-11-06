@@ -411,7 +411,7 @@ fn wasm_modules(root: &Path) -> std::io::Result<Vec<WasmModule>> {
         };
         *modified = (*modified).max(meta.modified()?);
         if meta.is_dir() {
-            *bytes += crate::disk::disk_size(0);
+            *bytes += crate::disk::file_charge(&meta);
             let entries = match std::fs::read_dir(path) {
                 Ok(entries) => entries,
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
@@ -421,7 +421,7 @@ fn wasm_modules(root: &Path) -> std::io::Result<Vec<WasmModule>> {
                 walk(&entry?.path(), bytes, modified)?;
             }
         } else {
-            *bytes += crate::disk::disk_size(meta.len());
+            *bytes += crate::disk::file_charge(&meta);
         }
         Ok(())
     }
