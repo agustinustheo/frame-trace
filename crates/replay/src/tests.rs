@@ -1534,3 +1534,110 @@ fn real_contract_call_fetches_pinned_child_proofs_and_rejects_bad_ones() {
         }
     }
 }
+
+/// Threads of this process, from the operating system.
+fn os_threads() -> usize {
+    if let Ok(tasks) = std::fs::read_dir("/proc/self/task") {
+        return tasks.count();
+    }
+    let out = std::process::Command::new("ps")
+        .args(["-M", "-p", &std::process::id().to_string()])
+        .output()
+        .unwrap();
+    String::from_utf8_lossy(&out.stdout).lines().count() - 1
+}
+
+#[test]
+fn prefetch_reuses_a_fixed_set_of_request_threads() {
+    const CHILD: &str = "FRAME_TRACE_PREFETCH_THREADS_TEST";
+    // Run alone in a child process, so other tests' threads do not change the count.
+    if std::env::var_os(CHILD).is_none() {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "tests::prefetch_reuses_a_fixed_set_of_request_threads",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env(CHILD, "1")
+            .output()
+            .unwrap();
+        let text = String::from_utf8_lossy(&output.stdout).into_owned()
+            + &String::from_utf8_lossy(&output.stderr);
+        assert!(output.status.success(), "{text}");
+        assert!(text.contains("1 passed"), "{text}");
+        return;
+    }
+    let parent = H256::repeat_byte(3);
+    // One thread answers every request in turn: the server adds no threads while counting.
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    let served = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let count = served.clone();
+    thread::spawn(move || {
+        for stream in listener.incoming() {
+            let mut stream = stream.unwrap();
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut len = 0;
+            loop {
+                let mut line = String::new();
+                if reader.read_line(&mut line).unwrap() == 0 || line == "\r\n" {
+                    break;
+                }
+                if let Some(value) = line.to_lowercase().strip_prefix("content-length:") {
+                    len = value.trim().parse().unwrap();
+                }
+            }
+            let mut bytes = vec![0; len];
+            reader.read_exact(&mut bytes).unwrap();
+            let request: Value = serde_json::from_slice(&bytes).unwrap();
+            let body =
+                json!({"jsonrpc":"2.0","id":request["id"],"result":{"at":parent,"proof":[]}})
+                    .to_string();
+            count.fetch_add(1, Ordering::SeqCst);
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                body.len()
+            )
+            .unwrap();
+        }
+    });
+    let rpc = Rpc::new(&url).unwrap();
+    let session = ReplaySession::new(None).unwrap();
+    // 10 batches of 32 keys: two rounds of 8 and 2 requests.
+    let keys: Vec<_> = (0..320u32).map(|i| i.to_be_bytes().to_vec()).collect();
+    let replay = || {
+        ProofDb::with_session(Some(rpc.fork()), parent, session.clone())
+            .prefetch(&keys)
+            .unwrap()
+    };
+    // The first replay starts the request threads and the network runtime.
+    replay();
+    let before = os_threads();
+    let peak = Arc::new(std::sync::atomic::AtomicUsize::new(before));
+    let done = Arc::new(AtomicBool::new(false));
+    let sampler = {
+        let (peak, done) = (peak.clone(), done.clone());
+        thread::spawn(move || {
+            while !done.load(Ordering::SeqCst) {
+                // Less this sampler thread.
+                peak.fetch_max(os_threads() - 1, Ordering::SeqCst);
+            }
+        })
+    };
+    let replays = 50;
+    for _ in 0..replays {
+        replay();
+    }
+    done.store(true, Ordering::SeqCst);
+    sampler.join().unwrap();
+    let after = os_threads();
+    assert_eq!(served.load(Ordering::SeqCst), (replays + 1) * 10);
+    assert_eq!(rpc.pool_threads(), Some(rpc.parallelism()));
+    assert!(
+        after <= before && peak.load(Ordering::SeqCst) <= before,
+        "threads before {before}, at most {} during and {after} after {replays} replays",
+        peak.load(Ordering::SeqCst)
+    );
+}

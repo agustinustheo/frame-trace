@@ -25,6 +25,7 @@ hex.workspace = true
 hash-db = "0.16"
 trie-db = "0.32"
 parking_lot = "0.12"
+rayon = "1"
 schnellru = "0.2.4"
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
 serde.workspace = true
