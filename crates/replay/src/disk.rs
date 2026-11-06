@@ -55,6 +55,25 @@ pub(crate) fn disk_size(len: u64) -> u64 {
     len.div_ceil(BLOCK) * BLOCK + BLOCK
 }
 
+/// What a file is charged: the formula, or what the file system really allocated if that is
+/// more. APFS reserves space ahead of a file that keeps growing (a 2.3 MB segment held
+/// 3.2 MB), so the formula alone is not an upper bound. `allocated` comes from `st_blocks`.
+fn charge(len: u64, allocated: u64) -> u64 {
+    disk_size(len).max(allocated + BLOCK)
+}
+
+/// The charge of a file from its metadata, which callers already have: no extra syscall.
+pub(crate) fn file_charge(meta: &std::fs::Metadata) -> u64 {
+    use std::os::unix::fs::MetadataExt;
+    charge(meta.len(), meta.blocks() * 512)
+}
+
+/// Bytes allocated to an open file, one `fstat`. Unknown is 0, which leaves the formula.
+fn allocated(file: &File) -> u64 {
+    use std::os::unix::fs::MetadataExt;
+    file.metadata().map_or(0, |m| m.blocks() * 512)
+}
+
 /// Node hashes are uniformly random already, so the key is its own hash.
 #[derive(Default)]
 struct KeyHasher(u64);
@@ -89,6 +108,14 @@ struct Segment {
     id: u32,
     file: Arc<File>,
     len: u64,
+    /// Bytes the file system allocated, from the last `fstat`: after each write batch to it,
+    /// when it is sealed, opened or cut back.
+    allocated: u64,
+}
+impl Segment {
+    fn charge(&self) -> u64 {
+        charge(self.len, self.allocated)
+    }
 }
 
 /// An evicted segment whose file is not deleted yet. Its bytes stay in the total until the
@@ -109,7 +136,7 @@ struct State {
     resume: Option<(u32, u64)>,
     next_id: u32,
     doomed: Vec<Doomed>,
-    /// `disk_size` of every segment and every doomed file.
+    /// The charge of every segment and every doomed file.
     total: u64,
     budget: u64,
 }
@@ -142,7 +169,7 @@ impl State {
             if self.segments.is_empty() {
                 self.writable = false;
             }
-            let bytes = disk_size(segment.len);
+            let bytes = segment.charge();
             self.doomed.push(Doomed {
                 id: segment.id,
                 bytes,
@@ -164,11 +191,12 @@ impl State {
             None => self.index = Index::default(),
         }
     }
-    /// Sets a segment's length after a write, and its share of the total.
-    fn resize(&mut self, at: usize, len: u64) {
-        let old = disk_size(self.segments[at].len);
+    /// Sets a segment's length and allocation after a write, and its share of the total.
+    fn resize(&mut self, at: usize, len: u64, allocated: u64) {
+        let old = self.segments[at].charge();
         self.segments[at].len = len;
-        self.total = self.total - old + disk_size(len);
+        self.segments[at].allocated = allocated;
+        self.total = self.total - old + self.segments[at].charge();
     }
 }
 
@@ -235,18 +263,22 @@ impl NodeStore {
                 continue;
             };
             next_id = next_id.max(id.saturating_add(1));
-            match File::open(&path).and_then(|file| Ok((file.metadata()?.len(), file))) {
-                Ok((len, file)) => segments.push(Segment {
+            match File::open(&path).and_then(|file| Ok((file.metadata()?, file))) {
+                Ok((meta, file)) => segments.push(Segment {
                     id,
                     file: Arc::new(file),
-                    len,
+                    len: meta.len(),
+                    allocated: {
+                        use std::os::unix::fs::MetadataExt;
+                        meta.blocks() * 512
+                    },
                 }),
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
                 Err(e) => note!("warning: disk cache: skipping {}: {e}", path.display()),
             }
         }
         segments.sort_by_key(|s| s.id);
-        let total = segments.iter().map(|s| disk_size(s.len)).sum();
+        let total = segments.iter().map(Segment::charge).sum();
         let store = Self {
             inner: Arc::new(Inner {
                 dir: dir.to_owned(),
@@ -476,14 +508,19 @@ impl NodeStore {
             if let Err(e) = file.write_all_at(bytes, start) {
                 // Cut the partial write off, so the next record starts at a record boundary.
                 // If that fails too, count the file as it is and write to a new one.
-                if file.set_len(start).is_err() {
-                    let real = file.metadata().map_or(start + len, |m| m.len());
-                    state.resize(at, real.max(start));
-                    state.writable = false;
+                match file.set_len(start) {
+                    Ok(()) => state.resize(at, start, allocated(&file)),
+                    Err(_) => {
+                        let real = file.metadata().map_or(start + len, |m| m.len());
+                        state.resize(at, real.max(start), allocated(&file));
+                        state.writable = false;
+                    }
                 }
                 return Err(e);
             }
-            state.resize(at, start + len);
+            // One `fstat` per segment written in this batch: the file system's preallocation
+            // shows up at the write, and does not grow until the next one.
+            state.resize(at, start + len, allocated(&file));
             for &(key, offset, _) in &records[next..end] {
                 let location = start + (offset - from) as u64;
                 state.index.insert(key, pack(id, location as u32));
@@ -511,9 +548,12 @@ impl NodeStore {
             }
         };
         if state.writable
-            && let Some(old) = state.segments.back()
+            && let Some(at) = state.segments.len().checked_sub(1)
         {
-            let _ = old.file.unlock();
+            // Sealed: charge what it holds now, and let another process take it.
+            let (len, file) = (state.segments[at].len, state.segments[at].file.clone());
+            state.resize(at, len, allocated(&file));
+            let _ = file.unlock();
         }
         state.writable = false;
         // Held while the file is open, so no other process appends to it.
@@ -529,12 +569,14 @@ impl NodeStore {
                 file.metadata().map_or(MAGIC.len() as u64, |m| m.len())
             }
         };
-        state.total += disk_size(len);
-        state.segments.push_back(Segment {
+        let segment = Segment {
             id,
+            allocated: allocated(&file),
             file: Arc::new(file),
             len,
-        });
+        };
+        state.total += segment.charge();
+        state.segments.push_back(segment);
         state.writable = header.is_ok();
         header
     }
@@ -560,8 +602,9 @@ impl NodeStore {
         {
             return;
         }
+        let blocks = allocated(&file);
         state.segments[at].file = Arc::new(file);
-        state.resize(at, end);
+        state.resize(at, end, blocks);
         state.writable = true;
     }
     #[cfg(test)]
@@ -850,6 +893,50 @@ mod tests {
         assert!(store.node_count() as u64 <= cap / (HEADER + 200));
         // Eviction stops once the cache fits: most of the cap is still in use.
         assert!(store.total() > cap / 2, "{} of {cap}", store.total());
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    /// Paced batches of varied sizes into real files, as a long `follow` writes them. APFS
+    /// reserves space ahead of a file past about 4 MiB that grows by many small writes with
+    /// pauses between them: about 1 MB past its length here, and 2.3 MB of data held 3.2 MB
+    /// in the 4-hour soak. Without pauses, or in smaller files, it reserves nothing. So the
+    /// charge must cover `st_blocks`, not only the length, after every batch, and eviction
+    /// must bring real allocation within the budget.
+    #[test]
+    fn the_charge_covers_real_allocation_after_every_batch() {
+        let dir = dir("allocation");
+        // The soak's limit: 8 MiB segments.
+        let cap = 128 * 1024 * 1024;
+        let store = NodeStore::open(&dir, cap, None).unwrap();
+        let mut seed = 7u64;
+        let mut random = |n: u64| {
+            seed = seed
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            (seed >> 33) % n
+        };
+        let mut next = 0u64;
+        for batch in 0..600 {
+            let count = 1 + random(90);
+            let nodes: Vec<_> = (0..count)
+                .map(|_| {
+                    next += 1;
+                    node(next, 100 + random(1400) as usize)
+                })
+                .collect();
+            put(&store, &nodes);
+            let real = du(&dir);
+            assert!(
+                real <= store.total(),
+                "batch {batch}: {real} allocated, {} charged",
+                store.total()
+            );
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        // Evicting against the charge brings real allocation within the budget.
+        let budget = store.total() / 2;
+        store.set_budget(budget);
+        assert!(du(&dir) <= budget, "{} allocated over {budget}", du(&dir));
         std::fs::remove_dir_all(dir).unwrap();
     }
 
