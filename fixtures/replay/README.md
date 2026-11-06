@@ -22,7 +22,7 @@ Westend Wasm as raw blob bytes also reduces the original public block artifact.
 The local `oracle.json.zst` files are E2's independent `state_traceBlock` RPC
 recordings of the exact same blocks. Tests compare the entire ordered keyed
 field list, omitting only random `ext_id`, and the phase ownership of every
-oracle operation. E1's older chain recordings remain in `../e1-chains.tar.zst`;
+oracle operation. E1's older chain recordings are in `e1-chains.tar.zst`, restored as [`../README.md`](../README.md) says;
 their hashes differ because they were recorded on different fresh dev chains.
 Local metadata is copied from E1's `next-people-paseo/2/metadata.hex` for the same
 People runtime. Public metadata was fetched at the saved parent hash.

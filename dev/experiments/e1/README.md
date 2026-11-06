@@ -2,6 +2,8 @@
 
 Experiment run on 2026-10-25 on macOS arm64. All chains are real local omni-node databases executing People Wasm, with manual dev block authoring and immediate finalization. No relay chain, Zombienet, bootstrap or ZK proofs are required. All submitted extrinsics have decoded on-chain success events; sudo calls also have successful inner results.
 
+The recordings this page cites (`fixtures/e1-probes/` and the chains in `fixtures/e1-chains.tar.zst`) are no longer in the tree. [`fixtures/README.md`](../../../fixtures/README.md) shows how to restore them from the history.
+
 ## Findings that affect frame-trace
 
 1. Pass **all four parameters**, including explicit empty strings: `[hash, "state", "", ""]`. Omitting the optional filters returns **zero events** in this SDK version.
