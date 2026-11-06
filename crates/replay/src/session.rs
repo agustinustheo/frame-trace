@@ -213,7 +213,9 @@ impl ReplaySession {
         if let Some(executor) = executors.get(&hash) {
             return executor.clone();
         }
-        if executors.len() >= 4
+        // Runtimes in use stay. Once they are idle again, the next new runtime drops as many as
+        // it takes to get back to four.
+        while executors.len() >= 4
             && let Some(old) = executors
                 .iter()
                 .find(|(_, e)| Arc::strong_count(e) == 1)
@@ -572,6 +574,17 @@ mod disk_tests {
         assert!(!stray.exists());
         drop(active);
         std::fs::remove_dir_all(dir).expect("cleanup");
+    }
+    #[test]
+    fn idle_runtimes_above_four_go_when_the_next_one_loads() {
+        let session = ReplaySession::new(None).expect("session");
+        // Six runtimes in use at once: all stay.
+        let busy: Vec<_> = (0..6u8).map(|i| session.executor_for(&[i])).collect();
+        assert_eq!(session.executors.lock().len(), 6);
+        drop(busy);
+        // Once idle, one more runtime brings the map back to four, not five.
+        let _next = session.executor_for(b"next");
+        assert_eq!(session.executors.lock().len(), 4);
     }
     fn persist(session: &ReplaySession, nodes: impl Iterator<Item = u32>) {
         let db = crate::proof::ProofDb::with_session(None, H256::zero(), session.clone());
