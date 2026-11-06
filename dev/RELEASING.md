@@ -1,5 +1,20 @@
 # Releasing
 
+frame-trace has two release channels, like Rust's stable and nightly:
+
+| Channel | Built from | Published as | `--version` prints |
+| --- | --- | --- | --- |
+| Stable | a `vX.Y.Z` tag | a GitHub release, by hand from a draft | `frame-trace X.Y.Z` |
+| Nightly | `main`, each night | the `Nightly` pre-release on the tag `nightly`, replaced each night | `frame-trace X.Y.Z-nightly.YYYYMMDD+<short commit>` |
+
+Both build the same four targets with the same packaging, in `.github/workflows/build.yml`.
+`release.yml` and `nightly.yml` call it, so the two cannot drift.
+
+frame-trace is not published on crates.io. The crate name `frame-trace` there belongs to an unrelated crate.
+Users install a release binary, a nightly binary, or build from Git; see `docs/getting-started/install.md`.
+
+## Stable releases
+
 A pushed `v*` tag runs `.github/workflows/release.yml`.
 It checks that the tag matches the `frame-trace` version in `Cargo.toml`, runs rustfmt, clippy and the tests, builds the binaries and creates a **draft** GitHub release.
 The repository and the pushed tag are public, but no release is public until you publish the draft.
@@ -16,7 +31,7 @@ The repository and the pushed tag are public, but no release is public until you
 
 5. Wait for the Release workflow. Open the draft release, check the four archives and `SHA256SUMS`, then click **Publish release**.
 
-## What the release contains
+### What the release contains
 
 | File | Built on |
 | --- | --- |
@@ -29,7 +44,7 @@ The repository and the pushed tag are public, but no release is public until you
 Each archive holds the `frame-trace` binary, `README.md` and `LICENSE`.
 Each archive also has a build provenance attestation. Check one with `gh attestation verify <archive> --repo agustinustheo/frame-trace`.
 
-## Re-running a release
+### Re-running a release
 
 `gh release create` fails if a release for the tag already exists.
 Delete the draft first, then re-run the failed run.
@@ -37,6 +52,33 @@ To start a new run, open the Release workflow in the Actions tab, click **Run wo
 A run started from a branch fails, so the provenance attestation always names the tag's commit.
 
 A version with a suffix, such as `0.2.0-rc.1`, becomes a draft pre-release.
+
+## Nightly builds
+
+`.github/workflows/nightly.yml` runs at 03:17 UTC each day, and by hand from the Actions tab with **Run workflow**.
+Only one nightly runs at a time; a second one waits for the first.
+
+1. The `test` job checks out the run's commit and runs rustfmt, clippy, the offline tests, the ignored live tests and a live replay of the latest finalized Westend Asset Hub block. Live failures can come from the public endpoints. The run's commit is the head of `main` when the run was triggered, even if the run waited in the queue while `main` moved. The provenance attestation names that commit, so the workflow builds it and checks it built it.
+2. If they pass and the published `Nightly` release is not complete and built from this commit, the `build` job builds the four archives with `build.yml`. The archives are named `frame-trace-nightly-<target>.tar.gz`, so their download links stay the same. The version comes from `FRAME_TRACE_BUILD_VERSION`, which only this workflow sets; local builds and `release.yml` builds print the crate version.
+3. The `publish` job writes `SHA256SUMS` and attests build provenance. It uploads the new release in full as a draft under a temporary tag name, which creates no tag. Then it deletes the old `Nightly` release and its assets, moves the `nightly` tag to the built commit, and publishes the draft as the `Nightly` pre-release on that tag. If any of this fails, it deletes the draft. It is never marked as the latest release. Its notes give the date, the commit, the run and a line pointing stable users to the latest `v*` release.
+
+The run still tests but does not publish if a published, not draft, `Nightly` release exists, has all four archives and `SHA256SUMS`, and its tag points to the run's commit.
+Otherwise it publishes, so a night whose publish failed is repaired by the next one, even if `main` did not change.
+If the upload fails, the old release and tag stay as they were.
+To publish anyway, run the workflow by hand with **force** checked.
+A run started from a branch other than `main` tests but never publishes, and never touches the failure issue.
+
+Moving the `nightly` tag does not start `release.yml`: it runs only for tags matching `v*`, and tags pushed with `GITHUB_TOKEN` start no workflows.
+
+### When a nightly fails
+
+The `notify` job runs after every nightly for `main`, scheduled or started by hand.
+If any job failed or was cancelled, it comments on the open issue **Nightly build failed** with the run link, the failed jobs and the date. If no such issue is open, it opens one with the label `nightly-failure`, and creates the label if it is missing.
+The next nightly that passes, including one that skips publishing because `main` did not change, comments on the issue and closes it.
+It only uses an issue it opened itself: one by `github-actions[bot]` whose body holds the hidden marker `<!-- frame-trace-nightly -->`. An issue a person opens with the same title and label is left alone.
+This issue is the only notification. Watch the repository's issues, or the label, to hear about failures.
+
+Each job has only the permissions it needs: `contents: read` to test and build, `contents: write`, `id-token: write` and `attestations: write` to publish, and `issues: write` to report.
 
 ## Polkadot SDK upgrades
 

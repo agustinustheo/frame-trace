@@ -17,7 +17,23 @@ It works with any node over normal RPC, with no unsafe methods or special node b
 
 ## Five-minute start
 
-Install frame-trace. The first build takes several minutes.
+Install frame-trace from the [latest release](https://github.com/agustinustheo/frame-trace/releases/latest). On Linux x86_64, with the newest version in `VERSION`:
+
+```sh
+VERSION=0.1.0
+TARGET=x86_64-unknown-linux-gnu
+curl -fsSLO "https://github.com/agustinustheo/frame-trace/releases/download/v$VERSION/frame-trace-$VERSION-$TARGET.tar.gz"
+curl -fsSLO "https://github.com/agustinustheo/frame-trace/releases/download/v$VERSION/SHA256SUMS"
+sha256sum --check --ignore-missing SHA256SUMS
+tar -xzf "frame-trace-$VERSION-$TARGET.tar.gz"
+mkdir -p ~/.local/bin && cp "frame-trace-$VERSION-$TARGET/frame-trace" ~/.local/bin/
+```
+
+Only `sha256sum` prints a line, which ends in `OK` when the archive is intact.
+
+[Install](docs/getting-started/install.md) has the commands for ARM64 Linux, macOS and nightly builds, and how to add `~/.local/bin` to your `PATH`.
+
+Or build it from source with Rust. The first build takes several minutes.
 
 ```sh
 git clone https://github.com/agustinustheo/frame-trace
@@ -70,7 +86,7 @@ The [documentation](https://agustinustheodorus.com/frame-trace/) has a [glossary
 
 ## Requirements
 
-- Rust 1.93.0. `rust-toolchain.toml` pins it and `rustup` installs it.
+- Linux (x86_64 or ARM64, glibc 2.35 or newer) or macOS for the release binaries. Building from source needs Rust 1.93.0; `rust-toolchain.toml` pins it and `rustup` installs it.
 - The RPC URL of a node for the chain. For old blocks, the node must keep their state, so use an archive node.
 - A Polkadot SDK chain with Blake2 headers and `u32` block numbers. Decoded names need metadata V14, V15 or V16.
 - Docker, or any trace viewer that accepts OTLP over HTTP. JSON output needs neither.

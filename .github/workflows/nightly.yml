@@ -1,32 +1,53 @@
-name: Nightly live check
+name: Nightly
 
-# Replays real blocks from public Westend Asset Hub and Westend relay chain nodes.
-# Failures here can come from the public endpoints as well as from frame-trace.
+# Each night: test main, including live replays from public Westend Asset Hub and
+# Westend relay chain nodes. If main changed since the last nightly and every check
+# passes, build the release targets and publish them as the "Nightly" prerelease
+# on the tag `nightly`. A failure opens or updates the issue "Nightly build failed".
+# Live failures can come from the public endpoints as well as from frame-trace.
+# See dev/RELEASING.md.
 
 on:
   schedule:
     - cron: "17 3 * * *"
   workflow_dispatch:
+    inputs:
+      force:
+        description: Publish even if main has not changed since the last nightly
+        type: boolean
+        default: false
 
+# One nightly at a time, so two runs never publish at once.
 concurrency:
-  group: nightly-${{ github.workflow }}
+  group: nightly
   cancel-in-progress: false
 
-permissions:
-  contents: read
+permissions: {}
 
 env:
   CARGO_TERM_COLOR: always
   RPC_URL: wss://westend-asset-hub-rpc.polkadot.io
 
 jobs:
-  live:
-    name: Public network
+  test:
+    name: Test
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
+    permissions:
+      contents: read
+    outputs:
+      sha: ${{ steps.plan.outputs.sha }}
+      version: ${{ steps.plan.outputs.version }}
+      date: ${{ steps.plan.outputs.date }}
+      publish: ${{ steps.plan.outputs.publish }}
     steps:
-      - name: Checkout repository
+      # Check out the run's own commit, not the current main: a queued run may start
+      # after main moved, and the provenance attestation names the run's commit.
+      # A scheduled run's commit is the head of main when it was triggered.
+      - name: Checkout the run's commit
         uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
 
       # The hosted /tmp is small; tests and builds write temporary files here instead.
       - name: Use the runner temp directory
@@ -36,12 +57,76 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: 1.93.0
+          components: rustfmt, clippy
+
+      # Version: 0.1.0-nightly.20261106+abc1234 (crate version, UTC date, short commit).
+      # Publish only from the main workflow file. Skip publishing only if the published
+      # Nightly release is complete and its tag points to this commit, unless forced.
+      - name: Plan the build
+        id: plan
+        env:
+          FORCE: ${{ inputs.force || false }}
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          sha=$(git rev-parse HEAD)
+          if [ "$sha" != "$GITHUB_SHA" ]; then
+            echo "::error::Checked out $sha, but the run is for $GITHUB_SHA"
+            exit 1
+          fi
+          crate=$(cargo +1.93.0 metadata --no-deps --format-version 1 --locked \
+            | jq -r '.packages[] | select(.name == "frame-trace") | .version')
+          date=$(date -u +%Y%m%d)
+          version="$crate-nightly.$date+${sha:0:7}"
+          # The archives build.yml makes for each target, and SHA256SUMS.
+          expected=$( { sed -n 's/^ *- target: *//p' .github/workflows/build.yml \
+            | sed 's/.*/frame-trace-nightly-&.tar.gz/'; echo SHA256SUMS; } | sort)
+          # A draft is not visible to this read-only token, so it counts as missing.
+          if release=$(gh release view nightly --json isDraft,assets 2> /dev/null) \
+            && [ "$(jq -r .isDraft <<< "$release")" = false ]; then
+            missing=$(comm -23 <(echo "$expected") <(jq -r '.assets[].name' <<< "$release" | sort) \
+              | paste -sd ' ' -)
+          else
+            release=""
+          fi
+          # The peeled line (^{}) wins for an annotated tag.
+          tagged=$(git ls-remote origin refs/tags/nightly 'refs/tags/nightly^{}' \
+            | sort -k2 | tail -n 1 | cut -f1)
+          publish=true
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            publish=false
+            echo "Not publishing: the run uses the workflow from $GITHUB_REF, not main"
+          elif [ "$FORCE" = "true" ]; then
+            echo "Publishing $sha: forced"
+          elif [ -z "$release" ]; then
+            echo "Publishing $sha: there is no published Nightly release"
+          elif [ -n "$missing" ]; then
+            echo "Publishing $sha: the Nightly release lacks $missing"
+          elif [ "$tagged" != "$sha" ]; then
+            echo "Publishing $sha: the last nightly is ${tagged:-missing}"
+          else
+            publish=false
+            echo "Not publishing: the Nightly release is complete and already built from $sha"
+          fi
+          {
+            echo "sha=$sha"
+            echo "version=$version"
+            echo "date=$(date -u +%Y-%m-%d)"
+            echo "publish=$publish"
+          } >> "$GITHUB_OUTPUT"
+          echo "version: $version"
+
+      - name: Check formatting
+        run: cargo +1.93.0 fmt --check
 
       - name: Cache Cargo build
         uses: Swatinem/rust-cache@v2
 
-      - name: Build tests
-        run: cargo +1.93.0 test --workspace --locked --no-run
+      - name: Run clippy
+        run: cargo +1.93.0 clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Run tests
+        run: cargo +1.93.0 test --workspace --locked
 
       # The three ignored tests replay live blocks; the runtime upgrade test reads
       # archive state; it took 4 minutes in a local debug build. Endpoints: dev/README.md#live-tests.
@@ -61,3 +146,161 @@ jobs:
             exit 1
           }
           echo "root check passed for block $(jq -r .block_number "$json")"
+
+  build:
+    name: Build
+    needs: test
+    if: needs.test.outputs.publish == 'true'
+    uses: ./.github/workflows/build.yml
+    permissions:
+      contents: read
+    with:
+      ref: ${{ needs.test.outputs.sha }}
+      package-version: nightly
+      build-version: ${{ needs.test.outputs.version }}
+
+  publish:
+    name: Publish the Nightly prerelease
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      SHA: ${{ needs.test.outputs.sha }}
+      VERSION: ${{ needs.test.outputs.version }}
+      DATE: ${{ needs.test.outputs.date }}
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v8
+        with:
+          pattern: frame-trace-*
+          path: dist
+          merge-multiple: true
+
+      # The attestation names the run's commit, so the archives must be built from it.
+      - name: Check the build is of the run's commit
+        run: |
+          if [ "$SHA" != "$GITHUB_SHA" ]; then
+            echo "::error::The archives are of $SHA, but the run is for $GITHUB_SHA"
+            exit 1
+          fi
+
+      - name: Write checksums
+        working-directory: dist
+        run: |
+          sha256sum -- *.tar.gz > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: dist/*.tar.gz
+
+      - name: Write release notes
+        run: |
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          cat > "$RUNNER_TEMP/notes.md" <<EOF
+          Nightly build of \`main\` from $DATE.
+
+          - Version: \`$VERSION\`
+          - Commit: [\`$SHA\`]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/commit/$SHA)
+          - Run: $run_url
+
+          Nightly builds are untested between releases. If you want a stable build, use the latest \`v*\` release.
+          EOF
+          cat "$RUNNER_TEMP/notes.md"
+
+      # The new release is uploaded in full as a draft under a temporary tag name,
+      # which creates no tag. Only then is the old release deleted, the `nightly` tag
+      # moved and the draft published on it. If the upload fails, the old release and
+      # tag stay as they were.
+      # Release events made with GITHUB_TOKEN start no workflows, and release.yml
+      # runs only for tags matching v*, so moving `nightly` never starts a stable release.
+      - name: Replace the Nightly prerelease
+        run: |
+          draft="nightly-draft-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          gh release create "$draft" --draft --prerelease --latest=false \
+            --target "$SHA" --title Nightly \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            dist/*.tar.gz dist/SHA256SUMS
+          if gh release view nightly > /dev/null 2>&1; then
+            gh release delete nightly --yes
+          fi
+          if gh api "repos/$GH_REPO/git/ref/tags/nightly" > /dev/null 2>&1; then
+            gh api --method PATCH "repos/$GH_REPO/git/refs/tags/nightly" \
+              -f sha="$SHA" -F force=true > /dev/null
+          else
+            gh api --method POST "repos/$GH_REPO/git/refs" \
+              -f ref=refs/tags/nightly -f sha="$SHA" > /dev/null
+          fi
+          gh release edit "$draft" --tag nightly --draft=false --prerelease --latest=false
+
+      # The next nightly sees no complete Nightly release and publishes again.
+      - name: Delete the unpublished draft
+        if: failure()
+        run: |
+          draft="nightly-draft-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          if [ "$(gh release view "$draft" --json isDraft --jq .isDraft 2> /dev/null)" = true ]; then
+            gh release delete "$draft" --yes
+          fi
+
+  notify:
+    name: Report the result in an issue
+    needs: [test, build, publish]
+    # Runs from other branches neither open nor close the issue.
+    if: always() && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      issues: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      NEEDS: ${{ toJSON(needs) }}
+    steps:
+      - name: Open, update or close the issue
+        run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "Not reporting: the run is for $GITHUB_REF, not main"
+            exit 0
+          fi
+          title="Nightly build failed"
+          label=nightly-failure
+          # Only the issue this workflow opened, never one a person opened.
+          marker="<!-- frame-trace-nightly -->"
+          run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+          today=$(date -u +%Y-%m-%d)
+          # A job that timed out or was cancelled counts as failed.
+          failed=$(jq -r '[to_entries[]
+            | select(.value.result == "failure" or .value.result == "cancelled")
+            | "\(.key) (\(.value.result))"] | join(", ")' <<< "$NEEDS")
+          issue=$(gh issue list --state open --label "$label" --author app/github-actions \
+            --limit 100 --json number,title,body \
+            --jq ".[] | select(.title == \"$title\" and (.body | contains(\"$marker\"))) | .number" \
+            | head -n 1)
+          if [ -n "$failed" ]; then
+            if ! gh label list --limit 1000 --json name --jq '.[].name' | grep -qxF "$label"; then
+              gh label create "$label" --color B60205 \
+                --description "Opened and closed by the Nightly workflow"
+            fi
+            body="The nightly run on $today failed.
+
+          - Run: $run_url
+          - Failing jobs: $failed"
+            if [ -n "$issue" ]; then
+              gh issue comment "$issue" --body "$body"
+            else
+              gh issue create --title "$title" --label "$label" --body "$body
+
+          $marker"
+            fi
+          elif [ -n "$issue" ]; then
+            gh issue close "$issue" --comment "The nightly run on $today passed: $run_url"
+          else
+            echo "All jobs passed and no failure issue is open."
+          fi
