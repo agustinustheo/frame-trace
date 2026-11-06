@@ -2309,3 +2309,17 @@ fn missing_host_function_fails_with_its_name_and_no_metadata_notice() {
     assert!(!stderr.contains("runtime execution failed"), "{stderr}");
     assert!(stderr.contains("root check: NOT VERIFIED"), "{stderr}");
 }
+
+#[test]
+fn version_prints_the_crate_version_or_the_nightly_build_version() {
+    let output = run(&["--version"]);
+    assert!(output.status.success());
+    let expected = match option_env!("FRAME_TRACE_BUILD_VERSION") {
+        Some(version) if !version.is_empty() => version,
+        _ => env!("CARGO_PKG_VERSION"),
+    };
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        format!("frame-trace {expected}\n")
+    );
+}

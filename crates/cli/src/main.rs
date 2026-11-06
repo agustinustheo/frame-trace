@@ -14,8 +14,19 @@ mod report;
 mod source;
 mod summary;
 
+/// The version `--version` prints. The nightly workflow sets `FRAME_TRACE_BUILD_VERSION`
+/// at build time, for example `0.1.0-nightly.20261106+abc1234`; other builds print the crate version.
+const VERSION: &str = build_version(option_env!("FRAME_TRACE_BUILD_VERSION"));
+
+const fn build_version(set: Option<&'static str>) -> &'static str {
+    match set {
+        Some(version) if !version.is_empty() => version,
+        _ => env!("CARGO_PKG_VERSION"),
+    }
+}
+
 #[derive(Parser)]
-#[command(name = "frame-trace", version, about)]
+#[command(name = "frame-trace", version = VERSION, about)]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -236,6 +247,21 @@ fn follow(args: FollowArgs) -> Result<()> {
 #[cfg(test)]
 mod argument_tests {
     use super::*;
+
+    #[test]
+    fn version_is_the_crate_version_unless_the_build_sets_one() {
+        assert_eq!(build_version(None), env!("CARGO_PKG_VERSION"));
+        assert_eq!(build_version(Some("")), env!("CARGO_PKG_VERSION"));
+        assert_eq!(
+            build_version(Some("0.1.0-nightly.20261106+abc1234")),
+            "0.1.0-nightly.20261106+abc1234"
+        );
+        let error = Cli::try_parse_from(["frame-trace", "--version"])
+            .err()
+            .expect("--version exits early");
+        assert_eq!(error.kind(), clap::error::ErrorKind::DisplayVersion);
+        assert_eq!(error.to_string(), format!("frame-trace {VERSION}\n"));
+    }
 
     #[test]
     fn follow_workers_default_and_limits() {
