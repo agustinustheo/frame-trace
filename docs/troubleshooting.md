@@ -268,6 +268,26 @@ The first run also compiles the runtime.
 - Raise `--proof-concurrency` on a fast connection. See [defaults and limits](reference/commands.md).
 - Use a node close to you, or your own node.
 
+## `cache: removing <dir>/nodes, left by an older frame-trace`
+
+```text
+cache: removing .frame-trace-cache/nodes, left by an older frame-trace; fetched state is now kept in .frame-trace-cache/proof-nodes
+```
+
+**What it means.** Earlier versions kept fetched state as one file per piece of state.
+A long `follow` could leave a million files there, using several GiB.
+frame-trace now keeps it in a few large files, and deletes the old folder in the background.
+
+**Fix.** Nothing to do. If frame-trace stops before the folder is gone, the next run carries on. You can also delete `<dir>/nodes` yourself.
+
+## `warning: cache: cannot save fetched state: …`
+
+**What it means.** frame-trace could not write to `--cache-dir`, for example because the disk is full or the directory is read-only.
+The trace is not affected. Later blocks fetch that state from the node again.
+This line is logged once per run.
+
+**Fix.** Free some disk space, or point `--cache-dir` at a directory you can write to.
+
 ## `failed to lookup address information`
 
 ```text
