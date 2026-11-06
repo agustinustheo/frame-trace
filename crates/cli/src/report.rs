@@ -161,7 +161,7 @@ pub fn run(args: ReportArgs) -> Result<()> {
                                 let loaded = crate::source::replay_loaded(replay, None)?;
                                 let mut block = frame_trace_decode::annotate_at_block(
                                     &loaded.traced,
-                                    loaded.metadata.as_ref(),
+                                    loaded.metadata.as_deref(),
                                     loaded.block_number,
                                 );
                                 block.execution = loaded.execution;

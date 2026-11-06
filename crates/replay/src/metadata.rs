@@ -1,6 +1,6 @@
 //! Metadata used for names and JSON arguments must come from authenticated code/state.
 use crate::*;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
 
 fn negotiate(mut run: impl FnMut(&str, &[u8]) -> Result<Vec<u8>>) -> Result<String> {
     for version in [16u32, 15] {
@@ -63,7 +63,7 @@ pub(crate) fn load(
             if entry.iteration_root.is_some() {
                 db.retain_nodes(&entry.proof_nodes);
             }
-            artifact.metadata = entry.metadata;
+            artifact.metadata = entry.metadata.clone();
             return Ok(());
         }
     }
@@ -141,7 +141,7 @@ pub(crate) fn load(
             }
             cache.insert(
                 hash,
-                session::MetadataEntry {
+                Arc::new(session::MetadataEntry {
                     metadata: metadata.clone(),
                     reads: reads
                         .into_iter()
@@ -153,7 +153,7 @@ pub(crate) fn load(
                     } else {
                         Vec::new()
                     },
-                },
+                }),
             );
             artifact.metadata = metadata;
         }
