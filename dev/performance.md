@@ -804,3 +804,24 @@ The run continued the existing state file (31.8 MB to 49.7 MB) instead of
 opening a new one. 344 traced, 0 skipped, no root failures. Ctrl-C stopped it
 in 0.20 s; a restart on the same disk cache stopped 0.04 s after a SIGHUP sent
 1 s in.
+
+### File system allocation (2026-11-06)
+
+The 4-hour soak of cbd7319 peaked at 131,888 KiB in `du -sk` against a 128 MiB
+limit: APFS reserves space ahead of a file that grows by many small writes with
+pauses between them (one 2,324,917-byte segment held 3,166,208 bytes). Each
+segment is now charged `max(formula, st_blocks × 512 + 4 KiB)`, from one `fstat`
+per segment written in a batch, at sealing, open and cut-back.
+`the_charge_covers_real_allocation_after_every_batch` fails on the formula alone
+(batch 120: 5,963,776 bytes allocated, 4,943,872 charged).
+
+`follow --cache-max-bytes 33554432` on Westend Asset Hub, release, fresh disk
+cache, `du -sk` every 30 s for 12 minutes, segments evicted from minute 7: peak
+33,696 KiB against the 32,768 KiB limit, in 5 of 24 samples. The compiled runtime
+in use is 26,726,400 bytes and the space kept for state is 8 MiB, so this is the
+documented exception, and the warning was logged once. The state part
+(`du` less `wasm/`) peaked at 7,640 KiB, within its 8,192 KiB budget, while APFS
+reserved up to 999,850 bytes ahead of 2 MiB segments. The host was loaded
+(load average 17, another profiling run on the same endpoint), so throughput in
+this run is not comparable: one block replayed on the same host right after took
+24.7–38.7 s before this change and 26.1–26.3 s after, with 95–96 RPC calls each.
