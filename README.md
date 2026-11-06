@@ -22,12 +22,14 @@ Install frame-trace from the [latest release](https://github.com/agustinustheo/f
 ```sh
 VERSION=0.1.0
 TARGET=x86_64-unknown-linux-gnu
-curl -LO "https://github.com/agustinustheo/frame-trace/releases/download/v$VERSION/frame-trace-$VERSION-$TARGET.tar.gz"
-curl -LO "https://github.com/agustinustheo/frame-trace/releases/download/v$VERSION/SHA256SUMS"
+curl -fsSLO "https://github.com/agustinustheo/frame-trace/releases/download/v$VERSION/frame-trace-$VERSION-$TARGET.tar.gz"
+curl -fsSLO "https://github.com/agustinustheo/frame-trace/releases/download/v$VERSION/SHA256SUMS"
 sha256sum --check --ignore-missing SHA256SUMS
 tar -xzf "frame-trace-$VERSION-$TARGET.tar.gz"
 mkdir -p ~/.local/bin && cp "frame-trace-$VERSION-$TARGET/frame-trace" ~/.local/bin/
 ```
+
+Only `sha256sum` prints a line, which ends in `OK` when the archive is intact.
 
 [Install](docs/getting-started/install.md) has the commands for ARM64 Linux, macOS and nightly builds, and how to add `~/.local/bin` to your `PATH`.
 
