@@ -128,11 +128,12 @@ jobs:
       - name: Run tests
         run: cargo +1.93.0 test --workspace --locked
 
-      # The three ignored tests replay live blocks; the runtime upgrade test reads
+      # The three live ignored tests replay public blocks; the runtime upgrade test reads
       # archive state; it took 4 minutes in a local debug build. Endpoints: dev/README.md#live-tests.
+      # --skip bench_ leaves out the ignored benchmarks.
       - name: Run ignored public-network tests
         timeout-minutes: 20
-        run: cargo +1.93.0 test --workspace --locked -- --ignored
+        run: cargo +1.93.0 test --workspace --locked -- --ignored --skip bench_
 
       - name: Build release binary
         run: cargo +1.93.0 build --release --locked -p frame-trace

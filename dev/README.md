@@ -50,7 +50,8 @@ The unit tests `unknown_host_import_error_names_the_import` and
 ## Live tests
 
 Tests that need a public node are `#[ignore]`d. Run them with
-`cargo +1.93.0 test --workspace --locked -- --ignored`. Each reads its endpoint from an
+`cargo +1.93.0 test --workspace --locked -- --ignored --skip bench_`. `--skip bench_` leaves
+out the ignored benchmarks, which skip themselves anyway without `FT_BENCH_DIR`. Each reads its endpoint from an
 environment variable and falls back to the public endpoint:
 
 | Variable | Default | Tests |

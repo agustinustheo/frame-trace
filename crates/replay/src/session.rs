@@ -743,7 +743,11 @@ mod disk_tests {
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(1_000_000);
-        let dir = PathBuf::from(std::env::var("FT_BENCH_DIR").expect("FT_BENCH_DIR"));
+        // `-- --ignored` also selects the live tests; without a directory this is not a bench run.
+        let Some(dir) = std::env::var_os("FT_BENCH_DIR").map(PathBuf::from) else {
+            eprintln!("bench_disk_cache_1m_nodes: skipped, FT_BENCH_DIR is not set");
+            return;
+        };
         if !dir.join("proof-nodes").exists() {
             let session =
                 ReplaySession::with_cache_max_bytes(Some(&dir), 1 << 30).expect("session");
