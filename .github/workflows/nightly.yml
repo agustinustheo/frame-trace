@@ -271,14 +271,18 @@ jobs:
           fi
           title="Nightly build failed"
           label=nightly-failure
+          # Only the issue this workflow opened, never one a person opened.
+          marker="<!-- frame-trace-nightly -->"
           run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           today=$(date -u +%Y-%m-%d)
           # A job that timed out or was cancelled counts as failed.
           failed=$(jq -r '[to_entries[]
             | select(.value.result == "failure" or .value.result == "cancelled")
             | "\(.key) (\(.value.result))"] | join(", ")' <<< "$NEEDS")
-          issue=$(gh issue list --state open --label "$label" --limit 100 \
-            --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -n 1)
+          issue=$(gh issue list --state open --label "$label" --author app/github-actions \
+            --limit 100 --json number,title,body \
+            --jq ".[] | select(.title == \"$title\" and (.body | contains(\"$marker\"))) | .number" \
+            | head -n 1)
           if [ -n "$failed" ]; then
             if ! gh label list --limit 1000 --json name --jq '.[].name' | grep -qxF "$label"; then
               gh label create "$label" --color B60205 \
@@ -291,7 +295,9 @@ jobs:
             if [ -n "$issue" ]; then
               gh issue comment "$issue" --body "$body"
             else
-              gh issue create --title "$title" --label "$label" --body "$body"
+              gh issue create --title "$title" --label "$label" --body "$body
+
+          $marker"
             fi
           elif [ -n "$issue" ]; then
             gh issue close "$issue" --comment "The nightly run on $today passed: $run_url"
