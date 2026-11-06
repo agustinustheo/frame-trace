@@ -2114,6 +2114,7 @@ dependencies = [
  "rustls",
  "sc-executor",
  "sc-executor-common",
+ "schnellru",
  "serde",
  "serde_json",
  "sp-core",

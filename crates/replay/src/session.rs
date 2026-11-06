@@ -1,5 +1,5 @@
 //! Reusable, bounded acquisition and compiled-runtime caches. Each replay authenticates its own root.
-use crate::{Error, Executor, Result};
+use crate::{Error, Executor, Result, nodes::Nodes};
 use parking_lot::Mutex;
 use sp_core::H256;
 use std::{
@@ -21,25 +21,6 @@ pub(crate) struct MetadataEntry {
 }
 type MetadataCache = BTreeMap<H256, MetadataEntry>;
 
-const MAX_SHARED_BYTES: usize = 256 * 1024 * 1024;
-#[derive(Default)]
-pub(crate) struct Nodes {
-    pub nodes: BTreeMap<H256, Arc<[u8]>>,
-    bytes: usize,
-}
-impl Nodes {
-    pub fn insert(&mut self, hash: H256, bytes: Arc<[u8]>) {
-        if self.nodes.contains_key(&hash) {
-            return;
-        }
-        if self.bytes + bytes.len() > MAX_SHARED_BYTES {
-            self.nodes.clear();
-            self.bytes = 0;
-        }
-        self.bytes += bytes.len();
-        self.nodes.insert(hash, bytes);
-    }
-}
 /// Keep one session across blocks. SDK compilation is keyed by authenticated code hash and heap settings.
 #[derive(Clone)]
 pub struct ReplaySession {
@@ -367,6 +348,10 @@ impl ReplaySession {
             disk.set_budget(self.cache_max_bytes.saturating_sub(runtimes).max(floor));
         }
         result
+    }
+    /// Proof nodes kept in memory for all replays of this session, within a fixed budget.
+    pub fn memory_cache(&self) -> crate::MemoryCacheStats {
+        self.nodes.lock().stats()
     }
     pub(crate) fn shared() -> Result<&'static Self> {
         static SESSION: OnceLock<std::result::Result<ReplaySession, String>> = OnceLock::new();
