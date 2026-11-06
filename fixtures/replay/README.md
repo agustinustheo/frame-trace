@@ -105,17 +105,20 @@ No runtime upgrade block is committed. Westend Asset Hub #18,985,169
 (`0x1ccb4c8ce07cacb802982d8b2aa1c8ceea40267c2503d1f48504fd7e6a405d8d`) is the first block
 executed with the new code; its initialization writes `System::LastRuntimeUpgrade`.
 
-Saved, #18,985,170 alone needs the new runtime (`c7a91f4a…`, 2,716,830 bytes compressed).
-The enactment block needs both runtimes, the old one as `:code` and the new one as
-`ParachainSystem::PendingValidationCode`. The pending value carries a 4-byte length prefix,
-so it cannot share the `:code` blob; saved on 2026-11-06 and converted with `blobify.py`,
-the two runtime blobs plus metadata measured about 5.3 MB (the self-contained `--save`
-directory was 5.8 MB). Neither runtime is shared with another fixture, and `:code` is
-already zstd-compressed by the SDK, so recompressing saves nothing.
+Saved, #18,985,170 alone needs the new runtime (`c7a91f4a…`, 2,716,830 bytes compressed);
+with its artifact and metadata it was 3,122,414 bytes, a fixture from 2026-11-06 until
+2026-11-07. The enactment block needs both runtimes, the old one as `:code` and the new one
+as `ParachainSystem::PendingValidationCode`. The pending value carries a 4-byte length
+prefix, so it cannot share the `:code` blob; converted with `blobify.py`, the two runtime
+blobs plus metadata measured about 5.3 MB. Neither runtime is shared with another fixture,
+and `:code` is already zstd-compressed by the SDK, so recompressing saves nothing.
 
 The ignored live test `runtime_upgrade_enactment_and_next_block_live` replays both blocks
-from an archive endpoint (`FRAME_TRACE_WESTEND_AH_RPC`), in one session and each alone.
-To replay #18,985,170 offline, save it from an archive node:
+every night from an archive endpoint (`FRAME_TRACE_WESTEND_AH_RPC`), in one session and
+each alone. Offline, `one_session_replays_blocks_on_different_runtimes` replays
+`westend-asset-hub` (spec 1025002), `paseo-asset-hub-contract` (spec 2005004) and
+`westend-asset-hub` again in one session, as `follow` meets two runtimes across an upgrade.
+To replay #18,985,170 offline, save it again from an archive node:
 
 ```sh
 frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block 18985170 --save <dir>
@@ -182,14 +185,14 @@ same artifact JSON apart from the emptied metadata.
 ## Relay chain
 
 No relay chain block is committed. Westend relay chain #33,614,892
-(`0xa7ab2bf3de7abcdc97740fc6a1187288e61490f174f4146a9a0b05e81596ff07`) passed the root
-check; its runtime blob alone is 1,552,297 bytes compressed, and the runtime's `:code` is
-already zstd-compressed by the SDK, so recompressing it saves nothing. The ignored live test
-`public_relay_network` replays the finalized block from `FRAME_TRACE_WESTEND_RPC` (default
-`wss://westend-rpc.polkadot.io`). It checks the root, that no call fails to decode, that the
-first extrinsics are `Timestamp.set` and `ParaInherent.enter`, and that `ParaInherent.enter`
-writes `ParaInherent::OnChainVotes`. To replay that block offline, save it from an archive
-node:
+(`0xa7ab2bf3de7abcdc97740fc6a1187288e61490f174f4146a9a0b05e81596ff07`) was a fixture until
+2026-11-07; its runtime blob alone was 1,552,297 bytes compressed and the three files 1,733,346
+bytes. The runtime's `:code` is already zstd-compressed by the SDK, so recompressing it saves
+nothing. The ignored live test `public_relay_network` replays the finalized block from
+`FRAME_TRACE_WESTEND_RPC` (default `wss://westend-rpc.polkadot.io`) every night. It checks
+the root, that no call fails to decode, that the first extrinsics are `Timestamp.set` and
+`ParaInherent.enter`, and that `ParaInherent.enter` writes `ParaInherent::OnChainVotes`.
+To replay the old block offline, save it again from an archive node:
 
 ```sh
 frame-trace block --rpc wss://westend-rpc.polkadot.io --block 33614892 --save <dir>

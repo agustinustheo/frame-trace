@@ -1,23 +1,34 @@
 //! Runtime upgrades on Westend Asset Hub: spec 1025003 -> 1025004 at block 18,985,169.
 //!
 //! Block 18,985,169 executes with the old code and writes the new `:code`. Block 18,985,170
-//! is the first block on the new code. Both are replayed by the ignored live test: saved,
-//! they would add 2.7 MB (one block) or about 5 MB (both) of runtimes.
+//! is the first block on the new code. Both are replayed by the ignored live test, which the
+//! nightly runs: saved, they would add 2.7 MB (one block) or about 5 MB (both) of runtimes.
+//! Offline, one session replays saved blocks of two different runtimes, as `follow` does
+//! across an upgrade.
 #![allow(clippy::unwrap_used)]
 use codec::Decode;
 use frame_metadata::{RuntimeMetadata, RuntimeMetadataPrefixed};
 use frame_trace_decode::{AnnotatedBlock, Metadata, annotate};
 use frame_trace_model::TracedBlock;
-use frame_trace_replay::{Replay, ReplaySession, rpc::unhex};
-use std::collections::BTreeMap;
+use frame_trace_replay::{Artifact, Replay, ReplaySession, replay_with_session, rpc::unhex};
+use std::{collections::BTreeMap, path::PathBuf};
 
 const ENACTMENT: u64 = 18_985_169;
-/// Blake2-256 of the stored `:code` bytes.
+/// Blake2-256 of the stored `:code` bytes. The fixture blobs are named by the same hash.
+const SPEC_1025002: &str = "0x57ccdb66df672638e8978d5eecce601930a6e498f6c0360a738a53cac2c2e9d9";
 const SPEC_1025003: &str = "0x985f0daaaeec1ed429c305034a95dd233bdd292bef383e3d6643bb00f1c6a132";
 const SPEC_1025004: &str = "0xc7a91f4aafad7a00424bf9d5c8029f2fac2b6ea87ee7ece41fcd3825a5aa8bfd";
+/// Paseo Asset Hub spec 2005004, the runtime of the `paseo-asset-hub-contract` fixture.
+const PASEO_2005004: &str = "0xd85bfdb17cf421d6a75c9db9ba16cd713a840e42a02ca69becff7e3570b8debb";
 
 fn code_hash(hex: &str) -> sp_core::H256 {
     hex.parse().unwrap()
+}
+
+fn fixture(name: &str) -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../fixtures/replay")
+        .join(name)
 }
 
 fn westend_asset_hub_rpc() -> String {
@@ -119,6 +130,47 @@ fn check_first_block_on_new_code(replay: &Replay) {
             .flat_map(|p| &p.ops)
             .any(|o| o.name == ":code" && o.op == "put")
     );
+}
+
+/// Two runtimes in one session, as `follow` meets them across an upgrade: each block gets
+/// its own executor and its own metadata, and neither result leaks into the other.
+#[test]
+fn one_session_replays_blocks_on_different_runtimes() {
+    let load = |name| Artifact::load(&fixture(name)).unwrap();
+    let session = ReplaySession::new(None).unwrap();
+    let westend = replay_with_session(load("westend-asset-hub"), None, &session).unwrap();
+    let paseo = replay_with_session(load("paseo-asset-hub-contract"), None, &session).unwrap();
+    let again = replay_with_session(load("westend-asset-hub"), None, &session).unwrap();
+
+    for replay in [&westend, &paseo, &again] {
+        assert!(replay.root_check);
+        assert_eq!((replay.rpc_count, replay.measured_rpc_count), (0, 0));
+        assert!(
+            annotated(replay)
+                .all_phases()
+                .all(|p| p.call_error.is_none())
+        );
+    }
+    assert_eq!(westend.runtime_code_hash, code_hash(SPEC_1025002));
+    assert_eq!(paseo.runtime_code_hash, code_hash(PASEO_2005004));
+    assert_eq!(metadata_spec_version(&westend.artifact.metadata), 1_025_002);
+    assert_eq!(metadata_spec_version(&paseo.artifact.metadata), 2_005_004);
+
+    assert_eq!(again.runtime_code_hash, westend.runtime_code_hash);
+    assert_eq!(again.artifact.metadata, westend.artifact.metadata);
+    assert_eq!(keyed_events(&again), keyed_events(&westend));
+    assert_eq!(ops(&annotated(&again)), ops(&annotated(&westend)));
+
+    // The second runtime gives the same result as in a fresh session.
+    let alone = replay_with_session(
+        load("paseo-asset-hub-contract"),
+        None,
+        &ReplaySession::new(None).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(alone.artifact.metadata, paseo.artifact.metadata);
+    assert_eq!(keyed_events(&alone), keyed_events(&paseo));
+    assert_eq!(ops(&annotated(&alone)), ops(&annotated(&paseo)));
 }
 
 #[test]
