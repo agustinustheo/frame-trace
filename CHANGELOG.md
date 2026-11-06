@@ -24,6 +24,7 @@ First release.
 - `--rpc-timeout`: the longest wait for one RPC response, for slow nodes. Each request gets four tries.
 - `follow` can run unattended. It stops cleanly on `SIGTERM` and `SIGHUP`, as on Ctrl-C. It waits longer after each failed check for new blocks. When the OTLP receiver is down, it keeps the traces and later resends only the requests the receiver did not accept.
 - A runtime that needs host functions frame-trace does not have fails with an error that names them.
+- Nightly builds of `main` for the same four systems as releases, in the `Nightly` pre-release on GitHub. `frame-trace --version` shows the date and commit they were built from.
 - Tested on relay chains and on blocks that upgrade the runtime, see [What frame-trace supports](https://agustinustheodorus.com/frame-trace/reference/support.html).
 
 ### Changed
