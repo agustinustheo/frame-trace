@@ -205,7 +205,7 @@ They are hidden from `--help`.
 
 | Limit | Value |
 | --- | --- |
-| What counts | Bytes on disk of both folders. Each file counts its size rounded up to 4 KiB, plus 4 KiB. |
+| What counts | Bytes on disk of both folders. Each file counts its size rounded up to 4 KiB, or the space the file system gave it if that is more, plus 4 KiB. |
 | State file size | The limit divided by 16, at least 64 KiB and at most 64 MiB. |
 | Largest piece of state kept | A sixteenth of the state file size: 4 MiB at the default limit. Larger pieces stay in memory only. |
 | Number of state files | At most 18 at or below 1 GiB. Above that, one more per 60 MiB. |

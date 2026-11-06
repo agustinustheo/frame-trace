@@ -870,7 +870,7 @@ fn disk_cache_limit_bounds_nodes_and_unused_runtimes_together() {
     assert!(!unused.exists(), "an unused runtime outlived the cap");
     let used: u64 = std::fs::read_dir(dir.join("proof-nodes"))
         .unwrap()
-        .map(|e| crate::disk::disk_size(e.unwrap().metadata().unwrap().len()))
+        .map(|e| crate::disk::file_charge(&e.unwrap().metadata().unwrap()))
         .sum();
     assert!(used > 0 && used <= cap, "{used} bytes of proof nodes");
     let zero = ReplaySession::with_cache_max_bytes(Some(&dir), 0).unwrap();
