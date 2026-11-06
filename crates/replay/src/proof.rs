@@ -232,25 +232,23 @@ impl ProofDb {
             }
         }
     }
-    /// Predictable full keys/storage prefixes are acquired in batches, across a bounded pool.
+    /// Predictable full keys/storage prefixes are acquired in batches, on the shared request
+    /// threads. Each group of batches is one round.
     pub fn prefetch(&self, keys: &[Vec<u8>]) -> Result<()> {
-        let concurrency = self.rpc.as_ref().map_or(1, Rpc::parallelism);
+        let Some(rpc) = &self.rpc else {
+            return keys
+                .chunks(32)
+                .try_for_each(|keys| self.fetch_inner(None, keys, false));
+        };
         let batches: Vec<_> = keys.chunks(32).collect();
-        for group in batches.chunks(concurrency) {
-            let before = self.rpc.as_ref().map_or(0, Rpc::count);
-            std::thread::scope(|scope| {
-                let handles: Vec<_> = group
+        for group in batches.chunks(rpc.parallelism()) {
+            let before = rpc.count();
+            rpc.run_all(
+                group
                     .iter()
-                    .map(|keys| scope.spawn(|| self.fetch_inner(None, keys, false)))
-                    .collect();
-                for handle in handles {
-                    handle.join().map_err(|_| {
-                        Error::Invalid("proof acquisition worker panicked".into())
-                    })??;
-                }
-                Ok::<_, Error>(())
-            })?;
-            if self.rpc.as_ref().map_or(0, Rpc::count) > before {
+                    .map(|keys| || self.fetch_inner(None, keys, false)),
+            )?;
+            if rpc.count() > before {
                 self.round_trips.fetch_add(1, Ordering::Relaxed);
             }
         }

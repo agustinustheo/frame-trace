@@ -2110,6 +2110,7 @@ dependencies = [
  "hex",
  "parity-scale-codec",
  "parking_lot",
+ "rayon",
  "reqwest",
  "rustls",
  "sc-executor",

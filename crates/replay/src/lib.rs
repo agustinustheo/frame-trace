@@ -446,17 +446,20 @@ pub fn online_with_session(rpc: &Rpc, selector: &str, session: &ReplaySession) -
     Ok(replay)
 }
 
-// Both calls are pinned to the block's parent and independent of each other. Join before
-// returning even on failure, so no context request can leak into timed replay accounting.
+// Both calls are pinned to the block's parent and independent of each other. Both finish
+// before this returns, even on failure, so no context request can leak into timed replay
+// accounting.
 fn parent_context(rpc: &Rpc, parent: H256) -> Result<(Value, Value)> {
-    std::thread::scope(|scope| {
-        let version = scope.spawn(|| rpc.call("state_getRuntimeVersion", json!([parent])));
-        let header = rpc.call("chain_getHeader", json!([parent]));
-        let version = version
-            .join()
-            .map_err(|_| Error::Invalid("context RPC worker panicked".into()))?;
-        Ok((header?, version?))
-    })
+    let mut results = rpc
+        .run_all(
+            ["chain_getHeader", "state_getRuntimeVersion"]
+                .map(|method| move || rpc.call(method, json!([parent]))),
+        )?
+        .into_iter();
+    match (results.next(), results.next()) {
+        (Some(header), Some(version)) => Ok((header, version)),
+        _ => Err(Error::Invalid("context requests returned no result".into())),
+    }
 }
 
 pub fn offline(dir: &Path) -> Result<Replay> {

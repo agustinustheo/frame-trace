@@ -41,6 +41,9 @@ struct Inner {
     limit: tokio::sync::Semaphore,
     cancel: CancellationToken,
     deadline: Duration,
+    /// Threads that send concurrent requests for one replay, shared by all forks. Started on
+    /// first use, one per request slot, and kept: replays do not start threads of their own.
+    pool: OnceLock<std::result::Result<rayon::ThreadPool, String>>,
 }
 
 fn runtime() -> Result<&'static Runtime> {
@@ -106,6 +109,7 @@ impl Rpc {
                 limit: tokio::sync::Semaphore::new(parallelism),
                 cancel,
                 deadline,
+                pool: OnceLock::new(),
             }),
             calls: Default::default(),
         })
@@ -118,6 +122,50 @@ impl Rpc {
     }
     pub fn parallelism(&self) -> usize {
         self.inner.sockets.len()
+    }
+    /// Runs `jobs` at once on the shared request threads and returns their results in order.
+    /// A job that panics returns an error. The request limit still applies to every call.
+    pub(crate) fn run_all<T: Send, F: FnOnce() -> Result<T> + Send>(
+        &self,
+        jobs: impl IntoIterator<Item = F>,
+    ) -> Result<Vec<T>> {
+        let pool = self
+            .inner
+            .pool
+            .get_or_init(|| {
+                rayon::ThreadPoolBuilder::new()
+                    .num_threads(self.parallelism())
+                    .thread_name(|index| format!("rpc-{index}"))
+                    .build()
+                    .map_err(|e| e.to_string())
+            })
+            .as_ref()
+            .map_err(|e| Error::Invalid(format!("starting request threads: {e}")))?;
+        let jobs: Vec<_> = jobs.into_iter().collect();
+        let results: Vec<_> = jobs.iter().map(|_| parking_lot::Mutex::new(None)).collect();
+        pool.in_place_scope(|scope| {
+            for (job, slot) in jobs.into_iter().zip(&results) {
+                scope.spawn(move |_| {
+                    *slot.lock() =
+                        Some(std::panic::catch_unwind(std::panic::AssertUnwindSafe(job)));
+                });
+            }
+        });
+        results
+            .into_iter()
+            .map(|slot| match slot.into_inner() {
+                Some(Ok(result)) => result,
+                _ => Err(Error::Invalid("request thread panicked".into())),
+            })
+            .collect()
+    }
+    #[cfg(test)]
+    pub(crate) fn pool_threads(&self) -> Option<usize> {
+        self.inner
+            .pool
+            .get()
+            .and_then(|p| p.as_ref().ok())
+            .map(rayon::ThreadPool::current_num_threads)
     }
     pub fn cancelled(&self) -> bool {
         self.inner.cancel.is_cancelled()
