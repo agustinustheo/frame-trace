@@ -15,28 +15,30 @@ Press Ctrl-C to stop.
 Here is output from a three-minute run that sent traces to a local OTLP receiver.
 
 ```text
-follow: queued=1 in-flight=0 traced=0 exported=0 export-waiting=0 export-rejected=0 export-failed=0 export-dropped=0 retrying=0 stopped=0 skipped=0 reverted=0 up=2s
-replay #19027339: fetching state (shared limit: 16 concurrent RPC requests)
-replay #19027339: loading runtime and preparing state
-root check: PASS; RPC calls: 55 (timed replay: 0); execution proof: 88836 bytes
-fetching state #19027339: 47 proof request rounds; 55 RPC calls
-state root: computed 0x09f37412eeb6a15e55daf44cb6a2c425ac273ffac4e4644601d5f72461f95e23; header 0x09f37412eeb6a15e55daf44cb6a2c425ac273ffac4e4644601d5f72461f95e23
-traced finalized block #19027339 0x35147e1c3c8f1c54fa83dc651c4aa4ffb22450a6705b65f49accfad3406ddc49: 569 storage operations in 17.179s
+follow: queued=1 in-flight=0 traced=0 exported=0 export-waiting=0 export-rejected=0 export-failed=0 export-dropped=0 retrying=0 stopped=0 skipped=0 reverted=0 state-memory=0MiB state-pieces=0 state-from-memory=0% up=2s
+replay #19068435: fetching state (shared limit: 16 concurrent RPC requests)
+replay #19068435: loading runtime and preparing state
+root check: PASS; RPC calls: 100 (timed replay: 0); execution proof: 85364 bytes
+fetching state #19068435: 62 proof request rounds; 100 RPC calls
+state root: computed 0x8f88a88dd02b0eba5da124ce7f05527d76cacea3fbe6e0a85394b25f7d98ac98; header 0x8f88a88dd02b0eba5da124ce7f05527d76cacea3fbe6e0a85394b25f7d98ac98
+traced finalized block #19068435 0x6166ad2385f35523fc97f4527c5a8e57334a78e2b3ea9c5eec274e049861c29e: 572 storage operations in 44.914s
 ...
-traced finalized block #19027340 0x8e08a9667e62da3e8553b399d63f73a856879ff198ffdcc8ef5fdfb7bf786e5c: 569 storage operations in 6.164s
+traced finalized block #19068441 0x022ee201d22a06a6fb7d75e3b093fe1d19892af3fa8ec30889ec5916f216383e: 572 storage operations in 10.439s
 ...
-follow: queued=3 in-flight=3 traced=25 exported=25 export-waiting=0 export-rejected=0 export-failed=0 export-dropped=0 retrying=0 stopped=0 skipped=0 reverted=0 up=1m03s
+follow: queued=20 in-flight=8 traced=3 exported=3 export-waiting=0 export-rejected=0 export-failed=0 export-dropped=0 retrying=0 stopped=0 skipped=0 reverted=0 state-memory=4MiB state-pieces=3777 state-from-memory=33% up=1m02s
+...
+follow: queued=19 in-flight=8 traced=34 exported=34 export-waiting=0 export-rejected=0 export-failed=0 export-dropped=0 retrying=0 stopped=0 skipped=0 reverted=0 state-memory=7MiB state-pieces=12506 state-from-memory=42% up=2m02s
 ...
 follow: stopping (signal again to exit now)
+follow: waiting up to 10s for 2 block(s) still being replayed
 replay job cancelled
 replay job cancelled
-replay job cancelled
-follow stopped after 2m59s: traced=85 exported=85 export-rejected=0 export-failed=0 export-dropped=0 export-unsent=0 stopped=0 skipped=0 reverted=0 cancelled=3 poll-failures=0
+follow stopped after 3m00s: traced=83 exported=83 export-rejected=0 export-failed=0 export-dropped=0 export-unsent=0 stopped=0 skipped=0 reverted=0 cancelled=2 poll-failures=0
 ```
 
-The cache directory was kept from an earlier run, so the first block took 17 seconds.
-The second took 6 seconds.
-The three blocks still waiting on the node when the stop began count as `cancelled`.
+The cache directory was kept from an earlier run, so the first block took 45 seconds on a slow node.
+The next took 10 seconds.
+The two blocks still being replayed when the stop began count as `cancelled`.
 Each time covers loading state and replaying it on this machine.
 It does not include sending the trace, or time spent waiting for the first replay.
 Each traced block appears in Jaeger as its own trace.
