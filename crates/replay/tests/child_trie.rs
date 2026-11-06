@@ -20,11 +20,11 @@ fn fixture(name: &str) -> PathBuf {
 
 #[test]
 fn contract_call_reads_and_writes_its_child_trie() {
-    let result = replay(
-        Artifact::load(&fixture("paseo-asset-hub-contract")).unwrap(),
-        None,
-    )
-    .unwrap();
+    let artifact = Artifact::load(&fixture("paseo-asset-hub-contract")).unwrap();
+    // The fixture stores no metadata: the replay derives it from the runtime, and the names
+    // below come from that.
+    assert!(artifact.metadata.is_empty());
+    let result = replay(artifact, None).unwrap();
     assert_eq!(result.block_number, 15_366_850);
     // Blake2-256 of the stored `:code`, the name of the runtime's fixture blob.
     assert_eq!(

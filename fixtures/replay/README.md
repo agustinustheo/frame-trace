@@ -7,8 +7,8 @@ and complete discovery proof nodes. The shared People/Westend Wasm nodes and met
 once under `blobs/<blake2-256>.zst`; fixture metadata/node strings use `blob:<hash>`.
 The loader bounds decompression and verifies each blob's content hash before
 rehydrating hex. No arbitrary reference paths are accepted. `Artifact::save`
-always writes self-contained artifacts. The 20 compressed files, including call artifacts, blobs,
-oracles and the public reference, total 13,988,228 bytes (13.34 MiB). Sharing the
+always writes self-contained artifacts. The 19 compressed files, including call artifacts, blobs,
+oracles and the public reference, total 13,818,269 bytes (13.18 MiB). Sharing the
 Westend Wasm as raw blob bytes also reduces the original public block artifact.
 
 | Directory | Block | Source | Artifact bytes |
@@ -17,7 +17,7 @@ Westend Wasm as raw blob bytes also reduces the original public block artifact.
 | `people-kill-prefix` | 8 / `7d99aaa1…` | E2 untraced People, sudo kill_prefix | 9,114 |
 | `people-traced` | 4 / `06618995…` | E2 traced People, three-transfer batch | 4,116,156 |
 | `westend-asset-hub` | 18,558,320 / `4c0d1d57…` | Public Westend Asset Hub, two inherents | 275,788 |
-| `paseo-asset-hub-contract` | 15,366,850 / `e6b71b09…` | Public Paseo Asset Hub, a contract call with child trie reads and writes | 101,226 |
+| `paseo-asset-hub-contract` | 15,366,850 / `e6b71b09…` | Public Paseo Asset Hub, a contract call with child trie reads and writes | 101,324 |
 
 The local `oracle.json.zst` files are E2's independent `state_traceBlock` RPC
 recordings of the exact same blocks. Tests compare the entire ordered keyed
@@ -128,10 +128,16 @@ frame-trace block --offline <dir>
 ## Making a fixture
 
 Fixture blobs were made from the `--save` output with [`blobify.py`](blobify.py): every
-hex value of at least 100,000 bytes moves into `blobs/<blake2-256>.zst` (`zstd -19`) and
+proof node of at least 100,000 bytes moves into `blobs/<blake2-256>.zst` (`zstd -19`) and
 is replaced by `blob:<hash>`; the artifact itself is recompressed with `zstd -19`. Running
 it again on `block --offline paseo-asset-hub-contract --save <dir>` reproduces that
-fixture's blobs byte for byte and the same artifact JSON. Runtime blobs barely shrink:
+fixture's blobs byte for byte and the same artifact JSON.
+
+`blobify.py` also empties the stored metadata. A replay derives metadata by running the
+runtime's metadata API on the saved proof nodes, which `--save` includes, and uses stored
+metadata only with `--unauthenticated-metadata` when that fails. The older fixtures still
+store theirs. On 2026-11-07 this removed the Paseo fixture's 170,057-byte metadata blob
+(`25dcaa7e…`). Runtime blobs barely shrink:
 `:code` is already zstd-compressed by the SDK (`sp-maybe-compressed-blob`, magic
 `52bc537646db8e05`), and `zstd -19` on top changes it by a few dozen bytes.
 
@@ -147,7 +153,8 @@ Extrinsic 2 is a `Revive.eth_transact` to contract
 default child trie `0xefdd7b91…5a2d`, the trie id in its `Revive::AccountInfoOf` entry.
 The call makes 14 child trie reads and 4 child trie writes. The recording run on
 2026-11-06 measured root check PASS, 113 RPC calls and 101,420 execution-proof bytes. The
-runtime (`d85bfdb1…`) and V16 metadata (`25dcaa7e…`) are blobs.
+runtime (`d85bfdb1…`) is a blob; the fixture stores no metadata (see
+[Making a fixture](#making-a-fixture)).
 
 Paseo Asset Hub was used because Westend Asset Hub has almost no contract activity: on
 2026-11-06 a scan of the 40,000 blocks before #19,021,000 through Westend Asset Hub's
@@ -172,6 +179,8 @@ python3 -I fixtures/replay/blobify.py <dir> fixtures/replay/paseo-asset-hub-cont
 
 Run again on 2026-11-06 with this command, the replay passed the root check with 113 RPC
 calls in 58 seconds, and `blobify.py` reproduced the artifact and both blobs byte for byte.
+On 2026-11-07, `blobify.py` without metadata, run on the offline `--save` output, gave the
+same artifact JSON apart from the emptied metadata.
 
 ## Relay chain
 
