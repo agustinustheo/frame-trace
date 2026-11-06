@@ -13,6 +13,8 @@ pub(crate) const DEFAULT_BUDGET: usize = 128 * 1024 * 1024;
 /// The table may use at most this share of the budget. Its size doubles, so without a cap
 /// one doubling late in a run could take memory the nodes would use better.
 const TABLE_SHARE: usize = 4;
+/// One table entry: the hash, the `Arc`, and two links.
+const ENTRY: usize = 56;
 
 /// The memory one `Arc<[u8]>` of `len` bytes takes: two reference counts, then the bytes,
 /// rounded to the size classes of the macOS allocator. glibc rounds to 16 bytes as well,
@@ -32,6 +34,10 @@ struct Budget {
     budget: usize,
     values: usize,
     table: usize,
+    /// At most half of what the largest table allowed holds. A full table then makes room by
+    /// rehashing in place: refused growth would make the map drop nodes until half of them
+    /// were gone.
+    max_len: usize,
     evicted: u64,
 }
 impl Budget {
@@ -42,8 +48,8 @@ impl Budget {
 impl Limiter<H256, Arc<[u8]>> for Budget {
     type KeyToInsert<'a> = H256;
     type LinkType = u32;
-    fn is_over_the_limit(&self, _: usize) -> bool {
-        self.charged() > self.budget
+    fn is_over_the_limit(&self, len: usize) -> bool {
+        self.charged() > self.budget || len > self.max_len
     }
     fn on_insert(&mut self, _: usize, key: H256, value: Arc<[u8]>) -> Option<(H256, Arc<[u8]>)> {
         let cost = charge(value.len());
@@ -74,7 +80,8 @@ impl Limiter<H256, Arc<[u8]>> for Budget {
         self.values = 0;
     }
     fn on_grow(&mut self, table: usize) -> bool {
-        let grow = table <= self.budget / TABLE_SHARE && table + self.values <= self.budget;
+        // Nodes over the budget after growing are dropped one by one, oldest first.
+        let grow = table <= self.budget / TABLE_SHARE;
         if grow {
             self.table = table;
         }
@@ -108,11 +115,20 @@ impl Default for Nodes {
 }
 impl Nodes {
     pub fn with_budget(budget: usize) -> Self {
+        // The largest table within its share: 56-byte entries and a control byte per bucket,
+        // in a power of two of buckets, seven eighths of which can be full.
+        let table =
+            LruMap::<H256, Arc<[u8]>, Budget>::memory_usage_for_memory_budget(budget / TABLE_SHARE);
+        let buckets = match table / (ENTRY + 1) {
+            0 => 0,
+            n => 1 << n.ilog2(),
+        };
         Self {
             map: LruMap::new(Budget {
                 budget,
                 values: 0,
                 table: 0,
+                max_len: (buckets * 7 / 16).max(1),
                 evicted: 0,
             }),
             hits: 0,
@@ -140,7 +156,9 @@ impl Nodes {
         // Whatever the table really allocated, so the charge stays exact.
         let table = self.map.memory_usage();
         self.map.limiter_mut().table = table;
-        while self.map.limiter().is_over_the_limit(0) && self.map.pop_oldest().is_some() {}
+        while self.map.limiter().is_over_the_limit(self.map.len())
+            && self.map.pop_oldest().is_some()
+        {}
         node
     }
     pub fn is_empty(&self) -> bool {
@@ -248,9 +266,17 @@ mod tests {
                     "a node read each block was dropped"
                 );
             }
+            let (before, table) = (nodes.stats().entries, nodes.map.memory_usage());
             nodes.intern(hash, bytes);
             hashes.push(hash);
             assert!(nodes.peek(&hash).is_some(), "the newest node was not kept");
+            // One node in, at most one node out, unless the table just doubled: then the nodes
+            // its new memory takes go at once.
+            assert!(
+                nodes.stats().entries >= before || nodes.map.memory_usage() > table,
+                "{before} then {:?}",
+                nodes.stats()
+            );
         }
         let stats = nodes.stats();
         assert!(stats.evicted > 0);
@@ -263,6 +289,30 @@ mod tests {
                 .all(|h| nodes.peek(h).is_some())
         );
         assert!(nodes.peek(&hashes[1]).is_none());
+    }
+    #[test]
+    fn a_full_table_drops_one_node_at_a_time() {
+        // Small nodes: the table, not the bytes, is what fills up.
+        let budget = 1024 * 1024;
+        let mut nodes = Nodes::with_budget(budget);
+        let mut most = 0;
+        for i in 0..200_000 {
+            let (before, table) = (nodes.stats().entries, nodes.map.memory_usage());
+            let (hash, bytes) = node(i, 8);
+            nodes.intern(hash, bytes);
+            let stats = nodes.stats();
+            assert!(
+                stats.entries >= before || nodes.map.memory_usage() > table,
+                "{before} then {stats:?}"
+            );
+            assert!(stats.bytes <= budget as u64);
+            assert!(nodes.map.memory_usage() <= budget / TABLE_SHARE);
+            most = most.max(stats.entries);
+        }
+        let stats = nodes.stats();
+        assert!(stats.evicted > 0);
+        assert_eq!(stats.entries, most, "{stats:?}");
+        assert_eq!(stats.entries as usize, nodes.map.limiter().max_len);
     }
     #[test]
     fn a_node_larger_than_the_budget_is_not_kept_and_empties_nothing() {
