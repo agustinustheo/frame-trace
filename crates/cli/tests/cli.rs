@@ -1019,6 +1019,83 @@ fn follow_ctrl_c_interrupts_a_stalled_websocket_handshake() {
     node.join().unwrap();
 }
 
+#[test]
+fn follow_exits_promptly_when_signalled_while_a_large_cache_loads() {
+    use std::{
+        process::Stdio,
+        thread,
+        time::{Duration, Instant},
+    };
+    let cache = std::env::temp_dir().join(format!("frame-trace-big-cache-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&cache);
+    // The one-file-per-node layout of earlier versions, and 200 MB of current segments.
+    let legacy = cache.join("nodes");
+    std::fs::create_dir_all(&legacy).unwrap();
+    for i in 0..20_000 {
+        std::fs::write(legacy.join(format!("{i:064x}")), [0; 200]).unwrap();
+    }
+    let segments = cache.join("proof-nodes");
+    std::fs::create_dir_all(&segments).unwrap();
+    let mut record = vec![0; 32];
+    record.extend(200u32.to_le_bytes());
+    record.extend([7; 200]);
+    for id in 0..4 {
+        let mut file = std::io::BufWriter::new(
+            std::fs::File::create(segments.join(format!("{id:010}.seg"))).unwrap(),
+        );
+        file.write_all(b"FTNODES1").unwrap();
+        for i in 0u32..200_000 {
+            record[..4].copy_from_slice(&i.to_le_bytes());
+            file.write_all(&record).unwrap();
+        }
+    }
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("ws://{}", listener.local_addr().unwrap());
+    let (accepted, connected) = std::sync::mpsc::channel();
+    let node = thread::spawn(move || {
+        if let Ok((mut stream, _)) = listener.accept() {
+            let _ = accepted.send(());
+            let _ = stream.read_to_end(&mut Vec::new());
+        }
+    });
+    let mut child = Command::new(BIN)
+        .args(["follow", "--rpc", &url, "--cache-dir"])
+        .arg(&cache)
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    // The signal handler is installed before the first connection; the cache opens after it.
+    connected.recv_timeout(Duration::from_secs(10)).unwrap();
+    let start = Instant::now();
+    Command::new("kill")
+        .args(["-HUP", &child.id().to_string()])
+        .status()
+        .unwrap();
+    while child.try_wait().unwrap().is_none() && start.elapsed() < Duration::from_secs(10) {
+        thread::sleep(Duration::from_millis(10));
+    }
+    if child.try_wait().unwrap().is_none() {
+        child.kill().unwrap();
+    }
+    let status = child.wait().unwrap();
+    let elapsed = start.elapsed();
+    drop(node);
+    std::fs::remove_dir_all(&cache).unwrap();
+    let mut text = String::new();
+    child
+        .stderr
+        .take()
+        .unwrap()
+        .read_to_string(&mut text)
+        .unwrap();
+    assert!(status.success(), "{status:?}: {text}");
+    assert!(
+        elapsed < Duration::from_secs(2),
+        "exit took {elapsed:?}: {text}"
+    );
+}
+
 /// Sends `signal` to `child` and waits up to ten seconds for it to exit.
 fn stop_child(child: &mut std::process::Child, signal: &str) -> std::process::ExitStatus {
     use std::{
