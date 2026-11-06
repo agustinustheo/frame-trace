@@ -252,7 +252,8 @@ jobs:
   notify:
     name: Report the result in an issue
     needs: [test, build, publish]
-    if: always()
+    # Runs from other branches neither open nor close the issue.
+    if: always() && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -264,6 +265,10 @@ jobs:
     steps:
       - name: Open, update or close the issue
         run: |
+          if [ "$GITHUB_REF" != "refs/heads/main" ]; then
+            echo "Not reporting: the run is for $GITHUB_REF, not main"
+            exit 0
+          fi
           title="Nightly build failed"
           label=nightly-failure
           run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
