@@ -58,21 +58,24 @@ A version with a suffix, such as `0.2.0-rc.1`, becomes a draft pre-release.
 `.github/workflows/nightly.yml` runs at 03:17 UTC each day, and by hand from the Actions tab with **Run workflow**.
 Only one nightly runs at a time; a second one waits for the first.
 
-1. The `test` job checks out `main` and runs rustfmt, clippy, the offline tests, the ignored live tests and a live replay of the latest finalized Westend Asset Hub block. Live failures can come from the public endpoints.
-2. If they pass and `main` is not the commit the `nightly` tag points to, the `build` job builds the four archives with `build.yml`. The archives are named `frame-trace-nightly-<target>.tar.gz`, so their download links stay the same. The version comes from `FRAME_TRACE_BUILD_VERSION`, which only this workflow sets; local builds and `release.yml` builds print the crate version.
-3. The `publish` job writes `SHA256SUMS`, attests build provenance, deletes the old `Nightly` release and its assets, moves the `nightly` tag to the built commit, and creates the new pre-release. It is never marked as the latest release. Its notes give the date, the commit, the run and a line pointing stable users to the latest `v*` release.
+1. The `test` job checks out the run's commit and runs rustfmt, clippy, the offline tests, the ignored live tests and a live replay of the latest finalized Westend Asset Hub block. Live failures can come from the public endpoints. The run's commit is the head of `main` when the run was triggered, even if the run waited in the queue while `main` moved. The provenance attestation names that commit, so the workflow builds it and checks it built it.
+2. If they pass and the published `Nightly` release is not complete and built from this commit, the `build` job builds the four archives with `build.yml`. The archives are named `frame-trace-nightly-<target>.tar.gz`, so their download links stay the same. The version comes from `FRAME_TRACE_BUILD_VERSION`, which only this workflow sets; local builds and `release.yml` builds print the crate version.
+3. The `publish` job writes `SHA256SUMS` and attests build provenance. It uploads the new release in full as a draft under a temporary tag name, which creates no tag. Then it deletes the old `Nightly` release and its assets, moves the `nightly` tag to the built commit, and publishes the draft as the `Nightly` pre-release on that tag. If any of this fails, it deletes the draft. It is never marked as the latest release. Its notes give the date, the commit, the run and a line pointing stable users to the latest `v*` release.
 
-If `main` has not changed since the last nightly, the run still tests but does not publish.
+The run still tests but does not publish if a published, not draft, `Nightly` release exists, has all four archives and `SHA256SUMS`, and its tag points to the run's commit.
+Otherwise it publishes, so a night whose publish failed is repaired by the next one, even if `main` did not change.
+If the upload fails, the old release and tag stay as they were.
 To publish anyway, run the workflow by hand with **force** checked.
-A run started from a branch other than `main` tests but never publishes.
+A run started from a branch other than `main` tests but never publishes, and never touches the failure issue.
 
 Moving the `nightly` tag does not start `release.yml`: it runs only for tags matching `v*`, and tags pushed with `GITHUB_TOKEN` start no workflows.
 
 ### When a nightly fails
 
-The `notify` job runs after every nightly.
+The `notify` job runs after every nightly for `main`, scheduled or started by hand.
 If any job failed or was cancelled, it comments on the open issue **Nightly build failed** with the run link, the failed jobs and the date. If no such issue is open, it opens one with the label `nightly-failure`, and creates the label if it is missing.
-The next nightly that passes comments on the issue and closes it.
+The next nightly that passes, including one that skips publishing because `main` did not change, comments on the issue and closes it.
+It only uses an issue it opened itself: one by `github-actions[bot]` whose body holds the hidden marker `<!-- frame-trace-nightly -->`. An issue a person opens with the same title and label is left alone.
 This issue is the only notification. Watch the repository's issues, or the label, to hear about failures.
 
 Each job has only the permissions it needs: `contents: read` to test and build, `contents: write`, `id-token: write` and `attestations: write` to publish, and `issues: write` to report.
