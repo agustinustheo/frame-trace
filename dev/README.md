@@ -55,7 +55,12 @@ environment variable and falls back to the public endpoint:
 
 | Variable | Default | Tests |
 | --- | --- | --- |
-| `FRAME_TRACE_WESTEND_AH_RPC` | `wss://westend-asset-hub-rpc.polkadot.io` | `public_network` (best block), `runtime_upgrade_enactment_and_next_block_live` (needs archive state for #18,985,169) |
+| `FRAME_TRACE_WESTEND_AH_RPC` | `wss://westend-asset-hub-rpc.polkadot.io` | `public_network` (best block), `runtime_upgrade_enactment_and_next_block_live` (the upgrade block #18,985,169 and the first block on the new code; needs archive state for #18,985,169) |
 | `FRAME_TRACE_WESTEND_RPC` | `wss://westend-rpc.polkadot.io` | `public_relay_network` (finalized block) |
 
 The nightly workflow (`.github/workflows/nightly.yml`) runs all three with the defaults.
+Runtime upgrade blocks and relay chain blocks have no offline fixture, because their runtimes
+would add 1.5 to 2.7 MB each to the repository (see
+[`fixtures/replay/README.md`](../fixtures/replay/README.md)). These live tests are their only
+tests, so run them when a change touches runtime loading, the session caches or block
+execution.

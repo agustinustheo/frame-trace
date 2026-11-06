@@ -7,8 +7,8 @@ and complete discovery proof nodes. The shared People/Westend Wasm nodes and met
 once under `blobs/<blake2-256>.zst`; fixture metadata/node strings use `blob:<hash>`.
 The loader bounds decompression and verifies each blob's content hash before
 rehydrating hex. No arbitrary reference paths are accepted. `Artifact::save`
-always writes self-contained artifacts. The 23 compressed files, including call artifacts, blobs,
-oracles and the public reference, total 17,110,642 bytes (16.32 MiB). Sharing the
+always writes self-contained artifacts. The 20 compressed files, including call artifacts, blobs,
+oracles and the public reference, total 13,988,228 bytes (13.34 MiB). Sharing the
 Westend Wasm as raw blob bytes also reduces the original public block artifact.
 
 | Directory | Block | Source | Artifact bytes |
@@ -17,7 +17,6 @@ Westend Wasm as raw blob bytes also reduces the original public block artifact.
 | `people-kill-prefix` | 8 / `7d99aaa1…` | E2 untraced People, sudo kill_prefix | 9,114 |
 | `people-traced` | 4 / `06618995…` | E2 traced People, three-transfer batch | 4,116,156 |
 | `westend-asset-hub` | 18,558,320 / `4c0d1d57…` | Public Westend Asset Hub, two inherents | 275,788 |
-| `westend-asset-hub-after-upgrade` | 18,985,170 / `1ccb4c8c…` | Public Westend Asset Hub, first block on spec 1025004 | 242,461 |
 | `paseo-asset-hub-contract` | 15,366,850 / `e6b71b09…` | Public Paseo Asset Hub, a contract call with child trie reads and writes | 101,226 |
 
 The local `oracle.json.zst` files are E2's independent `state_traceBlock` RPC
@@ -98,37 +97,43 @@ runtime source/Binary/Wasm provenance remains E1’s. `--unauthenticated-metadat
 (`--rpc-metadata-fallback` alias) explicitly allows stored metadata for older
 artifacts that still lack execution dependencies; output labels it unauthenticated.
 
-## Runtime upgrade fixture
+## Runtime upgrade
 
-`westend-asset-hub-after-upgrade` is Westend Asset Hub #18,985,170
-(`0x1ccb4c8ce07cacb802982d8b2aa1c8ceea40267c2503d1f48504fd7e6a405d8d`), recorded
-2026-11-06 from `wss://westend-asset-hub-rpc.polkadot.io` with `block --save`.
-Its parent, #18,985,169 (`0xd0e2fe81…ce55b`), enacted spec 1025003 -> 1025004: the
-`ParachainSystem.set_validation_data` inherent wrote the new `:code`. #18,985,170 is the
-first block executed with the new code; its initialization writes
-`System::LastRuntimeUpgrade`. The recording run on 2026-11-06 measured root check PASS,
-184 RPC calls and 237,816 execution-proof bytes; RPC counts depend on the endpoint and
-the run.
-The new runtime (`c7a91f4a…`, 2,716,830 bytes compressed) and its V16 metadata
-(`d678e714…`) are blobs.
+No runtime upgrade block is committed. Westend Asset Hub #18,985,169
+(`0xd0e2fe81…ce55b`) enacted spec 1025003 -> 1025004: the
+`ParachainSystem.set_validation_data` inherent wrote the new `:code`. #18,985,170
+(`0x1ccb4c8ce07cacb802982d8b2aa1c8ceea40267c2503d1f48504fd7e6a405d8d`) is the first block
+executed with the new code; its initialization writes `System::LastRuntimeUpgrade`.
 
-The enactment block itself is not committed. It needs both runtimes, the old one as
-`:code` and the new one as `ParachainSystem::PendingValidationCode`. The pending value
-carries a 4-byte length prefix, so it cannot share the `:code` blob. Saved on 2026-11-06
-and converted with `blobify.py`, the two runtime blobs plus metadata measured about
-5.3 MB (the self-contained `--save` directory was 5.8 MB). The ignored live test `runtime_upgrade_enactment_and_next_block_live`
-replays both blocks from an archive endpoint instead (`FRAME_TRACE_WESTEND_AH_RPC`).
+Saved, #18,985,170 alone needs the new runtime (`c7a91f4a…`, 2,716,830 bytes compressed);
+with its artifact and metadata it was 3,122,414 bytes, a fixture from 2026-11-06 until
+2026-11-07. The enactment block needs both runtimes, the old one as `:code` and the new one
+as `ParachainSystem::PendingValidationCode`. The pending value carries a 4-byte length
+prefix, so it cannot share the `:code` blob; converted with `blobify.py`, the two runtime
+blobs plus metadata measured about 5.3 MB. Neither runtime is shared with another fixture,
+and `:code` is already zstd-compressed by the SDK, so recompressing saves nothing.
+
+The ignored live test `runtime_upgrade_enactment_and_next_block_live` replays both blocks
+every night from an archive endpoint (`FRAME_TRACE_WESTEND_AH_RPC`), in one session and
+each alone. Offline, `one_session_replays_blocks_on_different_runtimes` replays
+`westend-asset-hub` (spec 1025002), `paseo-asset-hub-contract` (spec 2005004) and
+`westend-asset-hub` again in one session, as `follow` meets two runtimes across an upgrade.
+To replay #18,985,170 offline, save it again from an archive node:
+
+```sh
+frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block 18985170 --save <dir>
+frame-trace block --offline <dir>
+```
+
+## Making a fixture
 
 Fixture blobs were made from the `--save` output with [`blobify.py`](blobify.py): every
 hex value of at least 100,000 bytes moves into `blobs/<blake2-256>.zst` (`zstd -19`) and
 is replaced by `blob:<hash>`; the artifact itself is recompressed with `zstd -19`. Running
 it again on `block --offline paseo-asset-hub-contract --save <dir>` reproduces that
-fixture's blobs byte for byte and the same artifact JSON.
-
-```sh
-frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block 18985170 --save <dir>
-python3 -I fixtures/replay/blobify.py <dir> fixtures/replay/westend-asset-hub-after-upgrade fixtures/replay/blobs 100000
-```
+fixture's blobs byte for byte and the same artifact JSON. Runtime blobs barely shrink:
+`:code` is already zstd-compressed by the SDK (`sp-maybe-compressed-blob`, magic
+`52bc537646db8e05`), and `zstd -19` on top changes it by a few dozen bytes.
 
 ## Child trie fixture
 
