@@ -708,7 +708,7 @@ fn follow(args: FollowArgs) -> Result<()> {
     let show_status = |entries: &BTreeMap<String, Entry>,
                        totals: &Totals,
                        status: &mut (String, Option<Instant>)| {
-        let (key, line) = status_line(entries, totals, &shared, otlp);
+        let (key, line) = status_line(entries, totals, &shared, otlp, session.memory_cache());
         if key != status.0 || status.1.is_none_or(|at| at.elapsed() >= HEARTBEAT) {
             say!("{line} up={}", duration_text(started.elapsed()));
             *status = (key, Some(Instant::now()));
@@ -955,6 +955,7 @@ fn status_line(
     totals: &Totals,
     shared: &Shared,
     otlp: bool,
+    memory: frame_trace_replay::MemoryCacheStats,
 ) -> (String, String) {
     let count = |state| entries.values().filter(|e| e.state == state).count();
     let problems = format!(
@@ -984,7 +985,16 @@ fn status_line(
         // Drops have their own line, at most once a minute, so they do not trigger this one.
         key += &format!(" {} {}", state.rejected, state.failed);
     }
-    (key, format!("{line} {problems}"))
+    // Downloaded state kept in memory for all workers: its size, and how often it had the
+    // piece a replay needed. Not part of the key: it changes with every block.
+    let lookups = memory.hits + memory.misses;
+    let share = (memory.hits * 100).checked_div(lookups).unwrap_or(0);
+    let memory = format!(
+        "state-memory={}MiB state-pieces={} state-from-memory={share}%",
+        memory.bytes.div_ceil(1024 * 1024),
+        memory.entries
+    );
+    (key, format!("{line} {problems} {memory}"))
 }
 
 // One shared deadline bounds shutdown even when a CPU replay or export ignores cancellation.
@@ -1173,6 +1183,49 @@ mod tests {
             hash: format!("0x{number}"),
             spans: frame_trace_otel::prepare(&block, Timing::default()),
         }
+    }
+    #[test]
+    fn status_line_shows_state_in_memory_without_reprinting_for_it() {
+        let shared = Shared::default();
+        let memory = |bytes, hits| frame_trace_replay::MemoryCacheStats {
+            bytes,
+            budget: 128 << 20,
+            entries: 1234,
+            hits,
+            misses: 10,
+            evicted: 0,
+        };
+        let (key, line) = status_line(
+            &BTreeMap::new(),
+            &Totals::default(),
+            &shared,
+            false,
+            memory(5 * 1024 * 1024 + 1, 30),
+        );
+        assert!(
+            line.ends_with("reverted=0 state-memory=6MiB state-pieces=1234 state-from-memory=75%"),
+            "{line}"
+        );
+        // Memory changes with every block: it is not a reason to print the line again.
+        let (again, _) = status_line(
+            &BTreeMap::new(),
+            &Totals::default(),
+            &shared,
+            false,
+            memory(9 << 20, 90),
+        );
+        assert_eq!(key, again);
+        let (_, empty) = status_line(
+            &BTreeMap::new(),
+            &Totals::default(),
+            &shared,
+            false,
+            frame_trace_replay::MemoryCacheStats::default(),
+        );
+        assert!(
+            empty.ends_with("state-memory=0MiB state-pieces=0 state-from-memory=0%"),
+            "{empty}"
+        );
     }
     #[test]
     fn export_queue_keeps_the_newest_traces_and_counts_drops() {
