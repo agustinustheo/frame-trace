@@ -584,6 +584,74 @@ fn stalled_websocket_handshake_has_deadline_and_can_be_cancelled() {
     }
 }
 
+/// Writes fail part-way when files may not grow past 20 or 40 KiB (`ulimit -f 40`), so this
+/// runs itself again in a shell with that limit and `SIGXFSZ` ignored.
+#[test]
+fn disk_cache_write_failures_are_cut_back_counted_and_warned_once() {
+    use std::os::unix::fs::MetadataExt;
+    const CHILD: &str = "FRAME_TRACE_WRITE_FAILURE_CHILD";
+    if let Some(dir) = std::env::var_os(CHILD) {
+        let dir = std::path::PathBuf::from(dir);
+        let session = ReplaySession::with_cache_max_bytes(Some(&dir), 1 << 20).unwrap();
+        let disk = session.disk.clone().unwrap();
+        disk.wait_loaded();
+        for block in 0u32..40 {
+            let db = ProofDb::with_session(None, H256::zero(), session.clone());
+            db.insert_nodes(
+                (block * 20..block * 20 + 20)
+                    .map(|i| [i.to_le_bytes().as_slice(), &[7; 1000]].concat()),
+            );
+            db.persist().unwrap();
+        }
+        let (mut real, mut files) = (0, 0);
+        for entry in std::fs::read_dir(dir.join("proof-nodes")).unwrap() {
+            real += entry.unwrap().metadata().unwrap().blocks() * 512 + 4096;
+            files += 1;
+        }
+        println!(
+            "child: total {} real {real} files {files} segments {}",
+            disk.total(),
+            disk.segment_count()
+        );
+        assert!(
+            real <= disk.total(),
+            "{real} on disk, {} counted",
+            disk.total()
+        );
+        assert_eq!(files, disk.segment_count());
+        return;
+    }
+    let dir =
+        std::env::temp_dir().join(format!("frame-trace-write-failure-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let out = std::process::Command::new("/bin/sh")
+        .args(["-c", "trap '' XFSZ; ulimit -f 40; exec \"$0\" \"$@\""])
+        .arg(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "tests::disk_cache_write_failures_are_cut_back_counted_and_warned_once",
+            "--nocapture",
+            "--test-threads=1",
+        ])
+        .env(CHILD, &dir)
+        .output()
+        .unwrap();
+    let (stdout, stderr) = (
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr),
+    );
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert!(
+        out.status.success() && stdout.contains("child: total"),
+        "{stdout}{stderr}"
+    );
+    assert_eq!(
+        stderr.matches("warning: disk cache: cannot write:").count(),
+        1,
+        "{stderr}"
+    );
+}
+
 #[test]
 fn persistent_node_cache_reuses_and_heals_corrupt_nodes() {
     use sp_state_machine::TrieBackendStorage;
