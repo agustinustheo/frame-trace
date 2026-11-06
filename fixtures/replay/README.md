@@ -164,7 +164,7 @@ in its latest 200 blocks.
 ### How it was recorded
 
 On 2026-11-06 that endpoint took about 35 seconds to return the proof of `:code`
-(5,128,826 hex characters, measured once). `--rpc-timeout` (default 7.5 seconds) is the
+(5,128,826 hex characters, measured once). `--rpc-timeout` (then 7.5 seconds by default, now 30) is the
 wait for one try; a request gets four tries, so its overall deadline is four times that.
 With the default, the run failed with `state_getReadProof: overall request deadline
 exceeded`. With `--rpc-timeout 120`, each try waits up to 120 seconds and the run passed.

@@ -227,7 +227,7 @@ struct FollowArgs {
     #[arg(long, default_value_t = 16, value_parser = clap::value_parser!(u8).range(1..=64))]
     proof_concurrency: u8,
     /// Longest wait in seconds for one RPC response; each request gets four tries.
-    #[arg(long, value_name = "SECONDS", default_value = "7.5", value_parser = source::rpc_timeout)]
+    #[arg(long, value_name = "SECONDS", default_value = "30", value_parser = source::rpc_timeout)]
     rpc_timeout: std::time::Duration,
     /// Persistent proof-node and compiled Wasm cache directory.
     #[arg(long, value_name = "DIR")]
@@ -274,7 +274,7 @@ mod argument_tests {
         };
         assert_eq!(args.workers, 8);
         assert_eq!(args.proof_concurrency, 16);
-        assert_eq!(args.rpc_timeout, std::time::Duration::from_millis(7500));
+        assert_eq!(args.rpc_timeout, std::time::Duration::from_secs(30));
         for workers in ["1", "4", "16"] {
             assert!(
                 Cli::try_parse_from([

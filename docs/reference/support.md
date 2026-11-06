@@ -68,10 +68,12 @@ If one does not, open an issue with the chain, the block number and the error.
 
 ## Slow nodes
 
-Some nodes take longer to answer one request than `--rpc-timeout` allows by default.
-The replay then fails with `overall request deadline exceeded`.
-Raise `--rpc-timeout`, see [defaults and limits](commands.md#block).
-Dwellir's Paseo Asset Hub endpoint, `wss://asset-hub-paseo-rpc.n.dwellir.com`, needed `--rpc-timeout 120`.
+Public nodes can take tens of seconds to send the largest answer, the proof of the runtime code.
+The public Westend nodes took 7 to 20 seconds.
+Dwellir's Paseo Asset Hub endpoint, `wss://asset-hub-paseo-rpc.n.dwellir.com`, took 25 to 35 seconds.
+When one try takes longer than `--rpc-timeout` allows, the replay fails with `overall request deadline exceeded`.
+Raise `--rpc-timeout` for that node, see [defaults and limits](commands.md#block).
+The Dwellir node passed with `--rpc-timeout 120`.
 See [Troubleshooting](../troubleshooting.md#overall-request-deadline-exceeded) for that run.
 
 ## Versioning
