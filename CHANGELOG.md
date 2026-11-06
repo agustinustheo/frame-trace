@@ -28,6 +28,7 @@ First release.
 
 ### Changed
 
+- For anyone running builds from `main`: `--cache-dir` keeps fetched state in a few files of up to 64 MiB, not one file per piece of state. `--cache-max-bytes` now counts the space used on disk, so the cache stays within it. A long `follow` no longer slows down as the cache grows, and starts at once with a full cache. The old `nodes` folder is deleted in the background.
 - For anyone running builds from `main`: `follow` prints its status line when a problem count changes, and otherwise at a fixed interval. The status and summary lines have new fields: `done` is replaced by `traced` and `exported`, and there are export, `poll-failures` and `up` counts.
 
 [0.1.0]: https://github.com/agustinustheo/frame-trace/releases/tag/v0.1.0

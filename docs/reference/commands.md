@@ -52,6 +52,13 @@ Flags that do not apply to the chosen source are refused, with exit code 2: `--b
 
 Without `--cache-dir`, compiled runtimes are still kept in `$XDG_CACHE_HOME/frame-trace/wasm` (or `~/.cache/frame-trace/wasm`), and fetched state stays in memory only.
 
+`--cache-max-bytes` counts the space the cache takes on disk, fetched state and compiled runtimes together.
+Fetched state is kept in files of about 64 MiB, or a sixteenth of a smaller limit. The default limit means at most 17 files.
+When the cache is full, the oldest file is deleted first. State that a recent block read again is kept.
+
+A cache directory from an earlier version has a `nodes` folder with one file per piece of state.
+frame-trace deletes it in the background and logs `cache: removing <dir>/nodes, left by an older frame-trace`.
+
 ## summary
 
 ```sh
