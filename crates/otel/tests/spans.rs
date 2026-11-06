@@ -506,6 +506,31 @@ fn a_rejection_message_belongs_to_the_trace_it_came_with() {
 }
 
 #[test]
+fn an_awaited_export_does_not_block_its_runtime_thread() {
+    use std::io::Write;
+    // The receiver answers after 2 s; the caller's own 50 ms timeout must still fire on time.
+    let url = raw_receiver(|_, stream| {
+        std::thread::sleep(Duration::from_secs(2));
+        let _ =
+            stream.write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 0\r\nconnection: close\r\n\r\n");
+    });
+    let exporter =
+        frame_trace_otel::otlp_http_exporter_with_timeout(&url, Duration::from_secs(5)).unwrap();
+    let spans = export(&synthetic_block(10), Timing::default());
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    let start = std::time::Instant::now();
+    let result = runtime.block_on(async {
+        tokio::time::timeout(Duration::from_millis(50), exporter.export(spans)).await
+    });
+    let took = start.elapsed();
+    assert!(result.is_err(), "the caller's timeout fired");
+    assert!(took < Duration::from_millis(300), "{took:?}");
+}
+
+#[test]
 fn senders_and_exporters_work_inside_an_async_runtime() {
     let (url, seen) = scripted_receiver(Vec::new());
     let runtime = tokio::runtime::Builder::new_current_thread()

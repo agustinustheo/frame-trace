@@ -155,7 +155,7 @@ struct CheckedClient {
 struct Job {
     request: reqwest::Request,
     deadline: Instant,
-    answer: std::sync::mpsc::SyncSender<Result<Response<Bytes>, HttpError>>,
+    answer: tokio::sync::oneshot::Sender<Result<Response<Bytes>, HttpError>>,
 }
 
 /// Largest response body read from the receiver.
@@ -247,7 +247,7 @@ impl CheckedClient {
         if left.is_zero() {
             return Err("export deadline exceeded".into());
         }
-        let (answer, answered) = std::sync::mpsc::sync_channel(1);
+        let (answer, mut answered) = tokio::sync::oneshot::channel();
         self.jobs
             .send(Job {
                 request: reqwest::Request::try_from(request)?,
@@ -255,17 +255,74 @@ impl CheckedClient {
                 answer,
             })
             .map_err(|_| "OTLP transport thread stopped")?;
-        // The caller's own clock ends the wait, even if the transport thread is stuck. Like
-        // the upstream blocking client, this blocks the calling thread for at most `left`.
-        match answered.recv_timeout(left) {
-            Ok(result) => result,
-            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-                Err("export deadline exceeded".into())
+        // Waits without blocking the caller's thread, on any executor. The deadline ends the
+        // wait even if the transport thread is stuck.
+        let mut timer = Deadline::new(left);
+        std::future::poll_fn(|cx| {
+            use std::{future::Future, pin::Pin, task::Poll};
+            if let Poll::Ready(result) = Pin::new(&mut answered).poll(cx) {
+                return Poll::Ready(
+                    result.unwrap_or_else(|_| Err("OTLP transport thread stopped".into())),
+                );
             }
-            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
-                Err("OTLP transport thread stopped".into())
+            match Pin::new(&mut timer).poll(cx) {
+                Poll::Ready(()) => Poll::Ready(Err("export deadline exceeded".into())),
+                Poll::Pending => Poll::Pending,
             }
+        })
+        .await
+    }
+}
+
+/// A future that completes after a delay, on any executor: a helper thread wakes it, so it
+/// needs no runtime timer. Dropping it ends the thread at once.
+struct Deadline {
+    state: Arc<Mutex<(bool, Option<std::task::Waker>)>>,
+    // Dropped with the future, which wakes the helper thread so it exits.
+    _stop: std::sync::mpsc::Sender<()>,
+}
+
+impl Deadline {
+    fn new(after: Duration) -> Self {
+        let state = Arc::new(Mutex::new((false, None::<std::task::Waker>)));
+        let (stop, stopped) = std::sync::mpsc::channel::<()>();
+        let shared = state.clone();
+        let fire = move || {
+            let waker = {
+                let mut state = shared.lock().unwrap_or_else(PoisonError::into_inner);
+                state.0 = true;
+                state.1.take()
+            };
+            if let Some(waker) = waker {
+                waker.wake();
+            }
+        };
+        // If the helper thread cannot start, the transport's own timeout still answers by the
+        // deadline.
+        let _ = std::thread::Builder::new()
+            .name("otlp-deadline".into())
+            .spawn(move || {
+                if let Err(std::sync::mpsc::RecvTimeoutError::Timeout) = stopped.recv_timeout(after)
+                {
+                    fire();
+                }
+            });
+        Self { state, _stop: stop }
+    }
+}
+
+impl std::future::Future for Deadline {
+    type Output = ();
+    fn poll(
+        self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<()> {
+        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
+        if state.0 {
+            return std::task::Poll::Ready(());
         }
+        state.1 = Some(cx.waker().clone());
+        std::task::Poll::Pending
     }
 }
 
