@@ -1,0 +1,100 @@
+name: Build release archives
+
+# Builds and packages frame-trace for each target. release.yml and nightly.yml
+# both call this workflow, so stable and nightly archives are built the same way.
+# Each archive is uploaded as the artifact frame-trace-<target>.
+
+on:
+  workflow_call:
+    inputs:
+      ref:
+        description: Commit to build
+        required: true
+        type: string
+      package-version:
+        description: Version in the archive names, such as 0.1.0 or nightly
+        required: true
+        type: string
+      build-version:
+        description: Version that --version prints; empty for the crate version
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # ubuntu-22.04 links against an older glibc, so the binary runs on more systems.
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-22.04
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-22.04-arm
+          - target: aarch64-apple-darwin
+            os: macos-15
+          - target: x86_64-apple-darwin
+            os: macos-15-intel
+    env:
+      TARGET: ${{ matrix.target }}
+      PACKAGE_VERSION: ${{ inputs.package-version }}
+      BUILD_VERSION: ${{ inputs.build-version }}
+    steps:
+      - name: Checkout commit
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Use the runner temp directory
+        run: echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
+
+      - name: Install Rust 1.93.0
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.93.0
+          targets: ${{ matrix.target }}
+
+      # No build cache here: release binaries are built from a clean state.
+      # FRAME_TRACE_BUILD_VERSION is set only for nightly builds.
+      - name: Build frame-trace
+        run: |
+          if [ -n "$BUILD_VERSION" ]; then
+            export FRAME_TRACE_BUILD_VERSION="$BUILD_VERSION"
+          fi
+          cargo +1.93.0 build --release --locked -p frame-trace --target "$TARGET"
+
+      - name: Check the binary runs
+        run: |
+          bin="target/$TARGET/release/frame-trace"
+          printed=$("$bin" --version)
+          expected="frame-trace ${BUILD_VERSION:-$PACKAGE_VERSION}"
+          echo "$printed"
+          if [ "$printed" != "$expected" ]; then
+            echo "::error::--version printed '$printed', expected '$expected'"
+            exit 1
+          fi
+          "$bin" block --offline fixtures/replay/people-transfer
+
+      - name: Package
+        run: |
+          name="frame-trace-$PACKAGE_VERSION-$TARGET"
+          mkdir -p "dist/$name"
+          cp "target/$TARGET/release/frame-trace" README.md LICENSE "dist/$name/"
+          tar -C dist -czf "dist/$name.tar.gz" "$name"
+
+      - name: Upload package
+        uses: actions/upload-artifact@v7
+        with:
+          name: frame-trace-${{ matrix.target }}
+          path: dist/*.tar.gz
+          if-no-files-found: error
