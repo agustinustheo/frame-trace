@@ -263,10 +263,67 @@ The first run also compiles the runtime.
 
 **Fix.**
 
-- Add `--cache-dir <dir>`. Later blocks and runs reuse fetched state. In [Analyse many blocks](guides/analyse-many-blocks.md), RPC calls per block dropped from 85 to about 40.
+- Add `--cache-dir <dir>`. Later blocks and runs reuse the state earlier ones downloaded. In [Analyse many blocks](guides/analyse-many-blocks.md), RPC calls per block dropped from 85 to about 40.
 - Compiled runtimes are kept in `~/.cache/frame-trace/wasm` even without `--cache-dir`.
 - Raise `--proof-concurrency` on a fast connection. See [defaults and limits](reference/commands.md).
 - Use a node close to you, or your own node.
+
+## `disk cache: removing <dir>/nodes, left by an older frame-trace`
+
+```text
+disk cache: removing .frame-trace-cache/nodes, left by an older frame-trace; the disk cache is now in .frame-trace-cache/proof-nodes
+disk cache: kept .frame-trace-cache/nodes: it holds files frame-trace did not write
+```
+
+**What it means.** Earlier versions kept the [disk cache](reference/commands.md#disk-cache) as one file per piece of state.
+A long `follow` could leave a million files there, using several GiB.
+frame-trace now keeps it in a few large files. It deletes the files it wrote in `nodes` in the background, and keeps anything else.
+The second line appears only when something else is in the folder.
+
+**Fix.** Nothing to do. If frame-trace stops first, the next run carries on. If you see the second line, look at what is left in `<dir>/nodes` and delete it yourself if you do not need it.
+
+## `warning: disk cache: cannot write: …`
+
+```text
+warning: disk cache: cannot write: Permission denied (os error 13)
+```
+
+**What it means.** frame-trace could not write to the disk cache, for example because the disk is full or the directory is read-only.
+The trace is not affected. Later blocks download that state from the node again.
+This line is logged once per run.
+
+**Fix.** Free some disk space, or point `--cache-dir` at a directory you can write to.
+
+## `warning: disk cache: <dir>/proof-nodes: …; running without it`
+
+```text
+warning: disk cache: blocked/proof-nodes: File exists (os error 17); running without it
+```
+
+**What it means.** frame-trace could not create or open the folder for downloaded state, here because a file has that name.
+It runs without keeping state on disk. Traces are not affected, but each block asks the node for everything.
+
+**Fix.** Remove what is in the way, or point `--cache-dir` at another directory.
+
+## `warning: disk cache: <dir>/wasm: …; runtimes are compiled again each run`
+
+```text
+warning: disk cache: nowasm/wasm: File exists (os error 17); runtimes are compiled again each run
+```
+
+**What it means.** frame-trace could not create the folder for compiled runtimes. Each run compiles the runtime again, which can take a few seconds per block's first replay.
+
+**Fix.** Remove what is in the way, or point `--cache-dir` at another directory.
+
+## `warning: disk cache: skipping <file>: …`
+
+```text
+warning: disk cache: skipping ro/proof-nodes/0000000000.seg: Permission denied (os error 13)
+```
+
+**What it means.** One file of the disk cache could not be opened. frame-trace leaves it alone and does not count it towards `--cache-max-bytes`.
+
+**Fix.** Give your user read and write access to the file, or delete it.
 
 ## `failed to lookup address information`
 

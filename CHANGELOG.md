@@ -28,6 +28,7 @@ First release.
 
 ### Changed
 
+- For anyone running builds from `main`: the disk cache of `--cache-dir` keeps downloaded state in a few files of up to 64 MiB, not one file per piece. `--cache-max-bytes` now counts bytes used on disk, by state and compiled runtimes together. A runtime in use larger than the limit, runtimes compiled since the last check, the old `nodes` folder until it is deleted, and another frame-trace on the same directory can take it over the limit; see [Disk cache](https://agustinustheodorus.com/frame-trace/reference/commands.html#disk-cache). A long `follow` no longer slows down as the disk cache grows, and starts at once with a full one. The files the old version wrote in `nodes` are deleted in the background.
 - For anyone running builds from `main`: `follow` prints its status line when a problem count changes, and otherwise at a fixed interval. The status and summary lines have new fields: `done` is replaced by `traced` and `exported`, and there are export, `poll-failures` and `up` counts.
 
 [0.1.0]: https://github.com/agustinustheo/frame-trace/releases/tag/v0.1.0

@@ -95,7 +95,7 @@ Saved files need no network.
 | `--sort-by proof\|ops\|time` | Rank items, extrinsics and hooks by proof bytes, operations or storage time. |
 | `--concurrency N` | Blocks replayed at once, 1 to 4. |
 | `--proof-concurrency N` | RPC requests at once, shared by all blocks. |
-| `--cache-dir DIR` | Keep fetched state and compiled runtimes between blocks and runs. |
+| `--cache-dir DIR` | Keep a [disk cache](../reference/commands.md#disk-cache) of downloaded state and compiled runtimes between blocks and runs. |
 | `--json FILE` | Write the full report as JSON. `-` writes it to stdout and the tables to stderr. |
 
 ## When a block fails

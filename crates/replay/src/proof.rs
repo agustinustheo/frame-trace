@@ -223,32 +223,9 @@ impl ProofDb {
             self.nodes.lock().insert(*hash, node.clone());
             return Ok(Some(node.to_vec()));
         }
-        if let Some(dir) = &self.session.node_dir {
-            let path = dir.join(format!("{hash:x}"));
-            match std::fs::File::open(&path) {
-                Ok(file) => {
-                    use std::io::Read;
-                    let mut node = Vec::new();
-                    file.take(16 * 1024 * 1024 + 1)
-                        .read_to_end(&mut node)
-                        .map_err(|e| format!("{}: {e}", path.display()))?;
-                    if node.len() > 16 * 1024 * 1024
-                        || H256::from(sp_io::hashing::blake2_256(&node)) != *hash
-                    {
-                        // Content-addressed disk caches are disposable. Heal corrupt files.
-                        match std::fs::remove_file(&path) {
-                            Ok(()) => {}
-                            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-                            Err(e) => return Err(format!("{}: {e}", path.display())),
-                        }
-                        return Ok(None);
-                    }
-                    self.insert_nodes([node.clone()]);
-                    return Ok(Some(node));
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-                Err(e) => return Err(format!("{}: {e}", path.display())),
-            }
+        if let Some(node) = self.session.disk.as_ref().and_then(|disk| disk.get(hash)) {
+            self.insert_nodes([node.clone()]);
+            return Ok(Some(node));
         }
         Ok(None)
     }
@@ -315,27 +292,18 @@ impl ProofDb {
         if self.rpc.is_some() {
             self.session.remember_paths(self.observed.lock().clone());
         }
-        if let Some(dir) = &self.session.node_dir {
-            for (hash, node) in self.nodes.lock().iter() {
-                let path = dir.join(format!("{hash:x}"));
-                if std::fs::metadata(&path).is_ok_and(|meta| meta.len() == node.len() as u64)
-                    && let Ok(bytes) = std::fs::read(&path)
-                    && H256::from(sp_io::hashing::blake2_256(&bytes)) == *hash
-                {
-                    continue;
-                }
-                static NEXT: std::sync::atomic::AtomicUsize =
-                    std::sync::atomic::AtomicUsize::new(0);
-                let temporary = dir.join(format!(
-                    ".{hash:x}.{}.{}.tmp",
-                    std::process::id(),
-                    NEXT.fetch_add(1, Ordering::Relaxed)
-                ));
-                std::fs::write(&temporary, node.as_ref())
-                    .map_err(|e| Error::Invalid(format!("{}: {e}", temporary.display())))?;
-                std::fs::rename(&temporary, &path)
-                    .map_err(|e| Error::Invalid(format!("{}: {e}", path.display())))?;
-                self.session.index_write(path, node.len() as u64);
+        if let Some(disk) = &self.session.disk {
+            let nodes: Vec<_> = self
+                .nodes
+                .lock()
+                .iter()
+                .map(|(h, n)| (*h, n.clone()))
+                .collect();
+            // The cache is disposable: a failed write costs a later fetch, never this block.
+            if let Err(e) = disk.append(nodes.iter().map(|(h, n)| (h, n.as_ref())))
+                && !self.session.warned_write.swap(true, Ordering::Relaxed)
+            {
+                note!("warning: disk cache: cannot write: {e}");
             }
         }
         Ok(())

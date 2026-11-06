@@ -715,3 +715,92 @@ The final logs are `/tmp/ft-perf/fmt-final.log`, `clippy-final.log`,
 `tests-final.log` and `mdbook-final.log`. A separate log check confirmed **239**
 completed benchmark replays with matching roots, `PASS`, zero timed RPC, and
 successful client exit across the seven tabulated windows.
+
+## Disk cache as segment files (2026-11-06)
+
+`--cache-dir` used to write one file per proof node and re-list `nodes/` on every
+replay under a lock that every node write also took. Proof nodes now go to
+`proof-nodes/<id>.seg` files (records `[hash][len][bytes]`, up to 64 MiB or a
+sixteenth of the cap), evicted whole and oldest first. Totals are kept in memory
+and count 4 KiB blocks plus one block per file. The index has a 16-byte entry
+per node; with the table's spare buckets and control bytes that is about 34 B
+per node at 1M nodes. It loads in a background thread.
+
+Synthetic cache of 1M nodes of 200 bytes, `bench_disk_cache_1m_nodes` (ignored
+test, release, macOS, warm page cache). Before is the same harness on e826363.
+
+| | before | after |
+| --- | --- | --- |
+| disk used (`du -sk`) | 4,004,000 KiB, 1M files | 230,712 KiB, 5 files |
+| startup (`with_cache_max_bytes`) | 101 s | 0.3–0.7 ms; index ready after 26–226 ms |
+| index RSS | 346 MiB (~360 B/node) | 37–38 MiB (~40 B/node) |
+| node write per replay (50 new nodes) | 14.3 ms median | 2–3 µs median |
+| maintenance per replay | 184 ms median, 355 ms max | < 1 µs median, 0.12 ms max |
+| evicting one 64 MiB segment | — | 10.7 ms (284k index entries) |
+
+The debug build of the before harness took 11.0 s median and 61.6 s max per
+maintenance call.
+
+Real run: `follow --rpc wss://westend-asset-hub-rpc.polkadot.io --cache-dir
+/tmp/ft-dc-cache`, release, 8 workers, fresh cache, 25 minutes:
+
+| minute | blocks traced in window | median replay | cache files | `du -sk` | RSS |
+| --- | --- | --- | --- | --- | --- |
+| 5 | 145 | 6.62 s | 4 | 37,228 KiB | 732 MiB |
+| 10 | 150 | 6.42 s | 4 | 43,372 KiB | 763 MiB |
+| 15 | 150 | 6.37 s | 4 | 48,492 KiB | 780 MiB |
+| 20 | 150 | 6.32 s | 4 | 53,612 KiB | 684 MiB |
+| 25 | 76 | 6.31 s | 4 | 57,708 KiB | 763 MiB |
+
+Files are one segment plus the Wasm cache. The last window is short because
+block #19041491 needed 400 RPC calls and took 95 s, and the queue backed up
+behind it; the median replay time did not rise. 671 traced, 2 skipped, no root
+failures. Ctrl-C stopped it in 0.35 s. A restart on the same cache stopped 0.07 s
+after a SIGHUP sent 1 s in. With `--rpc http://127.0.0.1:9`, SIGHUP after 45 s
+stopped it in 0.06 s on this cache, 0.15 s on the 1M-node segment cache, and
+0.16 s on the 1M-file old layout (e826363 took 52–97 s there). The old `nodes/`
+folder is deleted in the background at about 4,000 files per second; an exit
+interrupts it and the next run continues.
+
+### Review fixes (2026-11-06)
+
+The first version undercounted failed writes and undeleted files, let one batch
+outgrow a segment, and could delete a runtime pinned during maintenance; see the
+commits after ff26bd9. One fix round bug was caught by the benchmark: eviction
+kept files waiting for deletion in its total and emptied the whole cache.
+`disk_usage_and_file_count_stay_within_the_cap` now checks that most of the cap
+stays in use.
+
+`index_bytes` now counts buckets (a power of two above capacity × 8/7) times 17
+bytes, not capacity × 17, so the table figure above (29 MiB) was low. Same
+benchmark, after the fixes, release, fresh process on the filled directory:
+
+| | after the fixes |
+| --- | --- |
+| startup | 0.10–0.31 ms; index ready after 16–38 ms |
+| index RSS at 1,001,000 nodes | 35–36 MiB (table 34 MiB, about 36 B/node) |
+| writing 50 new nodes per replay | 5–18 µs median, 71–190 µs max |
+| maintenance per replay | 0.17–0.6 µs median, 31–76 µs max |
+| evicting one 64 MiB segment | 5.1 ms (284,359 index entries) |
+
+The lock is held for the index lookups, for the writes themselves (to keep
+offsets in order), for creating one file per segment, and for the index walk at
+eviction. Batches are built outside it.
+
+Real run after the fixes, same command, on the disk cache left by the first run
+(one 31.8 MB state file), release, 8 workers, 12 minutes:
+
+| minute | blocks traced | files | `du -sk` | RSS |
+| --- | --- | --- | --- | --- |
+| 0 | 0 | 4 | 61,804 KiB | — |
+| 2 | 54 | 4 | 63,852 KiB | 560 MiB |
+| 4 | 115 | 4 | 66,924 KiB | 588 MiB |
+| 6 | 175 | 4 | 68,972 KiB | 606 MiB |
+| 8 | 232 | 4 | 71,020 KiB | 617 MiB |
+| 10 | 292 | 4 | 73,068 KiB | 618 MiB |
+| 12 | 344 | 4 | 75,116 KiB | 636 MiB |
+
+The run continued the existing state file (31.8 MB to 49.7 MB) instead of
+opening a new one. 344 traced, 0 skipped, no root failures. Ctrl-C stopped it
+in 0.20 s; a restart on the same disk cache stopped 0.04 s after a SIGHUP sent
+1 s in.
