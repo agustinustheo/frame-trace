@@ -180,6 +180,7 @@ Read its log with `journalctl -u frame-trace-follow -f`.
 
 - `TimeoutStopSec=45` leaves time for the replay and export waits at stop.
 - `Restart=on-failure` restarts `follow` after exit code 1, for example when its threads stop.
+  `follow` also exits 1 when it can no longer write its log, for example after journald restarts, so the restart gives it a working log again.
   A stop by `SIGTERM` or `SIGHUP` exits 0, so the service stays stopped.
 - `StartLimitBurst=5` within `StartLimitIntervalSec=300` gives up after five failed starts in five minutes, for example with a wrong URL.
 

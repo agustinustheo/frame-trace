@@ -70,15 +70,8 @@ impl Queue {
         self.state.lock().unwrap_or_else(PoisonError::into_inner)
     }
     /// Queues a line without waiting for the writer.
-    pub fn push(&self, mut text: String, kind: Kind) {
-        if text.len() > MAX_LINE_BYTES {
-            let mut cut = MAX_LINE_BYTES;
-            while !text.is_char_boundary(cut) {
-                cut -= 1;
-            }
-            text.truncate(cut);
-            text.push_str(" [cut]");
-        }
+    pub fn push(&self, text: String, kind: Kind) {
+        let text = cut(text);
         let mut state = self.lock();
         if state.closed {
             state.total_dropped += 1;
@@ -91,8 +84,29 @@ impl Queue {
             last.repeats += 1;
             return;
         }
-        while state.lines.len() >= self.max_lines || state.bytes + text.len() > self.max_bytes {
-            // The oldest line of the least important kind that is not more important than this.
+        if self.make_room(&mut state, text.len(), kind) {
+            self.append(&mut state, text, kind);
+        }
+    }
+    /// Queues the line `make` builds from the total of dropped lines, taken after making room
+    /// for it, so the count includes what this line pushed out.
+    pub fn push_counted(&self, kind: Kind, make: impl Fn(u64) -> String) {
+        let mut state = self.lock();
+        if state.closed {
+            state.total_dropped += 1;
+            return;
+        }
+        // The longest the line can be: the count has at most as many digits as u64::MAX.
+        let longest = cut(make(u64::MAX)).len();
+        if self.make_room(&mut state, longest, kind) {
+            let text = cut(make(state.total_dropped));
+            self.append(&mut state, text, kind);
+        }
+    }
+    /// Drops the oldest lines of the least important kind, never more important than `kind`,
+    /// until a line of `len` bytes fits. Returns false, counting it as dropped, if it cannot.
+    fn make_room(&self, state: &mut State, len: usize, kind: Kind) -> bool {
+        while state.lines.len() >= self.max_lines || state.bytes + len > self.max_bytes {
             let victim = state
                 .lines
                 .iter()
@@ -103,12 +117,15 @@ impl Queue {
             let Some(victim) = victim.and_then(|at| state.lines.remove(at)) else {
                 state.dropped += 1;
                 state.total_dropped += 1;
-                return;
+                return false;
             };
             state.bytes -= victim.text.len();
             state.dropped += 1 + victim.repeats;
             state.total_dropped += 1 + victim.repeats;
         }
+        true
+    }
+    fn append(&self, state: &mut State, text: String, kind: Kind) {
         state.bytes += text.len();
         state.lines.push_back(Line {
             text,
@@ -149,6 +166,7 @@ impl Queue {
         let state = self.lock();
         state.lines.is_empty() && !state.writing
     }
+    #[cfg(test)]
     fn total_dropped(&self) -> u64 {
         self.lock().total_dropped
     }
@@ -175,6 +193,23 @@ impl Queue {
             self.written();
         }
     }
+}
+
+/// A line of at most [`MAX_LINE_BYTES`], marker included, in a fresh allocation: the queue
+/// counts bytes by length, so a cut line must not keep its original capacity.
+fn cut(text: String) -> String {
+    const MARKER: &str = " [cut]";
+    if text.len() <= MAX_LINE_BYTES {
+        return text;
+    }
+    let mut end = MAX_LINE_BYTES - MARKER.len();
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    let mut short = String::with_capacity(end + MARKER.len());
+    short.push_str(&text[..end]);
+    short.push_str(MARKER);
+    short
 }
 
 static QUEUE: OnceLock<Queue> = OnceLock::new();
@@ -204,9 +239,18 @@ pub fn line(text: String, kind: Kind) {
     }
 }
 
-/// Lines dropped so far, because the queue was full or stderr failed.
-pub fn dropped() -> u64 {
-    QUEUE.get().map_or(0, Queue::total_dropped)
+/// Logs the line `make` builds from the number of lines dropped so far, counted after this
+/// line has found its room.
+pub fn line_counted(kind: Kind, make: impl Fn(u64) -> String) {
+    match QUEUE.get() {
+        Some(queue) => queue.push_counted(kind, make),
+        None => eprintln!("{}", make(0)),
+    }
+}
+
+/// Whether writing to stderr has failed. The log is then closed for good.
+pub fn broken() -> bool {
+    QUEUE.get().is_some_and(|queue| queue.lock().closed)
 }
 
 /// Waits up to `timeout` for queued lines to be written.
@@ -298,6 +342,36 @@ mod tests {
     }
 
     #[test]
+    fn a_cut_line_keeps_neither_its_length_nor_its_capacity() {
+        let queue = Queue::new(MAX_LINES, MAX_BYTES);
+        let mut long = String::with_capacity(1 << 20);
+        long.push_str(&"é".repeat(MAX_LINE_BYTES));
+        queue.push(long, Kind::Failure);
+        let state = queue.lock();
+        let line = &state.lines[0];
+        assert!(line.text.ends_with(" [cut]"));
+        assert!(line.text.len() <= MAX_LINE_BYTES);
+        assert!(
+            line.text.capacity() <= MAX_LINE_BYTES,
+            "{}",
+            line.text.capacity()
+        );
+    }
+
+    #[test]
+    fn the_summary_counts_the_lines_its_own_room_cost() {
+        let queue = Queue::new(3, MAX_BYTES);
+        for n in 0..3 {
+            queue.push(format!("progress {n}"), Kind::Progress);
+        }
+        queue.push_counted(Kind::Final, |dropped| {
+            format!("summary log-dropped={dropped}")
+        });
+        let (_, lines) = drain(&queue);
+        assert_eq!(lines.last().unwrap(), "summary log-dropped=1");
+    }
+
+    #[test]
     fn a_failed_write_closes_the_log_and_counts_what_is_lost() {
         struct Broken;
         impl Write for Broken {
@@ -312,6 +386,7 @@ mod tests {
         queue.push("first".into(), Kind::Progress);
         queue.push("second".into(), Kind::Failure);
         queue.write_all(&mut Broken);
+        assert!(queue.lock().closed);
         queue.push("third".into(), Kind::Final);
         assert!(queue.idle(), "nothing is kept or being written");
         assert_eq!(queue.total_dropped(), 3);
