@@ -2,6 +2,7 @@
 
 use std::{
     path::{Path, PathBuf},
+    sync::{Arc, Mutex},
     time::Duration,
 };
 
@@ -130,7 +131,7 @@ pub fn override_info(
 /// A block trace and what is needed to decode it.
 pub struct Loaded {
     pub traced: frame_trace_model::TracedBlock,
-    pub metadata: Option<Metadata>,
+    pub metadata: Option<Arc<Metadata>>,
     pub block_number: Option<u64>,
     pub execution: Option<frame_trace_decode::ExecutionInfo>,
     pub runtime_override: Option<frame_trace_replay::RuntimeOverride>,
@@ -198,7 +199,7 @@ mod file {
         let trace_path = trace;
         let trace = frame_trace_model::rpc::parse_trace_block(&json)
             .with_context(|| format!("parsing {}", trace.display()))?;
-        let metadata = metadata.map(load_metadata).transpose()?;
+        let metadata = metadata.map(load_metadata).transpose()?.map(Arc::new);
         Ok(Loaded {
             traced: frame_trace_model::TracedBlock::from_trace(&trace)
                 .with_context(|| format!("converting trace from {}", trace_path.display()))?,
@@ -236,6 +237,27 @@ mod file {
 }
 
 /// Both block and summary consume the same faithful measured result.
+/// The decoded metadata of the last few runtimes. `follow` and `report` replay many blocks of
+/// one runtime: they decode its metadata once, not once per block.
+fn decoded(hex: &str) -> std::result::Result<Arc<Metadata>, frame_trace_decode::Error> {
+    static DECODED: Mutex<Vec<(String, Arc<Metadata>)>> = Mutex::new(Vec::new());
+    let found = DECODED
+        .lock()
+        .ok()
+        .and_then(|d| d.iter().find(|(h, _)| h == hex).map(|(_, m)| m.clone()));
+    if let Some(metadata) = found {
+        return Ok(metadata);
+    }
+    let metadata = Arc::new(Metadata::from_hex(hex)?);
+    if let Ok(mut decoded) = DECODED.lock() {
+        if decoded.len() >= 4 {
+            decoded.remove(0);
+        }
+        decoded.push((hex.to_owned(), metadata.clone()));
+    }
+    Ok(metadata)
+}
+
 pub fn replay_loaded(replay: frame_trace_replay::Replay, save: Option<&Path>) -> Result<Loaded> {
     say!(
         "root check: {}{}; RPC calls: {} (timed replay: {}); execution proof: {} bytes",
@@ -266,7 +288,7 @@ pub fn replay_loaded(replay: frame_trace_replay::Replay, save: Option<&Path>) ->
     let metadata = if replay.artifact.metadata.is_empty() {
         None
     } else {
-        match Metadata::from_hex(&replay.artifact.metadata) {
+        match decoded(&replay.artifact.metadata) {
             Ok(metadata) => Some(metadata),
             Err(error) => {
                 say!(
@@ -289,4 +311,25 @@ pub fn replay_loaded(replay: frame_trace_replay::Replay, save: Option<&Path>) ->
         }),
         runtime_override: replay.runtime_override,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn metadata_is_decoded_once_per_runtime() {
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/metadata/westend-v16.scale");
+        let bytes = std::fs::read(path).expect("fixture");
+        let hex: String = std::iter::once("0x".to_owned())
+            .chain(bytes.iter().map(|b| format!("{b:02x}")))
+            .collect();
+        let first = decoded(&hex).expect("decodes");
+        let second = decoded(&hex).expect("decodes");
+        assert!(Arc::ptr_eq(&first, &second));
+        assert!(decoded("0x00").is_err());
+        // Failures are not kept: the same text fails again, and the good entry stays.
+        assert!(decoded("0x00").is_err());
+        assert!(Arc::ptr_eq(&first, &decoded(&hex).expect("decodes")));
+    }
 }

@@ -11,7 +11,6 @@ use std::{
 /// Metadata dependencies are authenticated again at each new state root. Pure metadata
 /// exports have an empty dependency list and reuse solely by code hash.
 type MetadataRead = (Vec<u8>, Option<Vec<u8>>, Option<H256>);
-#[derive(Clone)]
 pub(crate) struct MetadataEntry {
     pub metadata: String,
     pub reads: Vec<MetadataRead>,
@@ -19,7 +18,8 @@ pub(crate) struct MetadataEntry {
     pub iteration_root: Option<H256>,
     pub proof_nodes: Vec<Vec<u8>>,
 }
-type MetadataCache = BTreeMap<H256, MetadataEntry>;
+/// Shared: a hit copies only the metadata text into the block's artifact.
+type MetadataCache = BTreeMap<H256, Arc<MetadataEntry>>;
 
 /// Keep one session across blocks. SDK compilation is keyed by authenticated code hash and heap settings.
 #[derive(Clone)]
