@@ -6,6 +6,8 @@ mod artifact;
 pub mod call;
 mod disk;
 mod metadata;
+mod nodes;
+pub use nodes::MemoryCacheStats;
 mod session;
 pub use session::ReplaySession;
 mod backend;
@@ -509,7 +511,7 @@ fn replay_inner(
         let mut hints = session.predicted_keys();
         hints.extend(storage_hints(&artifact.metadata));
         // Fetch missing full paths before even loading :code: its ancestor nodes change each block.
-        if session.nodes.lock().nodes.is_empty() {
+        if session.nodes.lock().is_empty() {
             hints.extend([b":code".to_vec(), b":heappages".to_vec()]);
         }
         db.prefetch(&hints.into_iter().take(4096).collect::<Vec<_>>())?;
