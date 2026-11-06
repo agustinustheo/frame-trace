@@ -294,6 +294,30 @@ This line is logged once per run.
 
 **Fix.** Free some disk space, or point `--cache-dir` at a directory you can write to.
 
+## `warning: disk cache: --cache-max-bytes <N> is less than the runtimes in use …`
+
+```text
+warning: disk cache: --cache-max-bytes 1048576 is less than the runtimes in use (26710016 bytes) plus 262144 bytes kept for downloaded state; the disk cache stays above the limit
+```
+
+**What it means.** The compiled runtime frame-trace is using, plus the space it always keeps for downloaded state, is larger than `--cache-max-bytes`.
+frame-trace keeps both, so the disk cache stays above the limit. See [Disk cache](reference/commands.md#disk-cache).
+
+**Fix.** Raise `--cache-max-bytes` above the size in the message plus the kept space. A compiled Westend Asset Hub runtime is about 26 MB.
+
+## `warning: disk cache: old files in <dir> cannot be deleted; not writing until they can`
+
+```text
+warning: disk cache: stuck/proof-nodes/0000000000.seg: Permission denied (os error 13)
+warning: disk cache: old files in stuck/proof-nodes cannot be deleted; not writing until they can
+```
+
+**What it means.** The disk cache is full, and frame-trace could not delete its oldest file. It still counts that file, and stops writing new state so the disk cache does not grow.
+Traces are not affected. Blocks ask the node for state the disk cache does not have.
+frame-trace tries again before each write, and writes again once the file is gone.
+
+**Fix.** Give your user permission to delete files in the folder named in the message.
+
 ## `warning: disk cache: <dir>/proof-nodes: …; running without it`
 
 ```text
