@@ -107,7 +107,7 @@ impl ReplaySession {
                 Ok(store) => Some(Arc::new(store)),
                 Err(e) => {
                     note!(
-                        "warning: disk cache: {}: {e}; running without a disk cache for fetched state",
+                        "warning: disk cache: {}: {e}; running without it",
                         dir.display()
                     );
                     None
@@ -653,6 +653,8 @@ mod disk_tests {
     }
     /// Cache maintenance at scale. Run with
     /// `FT_BENCH_DIR=<empty dir> cargo test --release -p frame-trace-replay --lib bench_disk_cache -- --ignored --nocapture`.
+    /// The first run fills the directory; measure memory on a second run, a fresh process.
+    /// `FT_BENCH_EVICT=1` also times dropping one segment, which deletes it.
     #[test]
     #[ignore]
     fn bench_disk_cache_1m_nodes() {
@@ -710,7 +712,9 @@ mod disk_tests {
         let (mut persist, mut maintenance) = (Vec::new(), Vec::new());
         for r in 0..20u64 {
             let db = crate::proof::ProofDb::with_session(None, H256::zero(), session.clone());
-            db.insert_nodes((0..50).map(|j| node(n + 1_000_000 + r * 50 + j)));
+            db.insert_nodes(
+                (0..50).map(|j| node(n + u64::from(std::process::id()) * 1000 + r * 50 + j)),
+            );
             let start = Instant::now();
             db.persist().expect("persist");
             persist.push(start.elapsed());
@@ -727,7 +731,11 @@ mod disk_tests {
             median(&mut persist),
             median(&mut maintenance)
         );
-        // The rare expensive step: dropping the oldest segment walks the index once.
+        // The rare expensive step: dropping the oldest segment walks the index once. It
+        // changes the cache, so it runs only when asked.
+        if std::env::var_os("FT_BENCH_EVICT").is_none() {
+            return;
+        }
         let (before, nodes) = (disk.total(), disk.node_count());
         let start = Instant::now();
         disk.set_budget(before - 1);

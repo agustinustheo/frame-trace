@@ -128,22 +128,27 @@ impl State {
         }
         self.segments[self.segments.len() / 2].id
     }
-    /// Drops oldest segments until the total fits the budget. Their files are deleted by
-    /// `NodeStore::delete_doomed`, outside the lock.
+    /// Drops oldest segments until the live segments fit the budget. Their files are deleted
+    /// by `NodeStore::delete_doomed`, outside the lock. Files still waiting for deletion stay
+    /// in `total` but do not make more segments go: a file that cannot be deleted must not
+    /// empty the cache.
     fn evict(&mut self) {
         let mut evicted = false;
-        while self.total > self.budget {
+        let mut doomed: u64 = self.doomed.iter().map(|d| d.bytes).sum();
+        while self.total - doomed > self.budget {
             let Some(segment) = self.segments.pop_front() else {
                 break;
             };
             if self.segments.is_empty() {
                 self.writable = false;
             }
+            let bytes = disk_size(segment.len);
             self.doomed.push(Doomed {
                 id: segment.id,
-                bytes: disk_size(segment.len),
+                bytes,
                 warned: false,
             });
+            doomed += bytes;
             evicted = true;
         }
         if !evicted {
@@ -819,6 +824,8 @@ mod tests {
         assert!(max_files <= 18, "{max_files} files");
         // The index holds at most one entry per record that fits in the cap.
         assert!(store.node_count() as u64 <= cap / (HEADER + 200));
+        // Eviction stops once the cache fits: most of the cap is still in use.
+        assert!(store.total() > cap / 2, "{} of {cap}", store.total());
         std::fs::remove_dir_all(dir).unwrap();
     }
 
