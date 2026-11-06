@@ -825,3 +825,127 @@ reserved up to 999,850 bytes ahead of 2 MiB segments. The host was loaded
 (load average 17, another profiling run on the same endpoint), so throughput in
 this run is not comparable: one block replayed on the same host right after took
 24.7–38.7 s before this change and 26.1–26.3 s after, with 95–96 RPC calls each.
+
+## Memory of a long follow (2026-11-07)
+
+A 4-hour profile of `follow` on Westend Asset Hub (e778371, 8 workers,
+`--cache-max-bytes 134217728`) found the malloc heap growing, from 167 to 412 MiB,
+mostly in proof nodes held by the in-memory node cache shared by all workers. That
+cache had a 256 MiB limit on node bytes only, and emptied all at once when full.
+Its index, `Arc` headers and allocator rounding were not counted.
+
+What changed:
+
+- The shared node cache is a `schnellru` LRU map (already in `Cargo.lock` through
+  `sc-executor`). Each node is charged its `Arc<[u8]>` allocation rounded to the
+  macOS size classes (16 B up to 1008 B, then 512 B), plus the table's real
+  allocation. The default limit is 128 MiB charged. When a new node would go over,
+  the least recently read nodes go one at a time.
+- The table may take at most a quarter of the limit, and holds at most half the
+  entries of its largest allowed size. Above half full, a hashbrown table in a fixed
+  allocation cannot reuse its deleted slots without a rehash. Refused growth makes
+  `schnellru` drop nodes until half of them are gone. The first 130-minute run below
+  hit that path: 404k nodes fell to 234k in ten minutes.
+- `ProofDb::prefetch` and the parent context calls ran each group of requests on new
+  scoped threads, up to 16 per replay. They now run on one Rayon pool per `Rpc` (shared
+  by its forks), with as many threads as request slots. The RPC semaphore still limits
+  requests. The CLI's global Rayon pool, capped at 2 threads for Wasm compilation, is
+  not used.
+- The metadata cache holds `Arc<MetadataEntry>`, so a hit no longer copies the read
+  list and proof nodes. The CLI decodes metadata once per runtime, not once per block:
+  Westend's V16 metadata is 19,204 allocations and 1.1 MiB live, 3 ms to decode.
+- Compiled runtimes above four are dropped down to four once idle, not one per load.
+- `follow`'s status line shows `state-memory`, `state-pieces` and `state-from-memory`.
+
+Per-entry cost, measured with `malloc_zone_statistics` on 300k synthetic nodes of
+40–550 bytes (mean 261 B) on macOS arm64:
+
+| map | heap per node | over the payload |
+| --- | --- | --- |
+| `Arc<[u8]>` alone | 284 B | 23.5 B |
+| `BTreeMap<H256, Arc<[u8]>>` | 358 B | 97 B |
+| `HashMap` + `VecDeque<H256>` (FIFO) | 413–454 B | 152–193 B |
+| `schnellru::LruMap` | 389–414 B | 128–154 B |
+
+A `HashMap` is not cheaper than the `BTreeMap`: its power-of-two capacity leaves up to
+half of it empty. The LRU map costs about as much as a B-tree plus a FIFO queue. The
+charge formula matched `malloc_size` exactly for every node, and charged bytes covered
+98.5% of the heap the map really used.
+
+### Before and after, run side by side
+
+The old (3cc3bdc) and new release binaries ran at the same time for 150 minutes, so
+they saw the same blocks and the same node. Each had 8 workers, a fresh `--cache-dir`,
+`--cache-max-bytes 134217728`, and `--otlp` to a local sink that answers 200. Sampled
+every 60 s (RSS, `footprint`), `heap -s` every 10 minutes. From minute 20 to 40 the
+node served almost no new final blocks to either run.
+
+| min | traced old / new | footprint MiB old / new | heap in use MiB old / new | state-memory | state-pieces | state-from-memory |
+| --- | --- | --- | --- | --- | --- | --- |
+| 10 | 229 / 227 | 130 / 138 | 62 / 71 | 18 MiB | 55,583 | 40% |
+| 30 | 329 / 329 | 126 / 134 | 34 / 45 | 26 MiB | 76,236 | 40% |
+| 60 | 939 / 927 | 199 / 210 | 71 / 86 | 53 MiB | 191,799 | 45% |
+| 70 | 1,098 / 1,125 | 201 / 221 | 84 / 133 | 74 MiB | 229,376 | 46% |
+| 90 | 1,590 / 1,624 | 207 / 220 | 122 / 135 | 76 MiB | 229,376 | 45% |
+| 120 | 2,453 / 2,477 | 228 / 224 | 166 / 130 | 76 MiB | 229,376 | 45% |
+| 140 | 2,994 / 3,009 | 329 / 239 | 199 / 158 | 76 MiB | 229,376 | 45% |
+| 149 | 3,234 / 3,252 | 343 / 256 | — | 75 MiB | 229,376 | 45% |
+
+Blocks traced per 10 minutes, old / new: 229/227, 96/98, 4/4, 77/71, 259/257,
+274/270, 159/198, 219/210, 273/289, 275/290, 294/291, 294/272, 268/260, 273/272.
+In total 3,282 and 3,306 blocks, every root check passed, and no export was lost.
+Per 10-minute window, median RPC calls per block were 35–39 before and 32–36 after
+(44.5 in the stalled window, with few blocks). Median replay time was 6.4–9.1 s before
+and 6.3–8.5 s after, and 23.3 and 20.3 s in the minute 60 window, when the node was
+slow for both.
+
+The new cache reached its entry limit (229,376, half of 524,288 buckets) at minute 70
+and stayed at 75–77 MiB charged for the last 80 minutes. On this chain the entry
+limit binds before the 128 MiB: nodes average about 200 bytes. The old heap grew
+steadily, by 128 MiB from minute 60 to 140; the new one by 72 MiB, 47 of them before
+its cache was full. From minute 70 the new heap grew 25 MiB in 70 minutes, and not
+in the node cache, which was flat. The disk cache was full in both runs (segments
+evicted), so its index was not growing either. That rest is not attributed: it may be
+transient replays of large blocks plus allocator retention. RSS is not comparable
+across runs on this host: it fell from about 800 to 200–300 MiB in every process at
+minute 50 under memory pressure from other work, while `footprint` did not.
+
+Threads: the new process stayed at 35–38 threads. The old one ranged from 19 to 70.
+
+### Choosing the limit
+
+Three more runs of the new code, with the limit set through a build-only switch,
+ran next to the pair for 60 minutes:
+
+The window from minute 20 to 30, during the stall, is left out of the RPC and replay columns. The first window includes the cold start.
+
+| limit | state-memory at 60 min | pieces | state-from-memory | median RPC calls per block | median replay |
+| --- | --- | --- | --- | --- | --- |
+| 32 MiB | 22 MiB (entry limit from minute 20) | 57,344 | 44% | 31.5–37 | 6.3–7.2 s |
+| 128 MiB | 53 MiB | 191,799 | 45% | 32–36 | 6.3–7.1 s |
+| 512 MiB | 52 MiB | 184,696 | 45% | 32–37 | 6.4–7.2 s |
+
+`state-from-memory` counts reads past a block's own nodes. A 16-fold larger limit
+did not change it, or the RPC calls, or the replay time. The misses are mostly
+nodes no earlier block read, which neither the memory nor the disk cache has. With
+`--cache-dir`, the disk cache serves what memory dropped. 128 MiB is kept as the
+default, as headroom for chains whose blocks read more state. On this chain it
+levels off at about 76 MiB. The runs did not cover `follow` without `--cache-dir`.
+
+Earlier 130-minute run of the new code before the half-full limit (same settings,
+alone on the host): the cache reached 108 MiB and 404k nodes at minute 60, then fell
+to 234k as described above. The heap reached 281 MiB at minute 60 during blocks of
+80–400 RPC calls, and `footprint` stayed at 325 MiB after it.
+
+### Exact commands and retained evidence
+
+`/tmp/ft-memfix/harness.py LABEL BINARY SECONDS` starts the sink, runs
+`frame-trace follow --rpc wss://westend-asset-hub-rpc.polkadot.io --workers 8
+--cache-dir /tmp/ft-memfix/cache-LABEL --cache-max-bytes 134217728 --otlp
+http://127.0.0.1:PORT` in its own process group, and samples into
+`/tmp/ft-memfix/runs/LABEL/`. `analyze.py LABEL...` prints the tables. Runs:
+`before` (old, 65 min, alone), `after` (new before the half-full limit, 130 min,
+alone), `pair-before` and `pair-after` (150 min, together), `sweep32`, `sweep512`
+(60 min). The per-entry measurement is `/tmp/ft-memfix/overhead`.
+`prefetch_reuses_a_fixed_set_of_request_threads` counts the process's threads in a
+child process: with the old scoped threads it saw 5 before and 13 during 50 replays.
