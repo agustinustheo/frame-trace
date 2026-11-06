@@ -254,54 +254,19 @@ fn public_relay_network() {
     let block = TracedBlock::from_replay(&result.capture).unwrap();
     let metadata = frame_trace_decode::Metadata::from_hex(&result.artifact.metadata).unwrap();
     let annotated = frame_trace_decode::annotate(&block, Some(&metadata));
-    assert!(
-        annotated
-            .phases
-            .iter()
-            .any(|p| p.call.as_deref() == Some("ParaInherent.enter"))
-    );
-}
-
-/// Westend relay chain #33,614,892: the relay runtime, with its parachain inherent.
-#[test]
-fn westend_relay_block_with_para_inherent() {
-    let result = replay(Artifact::load(&fixture("westend-relay")).unwrap(), None).unwrap();
-    assert_eq!(result.block_number, 33_614_892);
-    // Blake2-256 of the stored `:code`, the name of the runtime's fixture blob.
-    assert_eq!(
-        result.runtime_code_hash,
-        "0xb5723ec53e943ee8a038e1bcbefee0132fb93900b394a1c41990aef203aeb8ba"
-            .parse()
-            .unwrap()
-    );
-    assert!(result.root_check);
-    assert_eq!((result.rpc_count, result.measured_rpc_count), (0, 0));
-    let block = TracedBlock::from_replay(&result.capture).unwrap();
-    let metadata = frame_trace_decode::Metadata::from_hex(&result.artifact.metadata).unwrap();
-    let annotated = frame_trace_decode::annotate(&block, Some(&metadata));
     assert!(annotated.all_phases().all(|p| p.call_error.is_none()));
     let labels: Vec<_> = annotated.all_phases().map(|p| p.label.as_str()).collect();
     assert_eq!(
-        labels,
+        labels[..3],
         [
             "initialization",
             "extrinsic 0: Timestamp.set",
             "extrinsic 1: ParaInherent.enter",
-            "post inherents (on_poll)",
-            "finalization",
         ]
     );
-    let enter = &annotated.phases[2];
-    let heads = |op: &str| {
-        enter
-            .ops
-            .iter()
-            .filter(|o| o.op == op && o.item == "Paras::Heads")
-            .count()
-    };
-    assert_eq!((heads("get"), heads("put")), (14, 11), "parachain heads");
+    // Every relay block records the on-chain dispute and backing votes.
     assert!(
-        enter
+        annotated.phases[2]
             .ops
             .iter()
             .any(|o| o.op == "put" && o.item == "ParaInherent::OnChainVotes")

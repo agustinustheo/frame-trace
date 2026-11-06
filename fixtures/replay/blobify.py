@@ -1,8 +1,10 @@
 """Convert a self-contained `--save` directory into fixture form.
 
-Every hex value (metadata or proof node) of at least THRESHOLD bytes moves into
-BLOBS/<blake2-256>.zst (zstd -19) and is replaced by `blob:<hash>`; the artifact is
-recompressed with zstd -19. Existing blobs with the same hash are reused.
+The stored metadata is emptied: a replay derives metadata by running the runtime on the
+saved proof nodes and uses stored metadata only with --unauthenticated-metadata. Every proof
+node of at least THRESHOLD bytes moves into BLOBS/<blake2-256>.zst (zstd -19) and is
+replaced by `blob:<hash>`; the artifact is recompressed with zstd -19. Existing blobs with
+the same hash are reused.
 
     python3 -I fixtures/replay/blobify.py <saved-dir> <fixture-dir> fixtures/replay/blobs 100000
 """
@@ -25,7 +27,7 @@ def blob(value):
     return "blob:" + digest
 
 
-artifact["metadata"] = blob(artifact["metadata"])
+artifact["metadata"] = ""
 artifact["proof_nodes"] = [blob(node) for node in artifact["proof_nodes"]]
 os.makedirs(dst, exist_ok=True)
 out = json.dumps(artifact, separators=(",", ":")).encode()

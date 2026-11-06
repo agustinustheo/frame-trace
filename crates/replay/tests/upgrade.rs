@@ -1,8 +1,10 @@
 //! Runtime upgrades on Westend Asset Hub: spec 1025003 -> 1025004 at block 18,985,169.
 //!
 //! Block 18,985,169 executes with the old code and writes the new `:code`. Block 18,985,170
-//! is the first block on the new code. Only the second block is an offline fixture; the
-//! first one adds about 5 MB (two runtimes), so it is covered by the ignored live test.
+//! is the first block on the new code. Both are replayed by the ignored live test, which the
+//! nightly runs: saved, they would add 2.7 MB (one block) or about 5 MB (both) of runtimes.
+//! Offline, one session replays saved blocks of two different runtimes, as `follow` does
+//! across an upgrade.
 #![allow(clippy::unwrap_used)]
 use codec::Decode;
 use frame_metadata::{RuntimeMetadata, RuntimeMetadataPrefixed};
@@ -16,6 +18,8 @@ const ENACTMENT: u64 = 18_985_169;
 const SPEC_1025002: &str = "0x57ccdb66df672638e8978d5eecce601930a6e498f6c0360a738a53cac2c2e9d9";
 const SPEC_1025003: &str = "0x985f0daaaeec1ed429c305034a95dd233bdd292bef383e3d6643bb00f1c6a132";
 const SPEC_1025004: &str = "0xc7a91f4aafad7a00424bf9d5c8029f2fac2b6ea87ee7ece41fcd3825a5aa8bfd";
+/// Paseo Asset Hub spec 2005004, the runtime of the `paseo-asset-hub-contract` fixture.
+const PASEO_2005004: &str = "0xd85bfdb17cf421d6a75c9db9ba16cd713a840e42a02ca69becff7e3570b8debb";
 
 fn code_hash(hex: &str) -> sp_core::H256 {
     hex.parse().unwrap()
@@ -93,7 +97,7 @@ fn keyed_events(replay: &Replay) -> Vec<BTreeMap<String, String>> {
         .collect()
 }
 
-/// The first block after the upgrade: its own checks, shared by the offline and live tests.
+/// The first block after the upgrade.
 fn check_first_block_on_new_code(replay: &Replay) {
     assert_eq!(replay.block_number, ENACTMENT + 1);
     assert_eq!(replay.runtime_code_hash, code_hash(SPEC_1025004));
@@ -128,39 +132,45 @@ fn check_first_block_on_new_code(replay: &Replay) {
     );
 }
 
+/// Two runtimes in one session, as `follow` meets them across an upgrade: each block gets
+/// its own executor and its own metadata, and neither result leaks into the other.
 #[test]
-fn first_block_after_upgrade_runs_new_code_and_names_with_its_metadata() {
+fn one_session_replays_blocks_on_different_runtimes() {
+    let load = |name| Artifact::load(&fixture(name)).unwrap();
     let session = ReplaySession::new(None).unwrap();
-    let after = replay_with_session(
-        Artifact::load(&fixture("westend-asset-hub-after-upgrade")).unwrap(),
-        None,
-        &session,
-    )
-    .unwrap();
-    check_first_block_on_new_code(&after);
-    assert_eq!((after.rpc_count, after.proof_round_trips), (0, 0));
+    let westend = replay_with_session(load("westend-asset-hub"), None, &session).unwrap();
+    let paseo = replay_with_session(load("paseo-asset-hub-contract"), None, &session).unwrap();
+    let again = replay_with_session(load("westend-asset-hub"), None, &session).unwrap();
 
-    // An older Westend Asset Hub block (spec 1025002) in the same session: a different
-    // executor and different metadata, and neither result leaks into the other.
-    let before = replay_with_session(
-        Artifact::load(&fixture("westend-asset-hub")).unwrap(),
+    for replay in [&westend, &paseo, &again] {
+        assert!(replay.root_check);
+        assert_eq!((replay.rpc_count, replay.measured_rpc_count), (0, 0));
+        assert!(
+            annotated(replay)
+                .all_phases()
+                .all(|p| p.call_error.is_none())
+        );
+    }
+    assert_eq!(westend.runtime_code_hash, code_hash(SPEC_1025002));
+    assert_eq!(paseo.runtime_code_hash, code_hash(PASEO_2005004));
+    assert_eq!(metadata_spec_version(&westend.artifact.metadata), 1_025_002);
+    assert_eq!(metadata_spec_version(&paseo.artifact.metadata), 2_005_004);
+
+    assert_eq!(again.runtime_code_hash, westend.runtime_code_hash);
+    assert_eq!(again.artifact.metadata, westend.artifact.metadata);
+    assert_eq!(keyed_events(&again), keyed_events(&westend));
+    assert_eq!(ops(&annotated(&again)), ops(&annotated(&westend)));
+
+    // The second runtime gives the same result as in a fresh session.
+    let alone = replay_with_session(
+        load("paseo-asset-hub-contract"),
         None,
-        &session,
+        &ReplaySession::new(None).unwrap(),
     )
     .unwrap();
-    assert!(before.root_check);
-    assert_eq!(before.runtime_code_hash, code_hash(SPEC_1025002));
-    assert_eq!(metadata_spec_version(&before.artifact.metadata), 1_025_002);
-    let again = replay_with_session(
-        Artifact::load(&fixture("westend-asset-hub-after-upgrade")).unwrap(),
-        None,
-        &session,
-    )
-    .unwrap();
-    assert_eq!(again.runtime_code_hash, after.runtime_code_hash);
-    assert_eq!(again.artifact.metadata, after.artifact.metadata);
-    assert_eq!(keyed_events(&again), keyed_events(&after));
-    assert_eq!(ops(&annotated(&again)), ops(&annotated(&after)));
+    assert_eq!(alone.artifact.metadata, paseo.artifact.metadata);
+    assert_eq!(keyed_events(&alone), keyed_events(&paseo));
+    assert_eq!(ops(&annotated(&alone)), ops(&annotated(&paseo)));
 }
 
 #[test]
@@ -227,9 +237,4 @@ fn runtime_upgrade_enactment_and_next_block_live() {
         assert_eq!(keyed_events(&alone), keyed_events(shared));
         assert_eq!(ops(&annotated(&alone)), ops(&annotated(shared)));
     }
-
-    // The saved fixture is the same block.
-    let offline = frame_trace_replay::offline(&fixture("westend-asset-hub-after-upgrade")).unwrap();
-    assert_eq!(offline.runtime_code_hash, next.runtime_code_hash);
-    assert_eq!(keyed_events(&offline), keyed_events(&next));
 }
