@@ -719,6 +719,10 @@ fn follow(args: FollowArgs) -> Result<()> {
             fatal = Some("all replay workers stopped");
         } else if exporter.as_ref().is_some_and(|e| e.is_finished()) {
             fatal = Some("the OTLP export thread stopped");
+        } else if crate::log::broken() {
+            // Without a log, a supervisor cannot see this run; exit so it restarts us with
+            // fresh streams, for example after journald restarted.
+            fatal = Some("stderr cannot be written");
         }
         if let Some(reason) = fatal {
             last_word!("follow: {reason}; stopping");
@@ -850,7 +854,7 @@ fn follow(args: FollowArgs) -> Result<()> {
                 process(event, &mut entries, &mut totals);
             }
             show_status(&entries, &totals, &mut status);
-            if cancel.is_cancelled() || Instant::now() >= next {
+            if cancel.is_cancelled() || Instant::now() >= next || crate::log::broken() {
                 break;
             }
             pause(Duration::from_millis(100), || cancel.is_cancelled());
@@ -923,20 +927,18 @@ fn follow(args: FollowArgs) -> Result<()> {
     };
     let traced = state.traced;
     drop(state);
-    // Shown only when the log lost lines, which stderr may not show by itself.
-    let log_dropped = match crate::log::dropped() {
-        0 => String::new(),
-        dropped => format!(" log-dropped={dropped}"),
-    };
-    last_word!(
-        "follow stopped after {}: traced={traced}{export_summary} stopped={} skipped={} reverted={} cancelled={} poll-failures={}{log_dropped}",
-        duration_text(started.elapsed()),
-        totals.stopped,
-        totals.skipped,
-        totals.reverted,
-        totals.cancelled,
-        totals.poll_failures
-    );
+    let uptime = duration_text(started.elapsed());
+    // `log-dropped` is shown only when the log lost lines, counting any this line pushed out.
+    crate::log::line_counted(crate::log::Kind::Final, |dropped| {
+        let log_dropped = match dropped {
+            0 => String::new(),
+            dropped => format!(" log-dropped={dropped}"),
+        };
+        format!(
+            "follow stopped after {uptime}: traced={traced}{export_summary} stopped={} skipped={} reverted={} cancelled={} poll-failures={}{log_dropped}",
+            totals.stopped, totals.skipped, totals.reverted, totals.cancelled, totals.poll_failures
+        )
+    });
     match fatal {
         Some(reason) => anyhow::bail!("follow stopped because {reason}"),
         None => Ok(()),

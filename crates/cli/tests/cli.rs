@@ -1342,6 +1342,23 @@ fn follow_startup_errors_and_replays_do_not_wait_for_a_blocked_stderr() {
 }
 
 #[test]
+fn follow_exits_1_when_its_stderr_is_closed() {
+    use std::process::Stdio;
+    // Nobody will ever read: every write to this pipe fails, as after journald restarted.
+    let (reader, writer) = std::io::pipe().unwrap();
+    drop(reader);
+    let mut child = Child(
+        Command::new(BIN)
+            .args(["follow", "--rpc", "ws://127.0.0.1:9"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::from(writer))
+            .spawn()
+            .unwrap(),
+    );
+    assert_eq!(exit_code_within(&mut child, 15), Some(1));
+}
+
+#[test]
 fn follow_exits_1_with_a_summary_when_its_threads_die() {
     use std::{process::Stdio, time::Duration};
     for (fault, reason) in [
