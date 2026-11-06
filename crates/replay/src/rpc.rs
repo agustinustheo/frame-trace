@@ -58,10 +58,11 @@ fn runtime() -> Result<&'static Runtime> {
 }
 impl Rpc {
     /// Lazy connections. DNS, TCP, TLS and WS handshake share a ten-second connect deadline;
-    /// the logical call (including retries) has a thirty-second deadline after a slot is acquired,
-    /// and each of its four attempts a quarter of that.
+    /// the logical call (including retries) has a two-minute deadline after a slot is acquired,
+    /// and each of its four attempts a quarter of that. Public nodes can take 20 s or more to
+    /// prove `:code`.
     pub fn new(url: &str) -> Result<Self> {
-        Self::with_options(url, 8, Duration::from_secs(30), CancellationToken::new())
+        Self::with_options(url, 8, Duration::from_secs(120), CancellationToken::new())
     }
     pub fn with_options(
         url: &str,

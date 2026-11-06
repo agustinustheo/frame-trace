@@ -62,7 +62,7 @@ pub struct CallArgs {
     #[arg(long, default_value_t = 8, requires = "rpc", conflicts_with = "offline", value_parser = clap::value_parser!(u8).range(1..=64))]
     proof_concurrency: u8,
     /// Longest wait in seconds for one RPC response; each request gets four tries.
-    #[arg(long, value_name = "SECONDS", default_value = "7.5", value_parser = super::source::rpc_timeout, requires = "rpc", conflicts_with = "offline")]
+    #[arg(long, value_name = "SECONDS", default_value = "30", value_parser = super::source::rpc_timeout, requires = "rpc", conflicts_with = "offline")]
     rpc_timeout: Duration,
     /// Persistent authenticated proof-node and compiled Wasm cache directory.
     #[arg(long, value_name = "DIR")]

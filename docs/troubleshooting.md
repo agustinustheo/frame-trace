@@ -239,9 +239,15 @@ Error: RPC error: state_getReadProof: overall request deadline exceeded
 This run used `wss://asset-hub-paseo-rpc.n.dwellir.com`.
 
 **What it means.** The node took too long to answer one request.
-Some nodes take more than half a minute to send a large proof, such as the one for the runtime code.
+`--rpc-timeout` is the wait for one try, 30 seconds by default.
+A request gets four tries, so it fails after 2 minutes by default.
 
-**Fix.** Raise `--rpc-timeout`. With `--rpc-timeout 120`, the same command passed:
+The largest answer is the proof of the runtime code, about 2.7 MB.
+Public Westend nodes took 7 to 20 seconds to send it, and this node 25 to 35 seconds.
+
+**Fix.** Raise `--rpc-timeout` when one try needs more than 30 seconds.
+This run failed with the old default of 7.5 seconds.
+With `--rpc-timeout 120`, the same command passed:
 
 ```text
 root check: PASS; RPC calls: 113 (timed replay: 0); execution proof: 101420 bytes

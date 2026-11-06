@@ -13,7 +13,7 @@ frame-trace replays a Polkadot SDK block, or a runtime API call, outside the nod
 - **Runtime spans** (dispatch, `batch` → `transfer_keep_alive`, hooks) when the runtime was built with `with-tracing`. For a live chain, build the same runtime source with tracing and replay real blocks with `--runtime-override`: the root check still passes, and the output is labelled as an override everywhere. See [See runtime calls inside extrinsics](../docs/guides/see-runtime-calls.md).
 - **Commands:** `block`, `call`, `summary`, `report` (many blocks), `follow` (each finalized block). Traces go to Jaeger/Tempo over OTLP, or to JSON. Replays can be saved and re-run offline.
 - **`follow` runs unattended.** It stops cleanly on SIGTERM, SIGHUP and Ctrl-C, backs off failed polls up to 60 s, and prints status on change with a 60 s heartbeat. While the OTLP receiver is down it holds up to 32 traces and later resends only the batches the receiver did not accept, without replaying blocks. Exit code 0 on a signal stop; failures are counted in the summary. A systemd unit is in the [follow guide](../docs/guides/follow-new-blocks.md#6-run-it-as-a-service).
-- **Slow nodes.** `--rpc-timeout` (default 7.5 s) is the wait for one RPC try; each request gets four tries. Dwellir's Paseo Asset Hub endpoint needed `--rpc-timeout 120`: its proof of `:code` took about 35 s.
+- **Slow nodes.** `--rpc-timeout` (default 30 s, raised from 7.5 s) is the wait for one RPC try; each request gets four tries. Public Westend nodes take 7–20+ s to prove `:code` (~2.7 MB); Dwellir's Paseo Asset Hub endpoint took 25–35 s and was recorded with `--rpc-timeout 120`.
 
 Try it:
 

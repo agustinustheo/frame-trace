@@ -21,7 +21,7 @@ First release.
 - `--save` and `--offline`: save a block or call, then replay it with no network.
 - `--runtime-override`: replay real blocks with a runtime built with tracing, to see runtime calls inside extrinsics.
 - Ready setups for Jaeger, Grafana and Grafana Alloy with Tempo, with a provisioned dashboard.
-- `--rpc-timeout`: the longest wait for one RPC response, for slow nodes. Each request gets four tries.
+- `--rpc-timeout`: the longest wait for one RPC response, for slow nodes. Each request gets four tries. The default is 30 seconds, so a request can take up to 2 minutes. Public nodes take 7 to 35 seconds to send the runtime code.
 - `follow` can run unattended. It stops cleanly on `SIGTERM` and `SIGHUP`, as on Ctrl-C. It waits longer after each failed check for new blocks. When the OTLP receiver is down, it keeps the traces and later resends only the requests the receiver did not accept.
 - A runtime that needs host functions frame-trace does not have fails with an error that names them.
 - Nightly builds of `main` for the same four systems as releases, in the `Nightly` pre-release on GitHub. `frame-trace --version` shows the date and commit they were built from.
