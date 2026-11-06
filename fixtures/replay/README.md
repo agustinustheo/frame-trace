@@ -7,8 +7,8 @@ and complete discovery proof nodes. The shared People/Westend Wasm nodes and met
 once under `blobs/<blake2-256>.zst`; fixture metadata/node strings use `blob:<hash>`.
 The loader bounds decompression and verifies each blob's content hash before
 rehydrating hex. No arbitrary reference paths are accepted. `Artifact::save`
-always writes self-contained artifacts. The 26 compressed files, including call artifacts, blobs,
-oracles and the public reference, total 18,843,988 bytes (17.97 MiB). Sharing the
+always writes self-contained artifacts. The 23 compressed files, including call artifacts, blobs,
+oracles and the public reference, total 17,110,642 bytes (16.32 MiB). Sharing the
 Westend Wasm as raw blob bytes also reduces the original public block artifact.
 
 | Directory | Block | Source | Artifact bytes |
@@ -19,7 +19,6 @@ Westend Wasm as raw blob bytes also reduces the original public block artifact.
 | `westend-asset-hub` | 18,558,320 / `4c0d1d57…` | Public Westend Asset Hub, two inherents | 275,788 |
 | `westend-asset-hub-after-upgrade` | 18,985,170 / `1ccb4c8c…` | Public Westend Asset Hub, first block on spec 1025004 | 242,461 |
 | `paseo-asset-hub-contract` | 15,366,850 / `e6b71b09…` | Public Paseo Asset Hub, a contract call with child trie reads and writes | 101,226 |
-| `westend-relay` | 33,614,892 / `a7ab2bf3…` | Public Westend relay chain, `ParaInherent.enter` | 90,893 |
 
 The local `oracle.json.zst` files are E2's independent `state_traceBlock` RPC
 recordings of the exact same blocks. Tests compare the entire ordered keyed
@@ -169,20 +168,19 @@ python3 -I fixtures/replay/blobify.py <dir> fixtures/replay/paseo-asset-hub-cont
 Run again on 2026-11-06 with this command, the replay passed the root check with 113 RPC
 calls in 58 seconds, and `blobify.py` reproduced the artifact and both blobs byte for byte.
 
-## Relay chain fixture
+## Relay chain
 
-`westend-relay` is Westend relay chain #33,614,892
-(`0xa7ab2bf3de7abcdc97740fc6a1187288e61490f174f4146a9a0b05e81596ff07`), recorded
-2026-11-06 from `wss://westend-rpc.polkadot.io` with `block --save`. The relay runtime
-imports only the standard Substrate host functions. Extrinsic 1 is
-`ParaInherent.enter`; it reads `Paras::Heads` 14 times and writes it 11 times. The
-recording run on 2026-11-06 measured root check PASS, 309 RPC calls in 293 proof request
-rounds and 107,322 execution-proof bytes.
-The runtime (`b5723ec5…`, 1,552,297 bytes compressed) and V16 metadata (`6e63addd…`) are
-blobs. The ignored live test `public_relay_network` replays the finalized block from
-`FRAME_TRACE_WESTEND_RPC` (default `wss://westend-rpc.polkadot.io`).
+No relay chain block is committed. Westend relay chain #33,614,892
+(`0xa7ab2bf3de7abcdc97740fc6a1187288e61490f174f4146a9a0b05e81596ff07`) was a fixture until
+2026-11-07; its runtime blob alone was 1,552,297 bytes compressed and the three files 1,733,346
+bytes. The runtime's `:code` is already zstd-compressed by the SDK, so recompressing it saves
+nothing. The ignored live test `public_relay_network` replays the finalized block from
+`FRAME_TRACE_WESTEND_RPC` (default `wss://westend-rpc.polkadot.io`) every night. It checks
+the root, that no call fails to decode, that the first extrinsics are `Timestamp.set` and
+`ParaInherent.enter`, and that `ParaInherent.enter` writes `ParaInherent::OnChainVotes`.
+To replay the old block offline, save it again from an archive node:
 
 ```sh
 frame-trace block --rpc wss://westend-rpc.polkadot.io --block 33614892 --save <dir>
-python3 -I fixtures/replay/blobify.py <dir> fixtures/replay/westend-relay fixtures/replay/blobs 100000
+frame-trace block --offline <dir>
 ```

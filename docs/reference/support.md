@@ -54,7 +54,7 @@ See [Troubleshooting](../troubleshooting.md#the-runtime-needs-host-functions-fra
 | --- | --- |
 | [Westend Asset Hub](glossary.md#westend-asset-hub) | Public endpoint `wss://westend-asset-hub-rpc.polkadot.io`, with `block`, `report` and `follow`. [Analyse many blocks](../guides/analyse-many-blocks.md) shows a `report` run. A nightly test replays the best block. |
 | Westend Asset Hub runtime upgrade | Block #18,985,170, the first block on new code, is a saved block replayed offline. A live test replays the upgrade block #18,985,169 and the next block from the public endpoint. |
-| Westend relay chain | Block #33,614,892 is a saved block replayed offline. A nightly test replays the finalized block from `wss://westend-rpc.polkadot.io`. |
+| Westend relay chain | A nightly test replays the finalized block from `wss://westend-rpc.polkadot.io`, with the parachain inherent `ParaInherent.enter`. Block #33,614,892 also passed. |
 | Paseo Asset Hub | Block #15,366,850 is a saved block replayed offline. It holds a smart-contract call that reads and writes the contract's child trie. |
 | Paseo People Next | Public endpoint `wss://paseo-people-next-system-rpc.polkadot.io`, 20 blocks with `block` and `summary`. Each passed the root check. |
 | A local [People chain](glossary.md#people-chain) | Saved blocks replayed offline. |

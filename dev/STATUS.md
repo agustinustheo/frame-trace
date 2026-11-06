@@ -66,6 +66,6 @@ frame-trace does not depend on either fix: it replays blocks itself from safe RP
 - The docs are an mdBook site, with a [support page](../docs/reference/support.md).
 - Both upstream bugs are filed and fixed.
 - CI runs rustfmt and clippy on Linux, and the tests on Linux and macOS. A nightly job replays live Westend Asset Hub and Westend relay chain blocks, including the runtime upgrade block. Tagging `v*` builds a draft release for four targets. Dependabot groups the Polkadot SDK crates.
-- Fixtures and tests for a relay chain block, a contract call with child trie reads and writes, and the first block after a runtime upgrade. The upgrade block itself is covered by a live test.
+- Fixtures and tests for a contract call with child trie reads and writes and the first block after a runtime upgrade. The upgrade block itself and relay chain blocks are covered by live tests.
 - `follow` hardened for unattended runs. OTLP retries resend only unacknowledged requests and keep span IDs; a lost acknowledgement can still deliver spans twice. New `--rpc-timeout` for slow nodes.
 - On 6 November 2026, `cargo +1.93.0 test --workspace --locked` on the integration of the CI, replay coverage and follow branches passed 208 tests offline and ignored 3 live tests. The 3 live tests also passed against the default public endpoints. The nightly job runs them.
