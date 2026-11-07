@@ -732,13 +732,13 @@ fn open_db(
 ) -> Result<ProofDb> {
     let db = ProofDb::with_session(rpc, state.hash(), session.clone());
     db.set_root(*state.state_root());
-    db.insert_nodes(
+    db.admit_nodes(
         artifact
             .proof_nodes
             .iter()
             .map(|s| unhex(s))
             .collect::<Result<Vec<_>>>()?,
-    );
+    )?;
     Ok(db)
 }
 

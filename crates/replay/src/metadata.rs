@@ -61,7 +61,7 @@ pub(crate) fn load(
         db.failure.lock().take();
         if valid {
             if entry.iteration_root.is_some() {
-                db.retain_nodes(&entry.proof_nodes);
+                db.retain_nodes(&entry.proof_nodes)?;
             }
             artifact.metadata = entry.metadata.clone();
             return Ok(());
