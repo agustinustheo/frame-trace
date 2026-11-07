@@ -10,16 +10,16 @@ polkadot-frame-trace has two release channels, like Rust's stable and nightly:
 Both build the same four targets with the same packaging, in `.github/workflows/build.yml`.
 `release.yml` and `nightly.yml` call it, so the two cannot drift.
 
-polkadot-frame-trace is not published on crates.io. The crate name `polkadot-frame-trace` there belongs to an unrelated crate.
+Stable releases also publish the five crates to crates.io. Nightly builds and pre-releases do not.
 Users install a release binary, a nightly binary, or build from Git; see `docs/getting-started/install.md`.
 
 ## Stable releases
 
 A pushed `v*` tag runs `.github/workflows/release.yml`.
 It checks that the tag matches the `polkadot-frame-trace` version in `Cargo.toml`, runs rustfmt, clippy and the tests, builds the binaries and creates a **draft** GitHub release.
-The repository and the pushed tag are public, but no release is public until you publish the draft.
+Then it publishes the crates to crates.io, so the crates are public before you publish the draft.
 
-1. Set the new version in `[workspace.package]` in `Cargo.toml`, then run `cargo build` so `Cargo.lock` follows.
+1. Set the new version in `[workspace.package]` in `Cargo.toml`, and in the `version` of the four `polkadot-frame-trace-*` entries in `[workspace.dependencies]`. Then run `cargo build` so `Cargo.lock` follows.
 2. In `CHANGELOG.md`, rename `## [X.Y.Z] - Unreleased` to `## [X.Y.Z] - YYYY-MM-DD` and check the entries. The release notes are this section. The workflow fails while the heading still says `Unreleased` or the date is not a calendar date.
 3. Commit, and merge to `main`.
 4. Tag the merged commit and push the tag:
@@ -30,6 +30,25 @@ The repository and the pushed tag are public, but no release is public until you
    ```
 
 5. Wait for the Release workflow. Open the draft release, check the four archives and `SHA256SUMS`, then click **Publish release**.
+
+### crates.io
+
+After the draft release is created, the `crates` job of the Release workflow publishes the workspace with `cargo publish --workspace --locked`.
+Cargo publishes the crates in dependency order: `polkadot-frame-trace-model`, `-decode`, `-replay`, `-otel`, then `polkadot-frame-trace`.
+It uses the crates.io API token in the repository secret `CARGO_REGISTRY_TOKEN`.
+
+- It runs only for versions without a suffix. `0.2.0-rc.1` gets a draft pre-release and nothing on crates.io.
+- It asks crates.io for each crate's version first and leaves out the ones already there. A re-run after a partial failure publishes the rest.
+- crates.io versions are permanent. A wrong one can only be yanked, so the job runs on a tag that passed the checks and built.
+
+The packages hold the sources, `Cargo.toml`, `LICENSE`, the README for `polkadot-frame-trace` and `ARTIFACT.md` for `polkadot-frame-trace-replay`.
+They leave out `tests/`, `examples/`, `fixtures/` and `dev/`: the tests need the fixtures, which stay in the repository.
+Check a change to the packaging with:
+
+```sh
+cargo +1.93.0 package --workspace --locked --no-verify --list
+cargo +1.93.0 publish --workspace --dry-run --locked
+```
 
 ### What the release contains
 

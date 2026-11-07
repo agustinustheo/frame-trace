@@ -163,3 +163,52 @@ jobs:
             --title "polkadot-frame-trace $VERSION" \
             --notes-file "$RUNNER_TEMP/notes.md" \
             dist/*.tar.gz dist/SHA256SUMS
+
+  # Publishes the crates once the draft release exists. Pre-releases stay on GitHub only.
+  # Crates whose version is already on crates.io are skipped, so a re-run is safe.
+  crates:
+    name: Publish to crates.io
+    needs: [verify, publish]
+    if: ${{ !contains(needs.verify.outputs.version, '-') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+
+      - name: Use the runner temp directory
+        run: echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
+
+      - name: Install Rust 1.93.0
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.93.0
+
+      - name: Publish the crates not yet on crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          exclude=()
+          pending=0
+          for name in $(cargo +1.93.0 metadata --no-deps --format-version 1 --locked \
+              | jq -r '.packages[].name'); do
+            status=$(curl -sS -o /dev/null -w '%{http_code}' \
+              -A "polkadot-frame-trace release workflow ($GITHUB_SERVER_URL/$GITHUB_REPOSITORY)" \
+              "https://crates.io/api/v1/crates/$name/$VERSION")
+            case "$status" in
+              200) echo "$name $VERSION is already on crates.io"; exclude+=(--exclude "$name") ;;
+              404) echo "$name $VERSION will be published"; pending=$((pending + 1)) ;;
+              *) echo "::error::crates.io answered $status for $name $VERSION"; exit 1 ;;
+            esac
+          done
+          if [ "$pending" -eq 0 ]; then
+            echo "Every crate is already on crates.io"
+            exit 0
+          fi
+          cargo +1.93.0 publish --workspace --locked "${exclude[@]}"
