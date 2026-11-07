@@ -193,9 +193,10 @@ fn emit(
         write_json(trace, path)?;
     }
     if let Some(endpoint) = otlp {
+        let shown = polkadot_frame_trace_model::redact::endpoint(endpoint);
         let spans = polkadot_frame_trace_otel::export_otlp(trace, endpoint, Default::default())
-            .with_context(|| format!("exporting to {endpoint}"))?;
-        eprintln!("exported {spans} spans to {endpoint}");
+            .with_context(|| format!("exporting to {shown}"))?;
+        eprintln!("exported {spans} spans to {shown}");
     }
     if let Some(top) = top {
         let summary = summary::render(trace, top);

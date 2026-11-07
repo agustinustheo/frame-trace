@@ -64,9 +64,12 @@ impl HttpExporter {
         let jobs = transport(client)?;
         let rejections = Arc::new(Mutex::new(Rejections::default()));
         let deadline = Arc::new(Mutex::new(None));
+        // The exporter's errors quote the endpoint, which can hold credentials.
+        let shown = polkadot_frame_trace_model::redact::endpoint(&endpoint);
+        let redact = |text: String| text.replace(&endpoint, &shown);
         let inner = opentelemetry_otlp::SpanExporter::builder()
             .with_http()
-            .with_endpoint(endpoint)
+            .with_endpoint(endpoint.clone())
             .with_timeout(timeout)
             .with_http_client(CheckedClient {
                 jobs,
@@ -74,7 +77,15 @@ impl HttpExporter {
                 deadline: deadline.clone(),
                 rejections: rejections.clone(),
             })
-            .build()?;
+            .build()
+            .map_err(|e| match e {
+                ExporterBuildError::InvalidConfiguration(text) => {
+                    ExporterBuildError::InvalidConfiguration(redact(text))
+                }
+                ExporterBuildError::InternalFailure(text) => {
+                    ExporterBuildError::InternalFailure(redact(text))
+                }
+            })?;
         Ok(Self {
             inner,
             rejections,
@@ -340,7 +351,8 @@ impl HttpClient for CheckedClient {
                 .unwrap_or_else(PoisonError::into_inner);
             // The first message since the batch began; [`HttpExporter::send`] clears it.
             if rejections.message.is_empty() {
-                rejections.message = partial.error_message;
+                rejections.message =
+                    polkadot_frame_trace_model::redact::untrusted(&partial.error_message);
             }
             rejections.rejected += partial.rejected_spans as u64;
         }

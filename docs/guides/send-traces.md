@@ -43,6 +43,7 @@ Stop it with `docker compose down` from `examples/jaeger`.
 
 `--otlp` takes the base URL of an OTLP/HTTP receiver.
 polkadot-frame-trace adds `/v1/traces` unless the URL already ends with it.
+Output shows only the scheme, host and port of the URL.
 Both of these send to the same place:
 
 ```sh
@@ -52,7 +53,7 @@ polkadot-frame-trace block --offline fixtures/replay/people-transfer --otlp http
 
 ```text
 ...
-exported 428 spans to http://127.0.0.1:4318/v1/traces
+exported 428 spans to http://127.0.0.1:4318
 ```
 
 The receiver must accept OTLP over HTTP with protobuf, usually on port 4318.
