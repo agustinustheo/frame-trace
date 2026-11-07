@@ -38,6 +38,7 @@ Cargo publishes the crates in dependency order: `polkadot-frame-trace-model`, `-
 It uses the crates.io API token in the repository secret `CARGO_REGISTRY_TOKEN`.
 
 - It runs only for versions without a suffix. `0.2.0-rc.1` gets a draft pre-release and nothing on crates.io.
+- It runs only for a tag push to `agustinustheo/polkadot-frame-trace`. A run started by hand with **Run workflow**, or in a fork, publishes nothing. To publish after a failure, re-run the tag's run.
 - It asks crates.io for each crate's version first and leaves out the ones already there. A re-run after a partial failure publishes the rest.
 - crates.io versions are permanent. A wrong one can only be yanked, so the job runs on a tag that passed the checks and built.
 
