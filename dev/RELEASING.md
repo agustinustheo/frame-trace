@@ -110,7 +110,7 @@ Then run the offline tests and the live tests (see [Live tests](README.md#live-t
 
 ```sh
 cargo +1.93.0 test --workspace --locked
-cargo +1.93.0 test --workspace --locked -- --ignored --skip bench_
+cargo +1.93.0 test --workspace --locked -- --ignored
 ```
 
 The saved blocks in `fixtures/replay/` are chain data, so an upgrade does not change them.

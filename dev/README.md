@@ -52,8 +52,7 @@ The unit tests `unknown_host_import_error_names_the_import` and
 ## Live tests
 
 Tests that need a public node are `#[ignore]`d. Run them with
-`cargo +1.93.0 test --workspace --locked -- --ignored --skip bench_`. `--skip bench_` leaves
-out the ignored benchmarks, which skip themselves anyway without `FT_BENCH_DIR`. Each reads its endpoint from an
+`cargo +1.93.0 test --workspace --locked -- --ignored`. Each reads its endpoint from an
 environment variable and falls back to the public endpoint:
 
 | Variable | Default | Tests |
@@ -61,7 +60,7 @@ environment variable and falls back to the public endpoint:
 | `FRAME_TRACE_WESTEND_AH_RPC` | `wss://westend-asset-hub-rpc.polkadot.io` | `public_network` (best block), `runtime_upgrade_enactment_and_next_block_live` (the upgrade block #18,985,169 and the first block on the new code; needs archive state for #18,985,169) |
 | `FRAME_TRACE_WESTEND_RPC` | `wss://westend-rpc.polkadot.io` | `public_relay_network` (finalized block) |
 
-The `FRAME_TRACE_*` and `FT_BENCH_DIR` variables used by tests, CI and the build version kept their names after the rename: they are internal.
+The `FRAME_TRACE_*` variables used by tests, CI and the build version kept their names after the rename: they are internal.
 
 The nightly workflow (`.github/workflows/nightly.yml`) runs all three with the defaults.
 Runtime upgrade blocks and relay chain blocks have no offline fixture, because their runtimes

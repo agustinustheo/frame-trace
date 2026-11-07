@@ -726,8 +726,8 @@ and count 4 KiB blocks plus one block per file. The index has a 16-byte entry
 per node; with the table's spare buckets and control bytes that is about 34 B
 per node at 1M nodes. It loads in a background thread.
 
-Synthetic cache of 1M nodes of 200 bytes, `bench_disk_cache_1m_nodes` (ignored
-test, release, macOS, warm page cache). Before is the same harness on e826363.
+Synthetic cache of 1M nodes of 200 bytes, `bench_disk_cache_1m_nodes` (an ignored
+test, since removed; it is in the history at 82c679d; release, macOS, warm page cache). Before is the same harness on e826363.
 
 | | before | after |
 | --- | --- | --- |

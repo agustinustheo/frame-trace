@@ -610,15 +610,6 @@ impl NodeStore {
     pub fn segment_count(&self) -> usize {
         self.inner.state.lock().segments.len()
     }
-    /// Heap bytes of the index table: buckets of a 16-byte entry and one control byte.
-    #[cfg(test)]
-    pub fn index_bytes(&self) -> usize {
-        let capacity = self.inner.state.lock().index.capacity();
-        if capacity == 0 {
-            return 0;
-        }
-        (capacity * 8 / 7).next_power_of_two() * 17
-    }
     #[cfg(test)]
     pub fn node_count(&self) -> usize {
         self.inner.state.lock().index.len()
