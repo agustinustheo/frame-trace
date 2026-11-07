@@ -173,6 +173,25 @@ Restart=on-failure
 RestartSec=10
 DynamicUser=yes
 CacheDirectory=polkadot-frame-trace
+CacheDirectoryMode=0700
+UMask=0077
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+RestrictSUIDSGID=yes
+RestrictRealtime=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LimitCORE=0
 
 [Install]
 WantedBy=multi-user.target
@@ -182,10 +201,13 @@ Start it with `sudo systemctl enable --now polkadot-frame-trace-follow`.
 Read its log with `journalctl -u polkadot-frame-trace-follow -f`.
 
 - `TimeoutStopSec=45` leaves time for the replay and export waits at stop.
-- `Restart=on-failure` restarts `follow` after exit code 1, for example when its threads stop.
+- `Restart=on-failure` restarts `follow` after exit code 1, for example when its threads stop, or when a replay passes the [replay deadline](../reference/commands.md#follow).
   `follow` also exits 1 when it can no longer write its log, for example after journald restarts, so the restart gives it a working log again.
   A stop by `SIGTERM` or `SIGHUP` exits 0, so the service stays stopped.
 - `StartLimitBurst=5` within `StartLimitIntervalSec=300` gives up after five failed starts in five minutes, for example with a wrong URL.
+- `CacheDirectoryMode=0700` and `UMask=0077` keep the [disk cache](../reference/commands.md#disk-cache) private, as polkadot-frame-trace requires.
+- The other options take away what `follow` does not need: other users' files, devices, kernel settings and privileges.
+  `MemoryDenyWriteExecute=yes` is left out on purpose: the runtime is compiled to machine code at run time, which that option forbids.
 
 ## Retries
 

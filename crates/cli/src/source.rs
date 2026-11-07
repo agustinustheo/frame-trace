@@ -102,6 +102,34 @@ pub fn warn_if_slow(what: String) -> SlowWarning {
     SlowWarning { _done: done }
 }
 
+/// Warns once when `url` is plain `ws://` or `http://` to a host other than this machine:
+/// anyone on the way can read, or change, what is sent.
+pub fn warn_unencrypted(flag: &str, url: &str) {
+    let shown = polkadot_frame_trace_model::redact::endpoint(url);
+    let Some(authority) = shown
+        .strip_prefix("ws://")
+        .or_else(|| shown.strip_prefix("http://"))
+    else {
+        return;
+    };
+    let host = match authority.strip_prefix('[') {
+        Some(v6) => v6.split(']').next().unwrap_or_default(),
+        None => authority.split(':').next().unwrap_or_default(),
+    };
+    let local = host.eq_ignore_ascii_case("localhost")
+        || host
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|ip| ip.is_loopback());
+    if !local {
+        let secure = if flag == "--otlp" {
+            "https://"
+        } else {
+            "wss:// or https://"
+        };
+        say!("warning: {flag} {shown} is not encrypted; use {secure} for a remote host");
+    }
+}
+
 /// A node client. `timeout` bounds each try; a request gets four tries within four times it.
 pub fn rpc(
     url: &str,
@@ -109,6 +137,7 @@ pub fn rpc(
     timeout: Duration,
     cancel: polkadot_frame_trace_replay::rpc::CancellationToken,
 ) -> Result<polkadot_frame_trace_replay::rpc::Rpc> {
+    warn_unencrypted("--rpc", url);
     Ok(polkadot_frame_trace_replay::rpc::Rpc::with_options(
         url,
         usize::from(concurrency),

@@ -62,6 +62,7 @@ These limits protect against a node that sends too much. They apply to every com
 
 Output shows `--rpc` and `--otlp` URLs as scheme, host and port only, so a user name, password or API key in the URL stays out of logs.
 Text from the node or the OTLP receiver in error lines is cut to 512 characters.
+A plain `ws://` or `http://` URL to another machine prints one warning, because anyone on the way can read and change what is sent. `localhost` and loopback addresses do not.
 
 ## summary
 
