@@ -1,4 +1,4 @@
-# frame-trace
+# polkadot-frame-trace
 
 Replay any block of a Polkadot SDK chain on your machine and see every storage read and write as a trace.
 
@@ -11,22 +11,22 @@ Replay any block of a Polkadot SDK chain on your machine and see every storage r
 - **Every storage read and write of a block**, in order, with decoded names such as `System::Account(5Grw…)`.
 - **Why each read cost what it did**: answered from the block's own [cache](docs/reference/glossary.md#cache) or from the [trie](docs/reference/glossary.md#trie), and how many bytes it added to the block's proof.
 - **The busiest storage items, repeated reads and costs per extrinsic**, for one block or a range of thousands.
-- **A trace you can trust.** frame-trace checks every value it fetches against the chain's [state root](docs/reference/glossary.md#state-root). After the replay, the root check confirms your machine reached the same state as the chain.
+- **A trace you can trust.** polkadot-frame-trace checks every value it fetches against the chain's [state root](docs/reference/glossary.md#state-root). After the replay, the root check confirms your machine reached the same state as the chain.
 
 It works with any node over normal RPC, with no unsafe methods or special node build.
 
 ## Five-minute start
 
-Install frame-trace from the [latest release](https://github.com/agustinustheo/frame-trace/releases/latest). On Linux x86_64, with the newest version in `VERSION`:
+Install polkadot-frame-trace from the [latest release](https://github.com/agustinustheo/polkadot-frame-trace/releases/latest). On Linux x86_64, with the newest version in `VERSION`:
 
 ```sh
 VERSION=0.1.0
 TARGET=x86_64-unknown-linux-gnu
-curl -fsSLO "https://github.com/agustinustheo/frame-trace/releases/download/v$VERSION/frame-trace-$VERSION-$TARGET.tar.gz"
-curl -fsSLO "https://github.com/agustinustheo/frame-trace/releases/download/v$VERSION/SHA256SUMS"
+curl -fsSLO "https://github.com/agustinustheo/polkadot-frame-trace/releases/download/v$VERSION/polkadot-frame-trace-$VERSION-$TARGET.tar.gz"
+curl -fsSLO "https://github.com/agustinustheo/polkadot-frame-trace/releases/download/v$VERSION/SHA256SUMS"
 sha256sum --check --ignore-missing SHA256SUMS
-tar -xzf "frame-trace-$VERSION-$TARGET.tar.gz"
-mkdir -p ~/.local/bin && cp "frame-trace-$VERSION-$TARGET/frame-trace" ~/.local/bin/
+tar -xzf "polkadot-frame-trace-$VERSION-$TARGET.tar.gz"
+mkdir -p ~/.local/bin && cp "polkadot-frame-trace-$VERSION-$TARGET/polkadot-frame-trace" ~/.local/bin/
 ```
 
 Only `sha256sum` prints a line, which ends in `OK` when the archive is intact.
@@ -36,8 +36,8 @@ Only `sha256sum` prints a line, which ends in `OK` when the archive is intact.
 Or build it from source with Rust. The first build takes several minutes.
 
 ```sh
-git clone https://github.com/agustinustheo/frame-trace
-cd frame-trace
+git clone https://github.com/agustinustheo/polkadot-frame-trace
+cd polkadot-frame-trace
 cargo install --locked --path crates/cli
 ```
 
@@ -50,7 +50,7 @@ docker run -d --rm --name jaeger -p 16686:16686 -p 4318:4318 jaegertracing/jaege
 Trace the latest finalized [Westend Asset Hub](docs/reference/glossary.md#westend-asset-hub) block and send it to Jaeger:
 
 ```sh
-frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block finalized --otlp
+polkadot-frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block finalized --otlp
 ```
 
 You should see this. Your block number and sizes will differ.
@@ -67,15 +67,15 @@ exported 555 spans to http://127.0.0.1:4318
 `root check: PASS` means the replay produced the same state root as the block header.
 So the trace shows what the block really did.
 
-Open <http://127.0.0.1:16686>, pick the service `frame-trace` and click **Find Traces**.
-Open the trace named `frame-trace: block #<number> (0x…)`.
+Open <http://127.0.0.1:16686>, pick the service `polkadot-frame-trace` and click **Find Traces**.
+Open the trace named `polkadot-frame-trace: block #<number> (0x…)`.
 You will see the block's [phases](docs/concepts/phases.md): initialization, the required extrinsics, post inherents and finalization (this block has only inherents, so post inherents is its own phase).
 Each phase holds its storage reads and writes.
 Click any read to see where it was answered and its proof bytes.
 
 ## Learn more
 
-The [documentation](https://agustinustheodorus.com/frame-trace/) has a [glossary](docs/reference/glossary.md) and:
+The [documentation](https://agustinustheodorus.com/polkadot-frame-trace/) has a [glossary](docs/reference/glossary.md) and:
 
 - **Getting started:** [install](docs/getting-started/install.md), [your first trace](docs/getting-started/first-trace.md), [reading a trace](docs/getting-started/reading-a-trace.md).
 - **Guides** named after the job: [find repeated reads](docs/guides/find-repeated-reads.md), [measure proof size](docs/guides/measure-proof-size.md), [trace a runtime API call](docs/guides/trace-a-runtime-api-call.md), [analyse many blocks](docs/guides/analyse-many-blocks.md) and [more](docs/SUMMARY.md).
@@ -91,7 +91,7 @@ The [documentation](https://agustinustheodorus.com/frame-trace/) has a [glossary
 - A Polkadot SDK chain with Blake2 headers and `u32` block numbers. Decoded names need metadata V14, V15 or V16.
 - Docker, or any trace viewer that accepts OTLP over HTTP. JSON output needs neither.
 
-[What frame-trace supports](docs/reference/support.md) lists the chain requirements, the RPC methods frame-trace sends, the host functions and the tested chains.
+[What polkadot-frame-trace supports](docs/reference/support.md) lists the chain requirements, the RPC methods polkadot-frame-trace sends, the host functions and the tested chains.
 
 ## Contributing
 

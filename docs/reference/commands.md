@@ -1,6 +1,6 @@
 # Commands and flags
 
-This page lists every command and flag, taken from `frame-trace <command> --help`.
+This page lists every command and flag, taken from `polkadot-frame-trace <command> --help`.
 
 | Command | Does |
 | --- | --- |
@@ -24,8 +24,8 @@ This page lists every command and flag, taken from `frame-trace <command> --help
 ## block
 
 ```sh
-frame-trace block --rpc URL --block finalized --otlp
-frame-trace block --offline fixtures/replay/people-traced --json block.json
+polkadot-frame-trace block --rpc URL --block finalized --otlp
+polkadot-frame-trace block --offline fixtures/replay/people-traced --json block.json
 ```
 
 | Flag | Default | Meaning |
@@ -50,13 +50,13 @@ Without `--otlp` or `--json`, `block` prints a one-line count of phases and oper
 
 Flags that do not apply to the chosen source are refused, with exit code 2: `--block`, `--proof-concurrency` and `--rpc-timeout` need `--rpc`, `--metadata` needs `--from-file`, and the cache and metadata flags do not work with `--from-file` or `--from-json`.
 
-Without `--cache-dir`, compiled runtimes are still kept in `$XDG_CACHE_HOME/frame-trace/wasm` (or `~/.cache/frame-trace/wasm`), and downloaded state stays in memory only. See [Disk cache](#disk-cache) for the limits.
+Without `--cache-dir`, compiled runtimes are still kept in `$XDG_CACHE_HOME/polkadot-frame-trace/wasm` (or `~/.cache/polkadot-frame-trace/wasm`), and downloaded state stays in memory only. See [Disk cache](#disk-cache) for the limits.
 
 ## summary
 
 ```sh
-frame-trace summary --rpc URL --block finalized
-frame-trace summary --from-json block.json
+polkadot-frame-trace summary --rpc URL --block finalized
+polkadot-frame-trace summary --from-json block.json
 ```
 
 `summary` takes the same source flags as `block`, plus `--save`, `--proof-concurrency`, `--rpc-timeout`, `--cache-dir`, `--cache-max-bytes`, `--unauthenticated-metadata` and `--runtime-override`.
@@ -71,8 +71,8 @@ It prints these tables: **Storage per phase**, **Phase shares**, **Top items by 
 ## call
 
 ```sh
-frame-trace call --rpc URL --method Core_version --data 0x --check-state-call
-frame-trace call --offline fixtures/replay/call-people-nonce --summary
+polkadot-frame-trace call --rpc URL --method Core_version --data 0x --check-state-call
+polkadot-frame-trace call --offline fixtures/replay/call-people-nonce --summary
 ```
 
 | Flag | Default | Meaning |
@@ -100,8 +100,8 @@ With `--rpc`, give `--method` and exactly one of `--data` or `--args`.
 ## report
 
 ```sh
-frame-trace report block-1.json block-2.json
-frame-trace report --rpc URL --last 10
+polkadot-frame-trace report block-1.json block-2.json
+polkadot-frame-trace report --rpc URL --last 10
 ```
 
 | Flag | Default | Meaning |
@@ -127,8 +127,8 @@ A range holds at most 10,000 blocks.
 ## follow
 
 ```sh
-frame-trace follow --rpc URL --otlp
-frame-trace follow --rpc URL --best
+polkadot-frame-trace follow --rpc URL --otlp
+polkadot-frame-trace follow --rpc URL --best
 ```
 
 | Flag | Default | Meaning |
@@ -218,16 +218,16 @@ They are hidden from `--help`.
 
 The disk cache can go over the limit in these cases:
 
-- the runtimes in use plus the space kept for state are more than the limit. frame-trace keeps both, and logs a warning once when it first sees it;
-- a file frame-trace could not delete. It keeps counting it: a runtime not in use leaves less room for state, and an old state file stops new writes until it is deleted. It logs a warning once;
-- a runtime compiled since the last check. frame-trace checks the runtime folder when it loads a new runtime, and every 10 minutes;
+- the runtimes in use plus the space kept for state are more than the limit. polkadot-frame-trace keeps both, and logs a warning once when it first sees it;
+- a file polkadot-frame-trace could not delete. It keeps counting it: a runtime not in use leaves less room for state, and an old state file stops new writes until it is deleted. It logs a warning once;
+- a runtime compiled since the last check. polkadot-frame-trace checks the runtime folder when it loads a new runtime, and every 10 minutes;
 - the `nodes` folder of an older version, until it is deleted;
-- the files of another frame-trace using the same directory.
+- the files of another polkadot-frame-trace using the same directory.
 
-Use one frame-trace per cache directory.
+Use one polkadot-frame-trace per cache directory.
 A second one never gets wrong state, but each counts only its own files, and each one's deletions cost the other requests to the node.
 
 An older version kept state in `<DIR>/nodes`, one file per piece.
-frame-trace deletes the files it wrote there in the background, and keeps anything else in the folder.
-An older frame-trace still using the same directory can lose files it needs, and fail a replay.
+polkadot-frame-trace deletes the files it wrote there in the background, and keeps anything else in the folder.
+An older polkadot-frame-trace still using the same directory can lose files it needs, and fail a replay.
 

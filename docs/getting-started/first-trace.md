@@ -1,7 +1,7 @@
 # Your first trace in Jaeger
 
 In five minutes you will trace a live [Westend Asset Hub](../reference/glossary.md#westend-asset-hub) block and open it in Jaeger.
-You need frame-trace [installed](install.md) and Docker running.
+You need polkadot-frame-trace [installed](install.md) and Docker running.
 
 ## 1. Start Jaeger
 
@@ -12,12 +12,12 @@ docker run -d --rm --name jaeger -p 16686:16686 -p 4318:4318 jaegertracing/jaege
 ```
 
 Port 16686 is the Jaeger web page.
-Port 4318 receives traces over OTLP/HTTP, which is where frame-trace sends them.
+Port 4318 receives traces over OTLP/HTTP, which is where polkadot-frame-trace sends them.
 
 ## 2. Trace the latest finalized block
 
 ```sh
-frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block finalized --otlp
+polkadot-frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block finalized --otlp
 ```
 
 `--block finalized` picks the newest block the chain has finalized.
@@ -44,21 +44,21 @@ What the lines mean:
 
 | Line | Meaning |
 | --- | --- |
-| `fetching state` | frame-trace is asking the node for the storage the block needs, with proofs. |
-| `loading runtime and preparing state` | frame-trace is loading the chain's own [runtime](../reference/glossary.md#runtime), taken from the parent block's state. |
+| `fetching state` | polkadot-frame-trace is asking the node for the storage the block needs, with proofs. |
+| `loading runtime and preparing state` | polkadot-frame-trace is loading the chain's own [runtime](../reference/glossary.md#runtime), taken from the parent block's state. |
 | `root check: PASS` | The replay produced the same [state root](../reference/glossary.md#state-root) as the block header. See [What a replay proves](../concepts/what-a-replay-proves.md). |
 | `RPC calls: 93 (timed replay: 0)` | 93 requests to the node in total. The timed replay, which the trace comes from, made none. |
 | `execution proof: 90712 bytes` | An estimate of the storage proof size for the whole block. See [Proof bytes](../concepts/proof-bytes.md). |
-| `64 proof request rounds` | How many times frame-trace had to go back to the node for more state. |
+| `64 proof request rounds` | How many times polkadot-frame-trace had to go back to the node for more state. |
 | `state root: computed …; header …` | The root your machine computed, next to the root in the block header. They are equal. |
-| `exported 555 spans` | Jaeger accepted all 555 [spans](../reference/glossary.md#span-and-trace): the block, its phases and every storage operation. frame-trace fails if the receiver rejects any span. A receiver can still drop data later, for example through sampling or retention. |
+| `exported 555 spans` | Jaeger accepted all 555 [spans](../reference/glossary.md#span-and-trace): the block, its phases and every storage operation. polkadot-frame-trace fails if the receiver rejects any span. A receiver can still drop data later, for example through sampling or retention. |
 
 ## 3. Open the trace
 
 1. Open <http://127.0.0.1:16686>.
-2. In **Service**, pick `frame-trace`.
+2. In **Service**, pick `polkadot-frame-trace`.
 3. Click **Find Traces**.
-4. In the results, click the trace named `frame-trace: block #<number> (0x<first 8 hex digits>…<last 4>)`, for example `frame-trace: block #18598757 (0xb971c31a…8875)`. Jaeger puts the service name in front of the root span name, `block #18598757 (0xb971c31a…8875)`.
+4. In the results, click the trace named `polkadot-frame-trace: block #<number> (0x<first 8 hex digits>…<last 4>)`, for example `polkadot-frame-trace: block #18598757 (0xb971c31a…8875)`. Jaeger puts the service name in front of the root span name, `block #18598757 (0xb971c31a…8875)`.
 5. Click the `>>` button above the span list to collapse everything, then click the block row to open one level.
 
 You should see this:

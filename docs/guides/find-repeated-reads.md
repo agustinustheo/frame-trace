@@ -10,11 +10,11 @@ Its extrinsic 2 is a `Utility.batch` of three `transfer_keep_alive` calls from A
 
 ## 1. Print the tables
 
-Run this from the `frame-trace` directory.
+Run this from the `polkadot-frame-trace` directory.
 `--top 5` keeps five rows per phase.
 
 ```sh
-frame-trace summary --offline fixtures/replay/people-traced --top 5
+polkadot-frame-trace summary --offline fixtures/replay/people-traced --top 5
 ```
 
 Against a live chain, use `--rpc <url> --block <block>` instead of `--offline`.
@@ -77,7 +77,7 @@ The table counts. Jaeger shows the order.
 Send the block to Jaeger and open `extrinsic 2: Utility.batch`:
 
 ```sh
-frame-trace block --offline fixtures/replay/people-traced --otlp
+polkadot-frame-trace block --offline fixtures/replay/people-traced --otlp
 ```
 
 Click each `get System::Account(…)` row and check `frame.storage.origin` and `frame.storage.duplicate_read`.

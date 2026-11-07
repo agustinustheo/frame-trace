@@ -6,10 +6,10 @@
 
 ## Rank by proof bytes
 
-Run this from the `frame-trace` directory:
+Run this from the `polkadot-frame-trace` directory:
 
 ```sh
-frame-trace summary --offline fixtures/replay/people-traced --top 5
+polkadot-frame-trace summary --offline fixtures/replay/people-traced --top 5
 ```
 
 ```text
@@ -57,8 +57,8 @@ Top items by proof bytes
 `report` takes saved JSON from `block --json` and has `--sort-by`:
 
 ```sh
-frame-trace block --offline fixtures/replay/people-traced --json block.json
-frame-trace report block.json --sort-by ops --top 5
+polkadot-frame-trace block --offline fixtures/replay/people-traced --json block.json
+polkadot-frame-trace report block.json --sort-by ops --top 5
 ```
 
 ```text

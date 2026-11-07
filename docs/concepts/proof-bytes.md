@@ -1,7 +1,7 @@
 # Proof bytes
 
 A block's **storage proof** is the set of trie nodes needed to re-run the block without the full state.
-frame-trace records those nodes while it replays the block.
+polkadot-frame-trace records those nodes while it replays the block.
 The `execution proof` it prints after each replay is an estimate of their encoded size:
 
 ```text
@@ -42,7 +42,7 @@ Duplicate reads 203 = cache 177, trie (already in proof) 26, trie (new) 0, unkno
 
 - The execution proof is not the block's proof of validity (PoV).
   A parachain's PoV also holds the block itself, and collators send a compacted, compressed form of the proof.
-  frame-trace's number is an estimate of the recorded proof before that.
+  polkadot-frame-trace's number is an estimate of the recorded proof before that.
   Use it to compare blocks and to find which phases and items dominate, not as the exact PoV size.
 
 - They are not the size of a proof for one item or one extrinsic on its own.
@@ -50,14 +50,14 @@ Duplicate reads 203 = cache 177, trie (already in proof) 26, trie (new) 0, unkno
   Order matters: move an extrinsic earlier and its numbers change.
 - They are not the block's weight, and not network traffic.
 - The execution proof covers the storage the block touched.
-  It does not include the runtime code or the metadata frame-trace loaded to decode names.
+  It does not include the runtime code or the metadata polkadot-frame-trace loaded to decode names.
 
 ## When the sum is larger than the proof
 
 A storage transaction that rolls back can drop trie nodes from the proof.
 If a later operation needs them again, it pays for them again.
 Then the per-operation sum is larger than the execution proof.
-frame-trace prints a warning that starts with
+polkadot-frame-trace prints a warning that starts with
 `warning: proof bytes assigned to operations exceed the execution proof by <bytes> B`.
 
 Use the execution proof for the block total in that case.

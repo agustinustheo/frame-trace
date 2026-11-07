@@ -1,6 +1,6 @@
-# What frame-trace supports
+# What polkadot-frame-trace supports
 
-This page lists the chains, nodes and runtimes frame-trace can replay.
+This page lists the chains, nodes and runtimes polkadot-frame-trace can replay.
 
 ## Chains
 
@@ -19,7 +19,7 @@ This page lists the chains, nodes and runtimes frame-trace can replay.
 | RPC methods | Only the safe methods below. No unsafe RPC and no special node build. |
 | State | The node must still have the parent state of the block. For old blocks, use an [archive node](glossary.md#archive-node). |
 
-frame-trace sends only these RPC methods:
+polkadot-frame-trace sends only these RPC methods:
 
 | Method | Used for |
 | --- | --- |
@@ -35,7 +35,7 @@ frame-trace sends only these RPC methods:
 
 ## Host functions
 
-frame-trace runs the runtime with the host functions of Polkadot SDK release `polkadot-stable2609`:
+polkadot-frame-trace runs the runtime with the host functions of Polkadot SDK release `polkadot-stable2609`:
 
 | Group | What it covers |
 | --- | --- |
@@ -45,8 +45,8 @@ frame-trace runs the runtime with the host functions of Polkadot SDK release `po
 | Elliptic curves | BLS12-381, Ed-on-BLS12-381-Bandersnatch, Pallas and Vesta. |
 
 A runtime that imports any other host function cannot be replayed.
-The error says `the runtime needs host functions frame-trace does not have` and names them.
-See [Troubleshooting](../troubleshooting.md#the-runtime-needs-host-functions-frame-trace-does-not-have).
+The error says `the runtime needs host functions polkadot-frame-trace does not have` and names them.
+See [Troubleshooting](../troubleshooting.md#the-runtime-needs-host-functions-polkadot-frame-trace-does-not-have).
 
 ## Tested chains
 
@@ -78,7 +78,7 @@ See [Troubleshooting](../troubleshooting.md#overall-request-deadline-exceeded) f
 
 ## Versioning
 
-frame-trace is at version 0.x.
+polkadot-frame-trace is at version 0.x.
 Any release can change commands, flags or the JSON output.
-Each such change is listed in [`CHANGELOG.md`](https://github.com/agustinustheo/frame-trace/blob/main/CHANGELOG.md).
+Each such change is listed in [`CHANGELOG.md`](https://github.com/agustinustheo/polkadot-frame-trace/blob/main/CHANGELOG.md).
 The JSON output also carries a `schema_version`, see [JSON output](json.md).

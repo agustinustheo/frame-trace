@@ -59,7 +59,7 @@ This run used a saved block whose header state root had been edited.
 
 **What it means.** The runtime stopped while running the block.
 The usual cause is the root check: the runtime computed a different state root from the header, and the runtime's own check aborted.
-frame-trace exports nothing in that case.
+polkadot-frame-trace exports nothing in that case.
 See [What a replay proves](concepts/what-a-replay-proves.md).
 
 **Fix.**
@@ -67,35 +67,35 @@ See [What a replay proves](concepts/what-a-replay-proves.md).
 - If you used `--runtime-override`, the error ends with `the runtime override may be the cause`.
   Build the override from exactly the source of the runtime on chain.
 - If you used `--offline`, the saved block may have been changed. Save it again.
-- Otherwise, the block itself may need something frame-trace does not support. Open an issue with the block number and chain.
+- Otherwise, the block itself may need something polkadot-frame-trace does not support. Open an issue with the block number and chain.
 
-## `the runtime needs host functions frame-trace does not have`
+## `the runtime needs host functions polkadot-frame-trace does not have`
 
 This output comes from a test runtime in the repository that imports one made-up host function, `ext_frame_trace_missing_version_1`.
 Run this from the repository root to see it:
 
 ```sh
-frame-trace block --offline fixtures/replay/westend-asset-hub \
+polkadot-frame-trace block --offline fixtures/replay/westend-asset-hub \
   --runtime-override fixtures/wasm/missing-host-function.wasm
 ```
 
 ```text
 ...
 root check: NOT VERIFIED; RPC calls: 0
-Error: fixtures/replay/westend-asset-hub/artifact.json.zst: the runtime needs host functions frame-trace does not have: env:ext_frame_trace_missing_version_1; a runtime override was executed instead of the authenticated :code; the runtime override may be the cause. frame-trace's host functions are fixed when it is built, so this chain needs a frame-trace build that adds them. See https://agustinustheodorus.com/frame-trace/troubleshooting.html#the-runtime-needs-host-functions-frame-trace-does-not-have
+Error: fixtures/replay/westend-asset-hub/artifact.json.zst: the runtime needs host functions polkadot-frame-trace does not have: env:ext_frame_trace_missing_version_1; a runtime override was executed instead of the authenticated :code; the runtime override may be the cause. polkadot-frame-trace's host functions are fixed when it is built, so this chain needs a polkadot-frame-trace build that adds them. See https://agustinustheodorus.com/polkadot-frame-trace/troubleshooting.html#the-runtime-needs-host-functions-polkadot-frame-trace-does-not-have
 ```
 
 Without `--runtime-override`, the error has no part about the runtime override.
 
-**What it means.** The runtime calls host functions that frame-trace does not provide.
+**What it means.** The runtime calls host functions that polkadot-frame-trace does not provide.
 The list after the colon names each one.
-frame-trace provides the same host functions as a stable2609 Polkadot SDK omni-node.
-They are fixed when frame-trace is built, so no flag adds more.
-frame-trace stops before it runs the block and exports nothing.
+polkadot-frame-trace provides the same host functions as a stable2609 Polkadot SDK omni-node.
+They are fixed when polkadot-frame-trace is built, so no flag adds more.
+polkadot-frame-trace stops before it runs the block and exports nothing.
 
-**Fix.** frame-trace needs a new build that includes these host functions.
+**Fix.** polkadot-frame-trace needs a new build that includes these host functions.
 Open an issue with the chain name and the list of names from the error.
-If you build frame-trace yourself, [the developer notes](https://github.com/agustinustheo/frame-trace/blob/main/dev/README.md#add-host-functions-for-a-chain) describe how to add them.
+If you build polkadot-frame-trace yourself, [the developer notes](https://github.com/agustinustheo/polkadot-frame-trace/blob/main/dev/README.md#add-host-functions-for-a-chain) describe how to add them.
 
 ## `--runtime-override <file>: … not a Wasm module`
 
@@ -111,7 +111,7 @@ error: the argument '--runtime-override <WASM>' cannot be used with '--save <DIR
 ```
 
 **What it means.** The file is not a runtime, does not exist, or you combined it with `--save`.
-frame-trace checks the file before it replays anything.
+polkadot-frame-trace checks the file before it replays anything.
 
 **Fix.** Pass the `.wasm` or `.compact.compressed.wasm` file from the runtime build, under `target/release/wbuild/`.
 Drop `--save` when you use an override.
@@ -141,7 +141,7 @@ This run used a test receiver that rejects five spans.
 
 **What it means.** The receiver answered, but refused some spans.
 The text after the last colon is the receiver's own reason.
-frame-trace exits with code 1, because the trace in your viewer is incomplete.
+polkadot-frame-trace exits with code 1, because the trace in your viewer is incomplete.
 
 **Fix.** Read the receiver's reason and its logs.
 Common causes are limits on attributes per span, span size or spans per request.
@@ -187,19 +187,19 @@ To make room for a new trace, it drops the oldest one. The status line counts it
 While this goes on, the line repeats once a minute.
 
 **Fix.** Start the receiver again. Dropped traces are not sent later.
-To trace a dropped block, run `frame-trace block --rpc <URL> --block <hash> --otlp` with the hash from the line.
+To trace a dropped block, run `polkadot-frame-trace block --rpc <URL> --block <hash> --otlp` with the hash from the line.
 This works while the node still has the state before that block.
 
 ## No traces in Jaeger, but no error
 
-frame-trace printed `exported <N> spans`, but Jaeger shows nothing.
+polkadot-frame-trace printed `exported <N> spans`, but Jaeger shows nothing.
 
 **Fix.**
 
-- Pick the service `frame-trace` and click **Find Traces**.
-- Widen **Lookback**. Traces are stamped with the time you ran frame-trace.
-- Check that frame-trace and the page you opened talk to the same Jaeger. Jaeger's default in-memory storage loses traces on restart.
-- Without `--otlp`, frame-trace sends nothing to Jaeger. When you give neither `--otlp` nor `--json`, `block` ends with `Use --otlp or --json to export it.`
+- Pick the service `polkadot-frame-trace` and click **Find Traces**.
+- Widen **Lookback**. Traces are stamped with the time you ran polkadot-frame-trace.
+- Check that polkadot-frame-trace and the page you opened talk to the same Jaeger. Jaeger's default in-memory storage loses traces on restart.
+- Without `--otlp`, polkadot-frame-trace sends nothing to Jaeger. When you give neither `--otlp` nor `--json`, `block` ends with `Use --otlp or --json to export it.`
 
 ## `unsupported metadata version V13 (need V14, V15 or V16)`
 
@@ -207,12 +207,12 @@ frame-trace printed `exported <N> spans`, but Jaeger shows nothing.
 Error: reading metadata from /tmp/ftdocs/v13.scale: unsupported metadata version V13 (need V14, V15 or V16)
 ```
 
-**What it means.** frame-trace decodes names with metadata V14, V15 or V16.
+**What it means.** polkadot-frame-trace decodes names with metadata V14, V15 or V16.
 Old runtimes only have older metadata.
 You see this error when you pass such a file with `--metadata`.
 
 **Fix.** Use metadata V14, V15 or V16.
-For a replayed block, frame-trace instead prints the notice in the next section and continues without names.
+For a replayed block, polkadot-frame-trace instead prints the notice in the next section and continues without names.
 
 ## `notice: local metadata unavailable (…); using unnamed storage and hex results`
 
@@ -220,11 +220,11 @@ For a replayed block, frame-trace instead prints the notice in the next section 
 notice: local metadata unavailable (saved proof does not cover metadata execution); using unnamed storage and hex results
 ```
 
-**What it means.** frame-trace could not run the runtime's metadata API for this state.
+**What it means.** polkadot-frame-trace could not run the runtime's metadata API for this state.
 The trace is still complete and checked.
 Keys show as `<unknown>` or raw hex, and call results as hex.
 
-**Fix.** For a live block, `--unauthenticated-metadata` lets frame-trace use the node's metadata.
+**Fix.** For a live block, `--unauthenticated-metadata` lets polkadot-frame-trace use the node's metadata.
 It is not checked, and the output says so.
 For a call, use `--data` instead of `--args`.
 
@@ -263,30 +263,30 @@ replay #18598757: fetching state (shared limit: 8 concurrent RPC requests)
 
 This line can stay on screen for 20 seconds or more.
 
-**What it means.** frame-trace is fetching, with proofs, every piece of state the block reads.
+**What it means.** polkadot-frame-trace is fetching, with proofs, every piece of state the block reads.
 A Westend Asset Hub block needed 64 rounds of requests in [Your first trace](getting-started/first-trace.md).
 The first run also compiles the runtime.
 
 **Fix.**
 
 - Add `--cache-dir <dir>`. Later blocks and runs reuse the state earlier ones downloaded. In [Analyse many blocks](guides/analyse-many-blocks.md), RPC calls per block dropped from 85 to about 40.
-- Compiled runtimes are kept in `~/.cache/frame-trace/wasm` even without `--cache-dir`.
+- Compiled runtimes are kept in `~/.cache/polkadot-frame-trace/wasm` even without `--cache-dir`.
 - Raise `--proof-concurrency` on a fast connection. See [defaults and limits](reference/commands.md).
 - Use a node close to you, or your own node.
 
-## `disk cache: removing <dir>/nodes, left by an older frame-trace`
+## `disk cache: removing <dir>/nodes, left by an older polkadot-frame-trace`
 
 ```text
-disk cache: removing .frame-trace-cache/nodes, left by an older frame-trace; the disk cache is now in .frame-trace-cache/proof-nodes
-disk cache: kept .frame-trace-cache/nodes: it holds files frame-trace did not write
+disk cache: removing .polkadot-frame-trace-cache/nodes, left by an older polkadot-frame-trace; the disk cache is now in .polkadot-frame-trace-cache/proof-nodes
+disk cache: kept .polkadot-frame-trace-cache/nodes: it holds files polkadot-frame-trace did not write
 ```
 
 **What it means.** Earlier versions kept the [disk cache](reference/commands.md#disk-cache) as one file per piece of state.
 A long `follow` could leave a million files there, using several GiB.
-frame-trace now keeps it in a few large files. It deletes the files it wrote in `nodes` in the background, and keeps anything else.
+polkadot-frame-trace now keeps it in a few large files. It deletes the files it wrote in `nodes` in the background, and keeps anything else.
 The second line appears only when something else is in the folder.
 
-**Fix.** Nothing to do. If frame-trace stops first, the next run carries on. If you see the second line, look at what is left in `<dir>/nodes` and delete it yourself if you do not need it.
+**Fix.** Nothing to do. If polkadot-frame-trace stops first, the next run carries on. If you see the second line, look at what is left in `<dir>/nodes` and delete it yourself if you do not need it.
 
 ## `warning: disk cache: cannot write: …`
 
@@ -294,7 +294,7 @@ The second line appears only when something else is in the folder.
 warning: disk cache: cannot write: Permission denied (os error 13)
 ```
 
-**What it means.** frame-trace could not write to the disk cache, for example because the disk is full or the directory is read-only.
+**What it means.** polkadot-frame-trace could not write to the disk cache, for example because the disk is full or the directory is read-only.
 The trace is not affected. Later blocks download that state from the node again.
 This line is logged once per run.
 
@@ -306,8 +306,8 @@ This line is logged once per run.
 warning: disk cache: --cache-max-bytes 1048576 is less than the runtimes in use (26710016 bytes) plus 262144 bytes kept for downloaded state; the disk cache stays above the limit
 ```
 
-**What it means.** The compiled runtime frame-trace is using, plus the space it always keeps for downloaded state, is larger than `--cache-max-bytes`.
-frame-trace keeps both, so the disk cache stays above the limit. See [Disk cache](reference/commands.md#disk-cache).
+**What it means.** The compiled runtime polkadot-frame-trace is using, plus the space it always keeps for downloaded state, is larger than `--cache-max-bytes`.
+polkadot-frame-trace keeps both, so the disk cache stays above the limit. See [Disk cache](reference/commands.md#disk-cache).
 
 **Fix.** Raise `--cache-max-bytes` above the size in the message plus the kept space. A compiled Westend Asset Hub runtime is about 26 MB.
 
@@ -318,9 +318,9 @@ warning: disk cache: stuck/proof-nodes/0000000000.seg: Permission denied (os err
 warning: disk cache: old files in stuck/proof-nodes cannot be deleted; not writing until they can
 ```
 
-**What it means.** The disk cache is full, and frame-trace could not delete its oldest file. It still counts that file, and stops writing new state so the disk cache does not grow.
+**What it means.** The disk cache is full, and polkadot-frame-trace could not delete its oldest file. It still counts that file, and stops writing new state so the disk cache does not grow.
 Traces are not affected. Blocks ask the node for state the disk cache does not have.
-frame-trace tries again before each write, and writes again once the file is gone.
+polkadot-frame-trace tries again before each write, and writes again once the file is gone.
 
 **Fix.** Give your user permission to delete files in the folder named in the message.
 
@@ -330,7 +330,7 @@ frame-trace tries again before each write, and writes again once the file is gon
 warning: disk cache: blocked/proof-nodes: File exists (os error 17); running without it
 ```
 
-**What it means.** frame-trace could not create or open the folder for downloaded state, here because a file has that name.
+**What it means.** polkadot-frame-trace could not create or open the folder for downloaded state, here because a file has that name.
 It runs without keeping state on disk. Traces are not affected, but each block asks the node for everything.
 
 **Fix.** Remove what is in the way, or point `--cache-dir` at another directory.
@@ -341,7 +341,7 @@ It runs without keeping state on disk. Traces are not affected, but each block a
 warning: disk cache: nowasm/wasm: File exists (os error 17); runtimes are compiled again each run
 ```
 
-**What it means.** frame-trace could not create the folder for compiled runtimes. Each run compiles the runtime again, which can take a few seconds per block's first replay.
+**What it means.** polkadot-frame-trace could not create the folder for compiled runtimes. Each run compiles the runtime again, which can take a few seconds per block's first replay.
 
 **Fix.** Remove what is in the way, or point `--cache-dir` at another directory.
 
@@ -351,7 +351,7 @@ warning: disk cache: nowasm/wasm: File exists (os error 17); runtimes are compil
 warning: disk cache: skipping ro/proof-nodes/0000000000.seg: Permission denied (os error 13)
 ```
 
-**What it means.** One file of the disk cache could not be opened. frame-trace leaves it alone and does not count it towards `--cache-max-bytes`.
+**What it means.** One file of the disk cache could not be opened. polkadot-frame-trace leaves it alone and does not count it towards `--cache-max-bytes`.
 
 **Fix.** Give your user read and write access to the file, or delete it.
 
@@ -374,10 +374,10 @@ With a block number it would be `chain_getBlockHash`.
 ```text
 error: the argument '--rpc <URL>' cannot be used with '--metadata <FILE>'
 
-Usage: frame-trace block --block <NUMBER|HASH|best|finalized> <--rpc <URL>|--offline <DIR>|--from-file <FILE>|--from-json <FILE>>
+Usage: polkadot-frame-trace block --block <NUMBER|HASH|best|finalized> <--rpc <URL>|--offline <DIR>|--from-file <FILE>|--from-json <FILE>>
 ```
 
-**What it means.** Two flags do not work together, so frame-trace refuses to run instead of ignoring one.
+**What it means.** Two flags do not work together, so polkadot-frame-trace refuses to run instead of ignoring one.
 For example, `--metadata` only applies to `--from-file`, `--block` only to `--rpc`, and `report --cache-dir` only to `report --rpc`.
 The exit code is 2.
 
@@ -397,8 +397,8 @@ Error: range must be ordered, non-genesis and finalized (head #18597087)
 
 ## `state_call check: MISMATCH`
 
-**What it means.** With `--check-state-call`, the node's own `state_call` returned different bytes from frame-trace's run.
-frame-trace exits with code 3 after writing all outputs.
+**What it means.** With `--check-state-call`, the node's own `state_call` returned different bytes from polkadot-frame-trace's run.
+polkadot-frame-trace exits with code 3 after writing all outputs.
 
 **Fix.** Check that the node runs the same runtime as the block's state.
 If you used `--runtime-override`, a mismatch is expected when the override behaves differently.

@@ -1,15 +1,15 @@
 # Analyse many blocks
 
 One block can mislead.
-`frame-trace report` adds up many blocks and shows where storage work and [proof bytes](../concepts/proof-bytes.md) go in general.
+`polkadot-frame-trace report` adds up many blocks and shows where storage work and [proof bytes](../concepts/proof-bytes.md) go in general.
 
 ## 1. Report on the latest blocks
 
 This replays the last five final blocks of Westend Asset Hub:
 
 ```sh
-frame-trace report --rpc wss://westend-asset-hub-rpc.polkadot.io --last 5 --top 5 \
-  --cache-dir .frame-trace-cache --json range.json
+polkadot-frame-trace report --rpc wss://westend-asset-hub-rpc.polkadot.io --last 5 --top 5 \
+  --cache-dir .polkadot-frame-trace-cache --json range.json
 ```
 
 The progress lines for each block come first, then the tables:

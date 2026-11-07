@@ -1,6 +1,6 @@
 # Trace a runtime API call
 
-`frame-trace call` runs one runtime API, such as a nonce query or a fee query, against a block's state.
+`polkadot-frame-trace call` runs one runtime API, such as a nonce query or a fee query, against a block's state.
 You get the result, every storage read it made and its proof size.
 Writes the call makes are thrown away afterwards.
 
@@ -9,7 +9,7 @@ Writes the call makes are thrown away afterwards.
 This asks Westend Asset Hub for Alice's nonce at the latest final block:
 
 ```sh
-frame-trace call --rpc wss://westend-asset-hub-rpc.polkadot.io --at finalized \
+polkadot-frame-trace call --rpc wss://westend-asset-hub-rpc.polkadot.io --at finalized \
   --method AccountNonceApi_account_nonce \
   --data 0xd43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d \
   --check-state-call --otlp --save saved-call
@@ -53,7 +53,7 @@ Use exactly one of `--data` or `--args`.
 - `--args` takes JSON and encodes it with the runtime's metadata. It needs metadata V15 or V16.
 
 ```sh
-frame-trace call --rpc wss://westend-asset-hub-rpc.polkadot.io --at finalized \
+polkadot-frame-trace call --rpc wss://westend-asset-hub-rpc.polkadot.io --at finalized \
   --method TransactionPaymentApi_query_weight_to_fee \
   --args '{"weight":{"ref_time":1000000,"proof_size":0}}'
 ```
@@ -72,14 +72,14 @@ For an SS58 address or any shape JSON cannot express, use `--data`.
 
 ## 4. See the reads
 
-- `--summary` prints the same tables as `frame-trace summary`.
+- `--summary` prints the same tables as `polkadot-frame-trace summary`.
 - `--json <file>` writes the trace, the input, the raw result and the decoded result.
 - `--otlp` sends the trace to Jaeger or Tempo.
 
 ## Compare with the node
 
 `--check-state-call` sends the same call to the node with `state_call` and compares the bytes.
-On a mismatch frame-trace prints `state_call check: MISMATCH` and exits with code 3.
+On a mismatch polkadot-frame-trace prints `state_call check: MISMATCH` and exits with code 3.
 It still writes the JSON, saves and exports first.
 
 ## Replay a call offline
@@ -88,7 +88,7 @@ The command in step 1 used `--save saved-call`, which keeps the call and its pro
 `--offline` runs it again with no network:
 
 ```sh
-frame-trace call --offline saved-call
+polkadot-frame-trace call --offline saved-call
 ```
 
 ```text

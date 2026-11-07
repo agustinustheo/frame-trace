@@ -1,6 +1,6 @@
 # Save a block and replay it offline
 
-`--save` keeps everything frame-trace needs to replay a block later: the block, its parent header, the runtime and the checked state.
+`--save` keeps everything polkadot-frame-trace needs to replay a block later: the block, its parent header, the runtime and the checked state.
 `--offline` replays it with no network at all.
 Use it to share a block with a colleague, attach it to a bug report or test the same block again and again.
 Read [Before you share](#before-you-share) first.
@@ -8,7 +8,7 @@ Read [Before you share](#before-you-share) first.
 ## 1. Save a block
 
 ```sh
-frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block finalized \
+polkadot-frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block finalized \
   --save saved-block --json block.json
 ```
 
@@ -22,12 +22,12 @@ state root: computed 0xfb9758620031f5227e6b1367d4deb04cab717c33605bc96b17f11227d
 
 `saved-block/` now holds one file, `artifact.json.zst`, of 3.0 MB.
 Most of it is the runtime code.
-frame-trace only saves the block after the root check passes.
+polkadot-frame-trace only saves the block after the root check passes.
 
 ## 2. Replay it with no network
 
 ```sh
-frame-trace block --offline saved-block --otlp
+polkadot-frame-trace block --offline saved-block --otlp
 ```
 
 ```text
@@ -49,7 +49,7 @@ An edited or broken saved block fails instead of giving a wrong trace.
 `--json` output can be read again without running the block:
 
 ```sh
-frame-trace summary --from-json block.json --top 3
+polkadot-frame-trace summary --from-json block.json --top 3
 ```
 
 ```text
@@ -87,7 +87,7 @@ See [Trace a runtime API call](trace-a-runtime-api-call.md#replay-a-call-offline
 | `paseo-asset-hub-contract` | Paseo Asset Hub #15,366,850, a smart contract call that reads and writes the contract's child trie. |
 
 The repository's saved blocks share large files through `fixtures/replay/blobs/`.
-frame-trace looks for that folder next to the block's directory, so copy both together.
+polkadot-frame-trace looks for that folder next to the block's directory, so copy both together.
 Blocks you save yourself always hold everything in one file.
 
 [Saved block format](../reference/saved-block-format.md) describes what is inside.

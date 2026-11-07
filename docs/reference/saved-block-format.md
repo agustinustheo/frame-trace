@@ -15,7 +15,7 @@ It has no paths to other files.
 | `block` | The block as `chain_getBlock` returned it: header and extrinsics. |
 | `parent_header` | The parent block's header. Its hash must match the block's parent hash. |
 | `runtime_version` | The runtime version the node reported, kept for reference. |
-| `metadata` | Metadata in hex, kept for reference. frame-trace derives it again from the runtime before decoding. |
+| `metadata` | Metadata in hex, kept for reference. polkadot-frame-trace derives it again from the runtime before decoding. |
 | `proof_nodes` | The trie nodes the replay read, in hex, each stored once. They include the runtime code. |
 | `call` | For calls only: `method`, `data`, the `result`, and the node's `state_call` answer if you used `--check-state-call`. |
 
@@ -24,7 +24,7 @@ For a call, `block` and `parent_header` both hold the header of the block whose 
 ## What is checked on replay
 
 The saved file is not trusted.
-On `--offline`, frame-trace checks:
+On `--offline`, polkadot-frame-trace checks:
 
 - the block hash against the header, and the parent header against the block's parent hash;
 - every trie node it uses, by walking down from the parent state root;
@@ -37,7 +37,7 @@ A saved `state_call` answer is only compared, and the output marks it `recorded 
 
 ## Size limits
 
-frame-trace refuses files beyond these limits:
+polkadot-frame-trace refuses files beyond these limits:
 
 | Limit | Value |
 | --- | --- |

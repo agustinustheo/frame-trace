@@ -1,7 +1,7 @@
 # Phases of a block
 
 A **phase** is one part of a block's execution.
-frame-trace puts every storage operation in exactly one phase.
+polkadot-frame-trace puts every storage operation in exactly one phase.
 In Jaeger every phase is a child of the block span, except `post inherents (on_poll)`.
 That phase sits inside the first extrinsic that is not an inherent, when the block has one.
 When the block has only inherents, it is a top-level phase of its own, just before finalization.
@@ -37,13 +37,13 @@ Here is block #4 of the People fixture as `summary` prints it:
 The runtime runs the post-inherent hooks lazily.
 They start when the first extrinsic that is not an inherent is applied, inside that extrinsic.
 That extrinsic is usually signed, but it can be an unsigned one.
-frame-trace shows the hooks nested under it, with `└`, and counts them separately.
+polkadot-frame-trace shows the hooks nested under it, with `└`, and counts them separately.
 The extrinsic's own row does not include them.
 If a block has only inherents, post inherents is a phase of its own, as in most Westend Asset Hub blocks.
 
 ## Phase groups
 
-When frame-trace adds up many blocks, it groups the extrinsic phases.
+When polkadot-frame-trace adds up many blocks, it groups the extrinsic phases.
 It sorts them by whether the extrinsic is signed, read from the extrinsic's bytes.
 That is an approximation of inherents and user transactions: an unsigned extrinsic that is not an inherent lands in the inherents group.
 The group names appear in the **Phase shares** table:

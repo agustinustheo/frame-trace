@@ -1,4 +1,4 @@
-# frame-trace
+# polkadot-frame-trace
 
 Replay any block of a Polkadot SDK chain on your machine and see every storage read and write as a trace.
 
@@ -23,7 +23,7 @@ The picture shows block #4 of a People chain in Jaeger:
 
 ## How it works
 
-frame-trace asks any node for the block and the state it needs, over normal RPC.
+polkadot-frame-trace asks any node for the block and the state it needs, over normal RPC.
 It checks every value against the parent block's state root.
 Then it runs the block with the chain's own runtime on your machine and records each storage call.
 
@@ -31,7 +31,7 @@ Then it runs the block with the chain's own runtime on your machine and records 
 
 ## Where to start
 
-- New here? [Install frame-trace](getting-started/install.md), then [get your first trace](getting-started/first-trace.md).
+- New here? [Install polkadot-frame-trace](getting-started/install.md), then [get your first trace](getting-started/first-trace.md).
 - Have a question about a block? Pick a guide, such as [Find repeated reads](guides/find-repeated-reads.md).
 - Want a dashboard and search across blocks? [Send traces to Grafana](guides/send-traces-to-grafana.md).
 - Not sure what a number means? Read the [concepts](concepts/what-a-replay-proves.md).
