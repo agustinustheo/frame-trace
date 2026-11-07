@@ -151,5 +151,5 @@ Client certificates are not supported.
 ## Before you share
 
 Traces hold raw storage keys and decoded names, including account addresses.
-Review them before you send them to a shared backend.
+Check them before you send them to a shared backend.
 See [Send traces](send-traces.md#before-you-share).

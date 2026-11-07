@@ -50,9 +50,9 @@ polkadot-frame-trace summary --rpc wss://westend-asset-hub-rpc.polkadot.io --blo
 ## Choose an endpoint
 
 The URL can be `ws://`, `wss://`, `http://` or `https://`.
-The node must serve the standard methods, including `state_getReadProof`, which polkadot-frame-trace uses for every piece of state.
+The node must serve the standard methods, including `state_getReadProof`. polkadot-frame-trace uses it for every piece of state.
 
-One block takes about 90 requests on Westend Asset Hub, and `report` and `follow` send that for every block.
+One Westend Asset Hub block takes about 90 requests, and `report` and `follow` send that many for every block.
 Before you trace ranges or follow a chain, check the endpoint's:
 
 - request limits: public endpoints can rate-limit you, and polkadot-frame-trace then retries and slows down;
@@ -78,5 +78,5 @@ polkadot-frame-trace decodes keys such as `System::Account(5Grw…)` using the r
 It gets the metadata by running the runtime's metadata API on your machine, checked like any other state.
 Runtimes need metadata V14, V15 or V16, see [What polkadot-frame-trace supports](../reference/support.md).
 If that fails, polkadot-frame-trace prints a notice and shows raw keys and hex values.
-`--unauthenticated-metadata` lets it fall back to the node's `state_getMetadata` instead.
+`--unauthenticated-metadata` uses the node's `state_getMetadata` instead.
 That metadata is not checked, and the output says so.

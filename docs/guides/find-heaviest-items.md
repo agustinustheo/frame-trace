@@ -48,7 +48,7 @@ Top items by proof bytes
 ## What the example shows
 
 - `System::EventTopics` added the most proof bytes, 1,120, with no reads at all.
-  Initialization deletes this prefix, and walking the keys to delete them pulls trie nodes into the proof.
+  Initialization deletes this prefix. To delete the keys, the runtime walks them, and that adds trie nodes to the proof.
 - `System::Account` was read 74 times: 52 from cache, 20 from the trie already in proof, 2 new.
   Only the two new reads added proof bytes, 166 each. The other reads found their trie path already in the proof.
 

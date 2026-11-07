@@ -5,7 +5,7 @@ One block can mislead.
 
 ## 1. Report on the latest blocks
 
-This replays the last five final blocks of Westend Asset Hub:
+This replays the last five finalized blocks of Westend Asset Hub:
 
 ```sh
 polkadot-frame-trace report --rpc wss://westend-asset-hub-rpc.polkadot.io --last 5 --top 5 \
@@ -63,28 +63,28 @@ Later blocks needed about 40, because `--cache-dir` kept state the earlier block
 
 ## 2. Read the result
 
-- **Finalization dominates.** It made 82.9% of the proof bytes and 60.1% of the storage time in these five blocks.
+- **Finalization is the largest part.** It made 82.9% of the proof bytes and 60.1% of the storage time in these five blocks.
   No signed extrinsic was in them, so this is the cost of an empty block.
 - **Staking data is the reason.** `VoterList::ListNodes`, `Staking::Ledger`, `Staking::Bonded` and `Staking::Nominators` lead the item table.
-  Each block reads 10 new ledgers and nominators, and those reads pull new trie nodes into the proof.
+  Each block reads 10 new ledgers and nominators, and those reads add new trie nodes to the proof.
 - **Repeats go to the trie.** `VoterList::ListNodes` was read 150 times from the trie already in proof.
   No write came first, so none could come from the cache.
   See [Find repeated reads](find-repeated-reads.md).
 - **Extrinsics** shows the median and the 95th percentile per extrinsic type.
   `Timestamp.set` added 0 proof bytes in every block: earlier phases had already touched its nodes.
 
-Your numbers will differ: the chain moves on.
+Your numbers will be different, because the chain has new blocks.
 
 ## 3. Choose the blocks
 
 | Input | Example |
 | --- | --- |
-| The last K final blocks | `--rpc <url> --last 10` |
-| A range of final blocks | `--rpc <url> --from 18563569 --to 18563608` |
+| The last K finalized blocks | `--rpc <url> --last 10` |
+| A range of finalized blocks | `--rpc <url> --from 18563569 --to 18563608` |
 | Saved `block --json` files | `report a.json b.json`, or `--from-json a.json` repeated |
 
 A range can hold up to 10,000 blocks.
-It must start after the genesis block and end at or before the latest final block.
+It must start after the genesis block and end at or before the latest finalized block.
 Saved files need no network.
 
 ## 4. Tune it
@@ -100,7 +100,7 @@ Saved files need no network.
 
 ## When a block fails
 
-`report` keeps going.
+`report` continues.
 Failed blocks and files are listed in the output and in the JSON `errors` field.
 The command then exits with code 1.
 A block hash that appears twice counts as a failed input.

@@ -20,8 +20,8 @@ In the runtime crate's `Cargo.toml`:
 with-tracing = ["sp-io/with-tracing", "frame-executive/with-tracing"]
 ```
 
-Both features turn on `sp-tracing/with-tracing` for the whole Wasm build.
-That also turns on the spans FRAME generates for hooks and calls.
+Both features enable `sp-tracing/with-tracing` for the whole Wasm build.
+That also enables the spans that FRAME makes for hooks and calls.
 This was checked against the stable2609 crates: `sp-io` 49.0.0, `frame-executive` 49.0.0 and `sp-tracing` 19.0.0.
 
 The feature does not change what the runtime writes.
@@ -39,7 +39,7 @@ cargo build --release -p <runtime-crate> --features with-tracing
 
 The Wasm is in `target/release/wbuild/<runtime-crate>/<runtime_crate>.compact.compressed.wasm`.
 If you set `CARGO_TARGET_DIR` outside the workspace, also set `WASM_BUILD_WORKSPACE_HINT` to the workspace root.
-Otherwise the Wasm builder can pick up a different lock file.
+Otherwise the Wasm builder may use a different lock file.
 
 Build it from the same source and version as the runtime on chain.
 
@@ -110,7 +110,7 @@ The spans, timings and metadata come from your Wasm.
 
 ## How the override is labelled
 
-Every output says a substitute ran:
+Every output says that another runtime ran:
 
 - stderr names the file and both code hashes before anything runs;
 - the Jaeger root span name ends in `[runtime override]` and has `frame.runtime.override = true`;

@@ -122,4 +122,4 @@ polkadot-frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block
 
 Traces and JSON hold raw storage keys and decoded names, including account addresses such as `5Grw…`.
 With `--runtime-override`, they also hold the local path of your Wasm file.
-Storage keys are not secrets on a public chain, but review traces before you upload them to a shared or hosted backend.
+Storage keys are not secret on a public chain. Check traces before you send them to a shared or hosted backend.

@@ -86,7 +86,7 @@ Click the first read of `System::Account(5FHn…94ty)`, then **Span attributes**
 2. A phase: extrinsic 2, a `Utility.batch`.
 3. Runtime calls: `batch`, then the first `transfer_keep_alive`. You see these because this block's runtime was built with tracing. See [See runtime calls inside extrinsics](see-runtime-calls.md).
 4. A read of Bob's account, `System::Account(5FHn…94ty)`.
-5. `frame.storage.origin`: `trie (new)`, so polkadot-frame-trace looked it up in the chain state and it was not in the proof yet.
+5. `frame.storage.origin`: `trie (new)`. The read went to the chain state, and its trie nodes were not in the proof yet.
 6. `frame.storage.proof_bytes`: this read added 166 bytes to the block's proof.
 7. The read took 6.88 µs in the replay on your machine.
 

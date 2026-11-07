@@ -51,7 +51,7 @@ curl -s -G http://127.0.0.1:3000/api/datasources/proxy/uid/tempo/api/search \
 
 ## Reads that cost proof bytes
 
-**Trie reads that added proof bytes.** Reads polkadot-frame-trace had to look up in the chain state and that made the proof bigger. See [Cache or trie](../concepts/cache-or-trie.md).
+**Trie reads that added proof bytes.** Reads that went to the chain state and made the proof larger. See [Cache or trie](../concepts/cache-or-trie.md).
 
 ```text
 { span.frame.storage.origin = "trie (new)" && span.frame.storage.proof_bytes > 0 }

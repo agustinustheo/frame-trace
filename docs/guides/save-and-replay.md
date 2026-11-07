@@ -2,7 +2,7 @@
 
 `--save` keeps everything polkadot-frame-trace needs to replay a block later: the block, its parent header, the runtime and the checked state.
 `--offline` replays it with no network at all.
-Use it to share a block with a colleague, attach it to a bug report or test the same block again and again.
+Use it to share a block, attach it to a bug report, or test the same block many times.
 Read [Before you share](#before-you-share) first.
 
 ## 1. Save a block
@@ -67,7 +67,7 @@ The saved block directory is the one that is checked again.
 | Keep | To |
 | --- | --- |
 | `--save` directory | Replay the block again, export it again, prove it again. |
-| `--json` file | Read the tables again, or feed many blocks to `report`. |
+| `--json` file | Read the tables again, or give many blocks to `report`. |
 
 ## Runtime API calls
 
@@ -76,7 +76,7 @@ See [Trace a runtime API call](trace-a-runtime-api-call.md#replay-a-call-offline
 
 ## Example blocks in the repository
 
-`fixtures/replay/` holds saved blocks you can replay right away:
+`fixtures/replay/` holds saved blocks that you can replay now:
 
 | Directory | Block |
 | --- | --- |
@@ -97,4 +97,4 @@ Blocks you save yourself always hold everything in one file.
 A saved block holds real chain data: the block, its extrinsics and the state values it read.
 `--json` output and traces hold raw storage keys and decoded account addresses.
 With `--runtime-override`, traces and JSON also hold the local path of your Wasm file.
-None of this is secret on a public chain, but review it before you share or upload it, especially for a private or test network.
+None of this is secret on a public chain. Check it before you share it, mainly for a private or test network.

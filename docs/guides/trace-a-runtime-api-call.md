@@ -2,11 +2,11 @@
 
 `polkadot-frame-trace call` runs one runtime API, such as a nonce query or a fee query, against a block's state.
 You get the result, every storage read it made and its proof size.
-Writes the call makes are thrown away afterwards.
+polkadot-frame-trace discards the writes of the call when it ends.
 
 ## 1. Run a call
 
-This asks Westend Asset Hub for Alice's nonce at the latest final block:
+This asks Westend Asset Hub for Alice's nonce at the latest finalized block:
 
 ```sh
 polkadot-frame-trace call --rpc wss://westend-asset-hub-rpc.polkadot.io --at finalized \
@@ -42,7 +42,7 @@ In Jaeger the trace is named `call AccountNonceApi_account_nonce at #18598779`.
 | Value | Picks |
 | --- | --- |
 | `best` | The newest block. This is the default. |
-| `finalized` | The latest final block. |
+| `finalized` | The latest finalized block. |
 | A number or a full hash | That block. |
 
 ## 3. Pass the arguments

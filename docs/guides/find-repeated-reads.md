@@ -3,7 +3,7 @@
 A repeated read is a read of a key the same phase already read.
 It is not an error.
 Many repeats are cheap [cache](../concepts/cache-or-trie.md) reads.
-Repeats that go to the [trie](../concepts/cache-or-trie.md) cost more, and they are worth a look.
+Repeats that go to the [trie](../concepts/cache-or-trie.md) cost more. Check those first.
 
 This guide uses block #4 of the People fixture.
 Its extrinsic 2 is a `Utility.batch` of three `transfer_keep_alive` calls from Alice.
@@ -66,9 +66,8 @@ With the first read, that is 48 reads of the same key in one extrinsic:
 Only the first read added proof bytes: 166 of them.
 The other 47 were repeats: 5 extra trie walks and 42 memory reads.
 
-Bob's row tells a different story: 15 repeats, 8 from cache and 7 from the trie.
-Bob is only read until the first transfer writes his balance.
-Until then, every read of his account walks the trie again.
+Bob's row is different: 15 repeats, 8 from cache and 7 from the trie.
+Until the first transfer writes his balance, every read of his account walks the trie again.
 Reading a key does not put it in the cache. Only a write does.
 
 ## 4. See the reads in order
