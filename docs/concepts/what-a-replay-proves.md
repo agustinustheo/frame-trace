@@ -1,9 +1,9 @@
 # What a replay proves
 
-A **replay** runs a block again on your machine.
-polkadot-frame-trace replays the block with the chain's own runtime and records every storage call.
-At the end it runs the **root check**: the replay must produce the same state root as the block header.
-If it does, the trace shows what the block really did to storage.
+A **replay** runs a block again on your machine, with the chain's own runtime.
+polkadot-frame-trace records every storage call during the replay.
+At the end, it does the **root check**: the replay must give the same state root as the block header.
+If the roots are the same, the trace shows what the block really did to storage.
 
 ```mermaid
 flowchart LR
@@ -16,21 +16,21 @@ flowchart LR
 
 ## The steps
 
-1. **Fetch.** polkadot-frame-trace asks the node for the block and its parent header with normal RPC methods.
-   It needs no unsafe methods. The node must still keep the parent block's state.
-2. **Check the proofs.** For every storage value the block needs, polkadot-frame-trace asks for a proof.
-   Each proof is checked against the parent block's state root before the value is used.
-   The runtime code itself, `:code`, comes through the same check.
-3. **Run the block.** Your machine executes `Core_execute_block` with that runtime.
+1. **Fetch.** polkadot-frame-trace gets the block and its parent header from the node with normal RPC methods.
+   It uses no unsafe methods. The node must still have the state of the parent block.
+2. **Check the proofs.** polkadot-frame-trace gets a proof for each storage value that the block needs.
+   It checks each proof against the parent's state root before it uses the value.
+   The runtime code, `:code`, gets the same check.
+3. **Run the block.** Your machine runs `Core_execute_block` with that runtime.
    Signature checks and the runtime's own final checks stay on.
-4. **Root check.** The runtime computes the new state root.
-   polkadot-frame-trace compares it with the root in the block header and prints both.
-5. **Export.** Only after a pass does polkadot-frame-trace send the trace to OTLP or write JSON.
+4. **Root check.** The runtime calculates the new state root.
+   polkadot-frame-trace compares it with the root in the block header, and prints both roots.
+5. **Export.** polkadot-frame-trace sends the trace to OTLP or writes JSON only after a pass.
 
-polkadot-frame-trace first fetches and prepares the state the block needs.
-That preparation can run the block more than once, to find which state it reads.
-Then it runs a final **timed replay** that uses only the prepared state and makes no network calls.
-The trace and its timings come from the timed replay.
+Before the final replay, polkadot-frame-trace finds and gets the state that the block reads.
+To find that state, it may run the block more than once.
+Then it does a last **timed replay**. This replay uses only the state it already has, and makes no network calls.
+The trace and its times come from the timed replay.
 That is why the output says `RPC calls: 92 (timed replay: 0)`.
 
 ## Reading the output lines
@@ -55,28 +55,28 @@ When the root check fails, polkadot-frame-trace stops with an error and exports 
 
 ## What a pass means
 
-- Every value the block read came from the real parent state, checked by proof.
-- The runtime that ran is the one stored on chain, unless you chose a [runtime override](../guides/see-runtime-calls.md).
-- The block's writes lead to exactly the state root the chain recorded.
-  So the list of reads and writes in the trace is complete and in the real order.
+- Each value that the block read came from the real parent state. A proof checked each value.
+- The runtime that ran is the runtime on chain, unless you used a [runtime override](../guides/see-runtime-calls.md).
+- The writes of the block give the same state root that the chain recorded.
+  Thus the reads and writes in the trace are complete, and in the real order.
 
 ## Runtime upgrades
 
-A block always runs with the runtime stored in its parent's state.
-A block that upgrades the runtime runs on the old code and writes the new `:code`.
-The next block is the first to run the new code.
-Storage and extrinsic names in each trace come from the runtime that ran that block.
+A block always runs with the runtime in the state of its parent.
+A block that upgrades the runtime runs on the old code, and writes the new `:code`.
+The next block is the first block that runs the new code.
+The storage and extrinsic names in each trace come from the runtime that ran that block.
 
 ## What a pass does not mean
 
 - It does not check consensus.
-  polkadot-frame-trace trusts the node to give it a block header from the chain you meant.
-  The root check proves the block matches that header, not that the header is final.
+  polkadot-frame-trace trusts the node to send a block header from the correct chain.
+  The root check proves that the block agrees with that header. It does not prove that the header is finalized.
 - Timings are from your machine.
   They are not the node's import time, its database speed or the block's weight.
   See [Timings](timings.md).
-- With `--runtime-override`, a pass shows that the substitute runtime wrote the same state.
-  The spans and timings then describe the substitute, and the output says so.
+- With `--runtime-override`, a pass shows that the other runtime wrote the same state.
+  The spans and times then show the other runtime, and the output says so.
 
 ## Runtime API calls have no root check
 

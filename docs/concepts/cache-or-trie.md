@@ -1,7 +1,7 @@
 # Cache or trie
 
-Every storage read has an **origin**: where the runtime got the value.
-There are three origins.
+Each storage read has an **origin**: the place where the runtime got the value.
+There are three origins. A fourth value, unknown, means there is no origin.
 
 | Origin | Meaning | Proof bytes |
 | --- | --- | --- |
@@ -30,7 +30,7 @@ Alice sends to Bob.
 ## Reading does not fill the cache
 
 Only a write puts a key in the cache.
-Reading a key twice goes to the trie twice.
+If the block reads a key two times, both reads go to the trie.
 That is why this transfer reads Bob's account from the trie eight times: once new, then seven times already in proof.
 After the transfer writes Bob's balance, his next reads come from the cache.
 
@@ -38,10 +38,10 @@ After the transfer writes Bob's balance, his next reads come from the cache.
 
 - **trie** does not mean a disk read.
   A real node has its own caches below the runtime.
-  The origin only says the runtime asked the chain state instead of its own pending changes.
+  The origin only tells you that the runtime read the chain state, not the changes of the block.
 - **cache** does not mean free.
   The runtime still makes a host call and copies the value.
-  It shows up in `storage time` like any other read.
+  The read is in `storage time`, as all reads are.
 - The origin does not tell you whether a read is safe to remove.
 
 ## Where you see origins
@@ -59,4 +59,4 @@ That line says block #4 made 312 reads.
 231 came from the cache.
 81 went to the trie: 47 found their path already in the proof and 34 added new nodes.
 
-[Find repeated reads](../guides/find-repeated-reads.md) puts these numbers to work.
+[Find repeated reads](../guides/find-repeated-reads.md) uses these numbers.
