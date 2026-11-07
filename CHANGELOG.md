@@ -19,28 +19,20 @@ The project is named polkadot-frame-trace: the command, the crates, the OTLP ser
 - `follow`: trace each new finalized block as it arrives, or each new best block with `--best`.
 - Root check: every block replay confirms it reached the same state root as the chain.
 - For each read: whether it came from the cache or the trie, and the bytes it added to the block's proof.
-- Export to any trace viewer over OTLP/HTTP, or to JSON.
+- Export to any trace viewer over OTLP/HTTP, or to JSON. Ready setups for Jaeger, Grafana and Grafana Alloy with Tempo, with a provisioned dashboard.
 - `--save` and `--offline`: save a block or call, then replay it with no network.
 - `--runtime-override`: replay real blocks with a runtime built with tracing, to see runtime calls inside extrinsics.
-- Ready setups for Jaeger, Grafana and Grafana Alloy with Tempo, with a provisioned dashboard.
 - `--rpc-timeout`: the longest wait for one RPC response, for slow nodes. Each request gets four tries. The default is 30 seconds, so a request can take up to 2 minutes. Public nodes take 7 to 35 seconds to send the runtime code.
 - `follow` can run unattended. It stops cleanly on `SIGTERM` and `SIGHUP`, as on Ctrl-C. It waits longer after each failed check for new blocks. When the OTLP receiver is down, it keeps the traces and later resends only the requests the receiver did not accept.
 - A runtime that needs host functions polkadot-frame-trace does not have fails with an error that names them.
 - Nightly builds of `main` for the same four systems as releases, in the `Nightly` pre-release on GitHub. `polkadot-frame-trace --version` shows the date and commit they were built from.
 - Tested on relay chains and on blocks that upgrade the runtime, see [What polkadot-frame-trace supports](https://agustinustheodorus.com/polkadot-frame-trace/reference/support.html).
-
-- Limits against a node that sends too much: 64 MiB per RPC response and 16 MiB per WebSocket frame, and 1,000,000 pieces of state or 256 MiB for one block.
+- Limits against a node that sends too much: 64 MiB per RPC response, 16 MiB per WebSocket frame, and 1,000,000 pieces of state or 256 MiB for one block.
 - A replay deadline: `follow` exits 1 when a replay runs the runtime for 10 minutes, so a supervisor restarts it. Other commands warn once.
 - A warning when `--rpc` or `--otlp` is plain `ws://` or `http://` to another machine.
+- A private disk cache: polkadot-frame-trace creates the `--cache-dir` directory readable by you alone, and runs without one that another user owns or can write. Without `HOME`, compiled runtimes go to a per-user folder in the temporary directory.
+- URL redaction: output and errors show `--rpc` and `--otlp` URLs as scheme, host and port only, so credentials and API keys stay out of logs. Error text from the node or the OTLP receiver is cut to 512 characters.
 
-### Changed
-
-- The disk cache directory must be private: polkadot-frame-trace creates it readable by you alone, and runs without one that another user owns or can write. Without `HOME`, compiled runtimes are kept in a per-user folder in the temporary directory.
-- Output and errors show `--rpc` and `--otlp` URLs as scheme, host and port only, so credentials and API keys in them stay out of logs. Error text from the node or the OTLP receiver is cut to 512 characters.
-
-- For anyone running builds from `main`: compiled runtimes are kept in `~/.cache/polkadot-frame-trace`. You can delete `~/.cache/frame-trace`.
-- For anyone running builds from `main`: the disk cache of `--cache-dir` keeps downloaded state in a few files of up to 64 MiB, not one file per piece. `--cache-max-bytes` now counts bytes used on disk, by state and compiled runtimes together. Runtimes in use plus the space kept for state, files polkadot-frame-trace cannot delete, runtimes compiled since the last check, the old `nodes` folder until it is deleted, and another polkadot-frame-trace on the same directory can take it over the limit; see [Disk cache](https://agustinustheodorus.com/polkadot-frame-trace/reference/commands.html#disk-cache). A long `follow` no longer slows down as the disk cache grows, and starts at once with a full one. The files the old version wrote in `nodes` are deleted in the background.
-- For anyone running builds from `main`: downloaded state kept in memory for all workers is limited to 128 MiB, counting an upper estimate of what each piece takes in memory. When it is full, the least recently read pieces go first, not all of them at once. On Westend Asset Hub, a long `follow` now levels off at about 100 MiB of that estimate. The status line shows it in `state-memory`, `state-pieces` and `state-from-memory`.
-- For anyone running builds from `main`: `follow` prints its status line when a problem count changes, and otherwise at a fixed interval. The status and summary lines have new fields: `done` is replaced by `traced` and `exported`, and there are export, `poll-failures` and `up` counts.
+Nightly users: delete `~/.cache/frame-trace` and `<cache-dir>/nodes`.
 
 [0.1.0]: https://github.com/agustinustheo/polkadot-frame-trace/releases/tag/v0.1.0
