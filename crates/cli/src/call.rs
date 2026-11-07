@@ -136,7 +136,10 @@ pub fn run(args: CallArgs) -> Result<()> {
         artifact.call.as_mut().context("missing call context")?.data = hex0(&data);
         (artifact, Some(rpc))
     };
-    let replay = call::replay(artifact, rpc, &session, args.oracle)?;
+    let replay = {
+        let _slow = super::source::warn_if_slow("the call".into());
+        call::replay(artifact, rpc, &session, args.oracle)?
+    };
     if let Some(dir) = &args.save {
         replay.artifact.save(dir)?;
     }

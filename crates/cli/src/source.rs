@@ -79,6 +79,29 @@ pub fn rpc_timeout(text: &str) -> std::result::Result<Duration, String> {
     Ok(Duration::from_secs_f64(secs))
 }
 
+/// Longest a replay should keep running the runtime. `follow` exits 1 when one does; the
+/// other commands warn once. Real blocks take seconds, and compiling a new runtime a minute.
+pub const REPLAY_DEADLINE: Duration = Duration::from_secs(600);
+
+/// Warns once if still alive after [`REPLAY_DEADLINE`]. The runtime cannot be interrupted, so
+/// the replay goes on until it ends or the user stops it.
+pub struct SlowWarning {
+    _done: std::sync::mpsc::Sender<()>,
+}
+pub fn warn_if_slow(what: String) -> SlowWarning {
+    let (done, wait) = std::sync::mpsc::channel::<()>();
+    let _ = std::thread::Builder::new()
+        .name("replay-deadline".into())
+        .spawn(move || {
+            if wait.recv_timeout(REPLAY_DEADLINE) == Err(std::sync::mpsc::RecvTimeoutError::Timeout) {
+                say!(
+                    "warning: {what} has run for more than 10 minutes; the runtime may never finish. Press Ctrl-C to stop it"
+                );
+            }
+        });
+    SlowWarning { _done: done }
+}
+
 /// A node client. `timeout` bounds each try; a request gets four tries within four times it.
 pub fn rpc(
     url: &str,
@@ -138,6 +161,10 @@ pub struct Loaded {
 }
 
 pub fn load(args: &SourceArgs) -> Result<Loaded> {
+    let _slow = warn_if_slow(match &args.block {
+        Some(block) => format!("the replay of block {block}"),
+        None => "the replay".into(),
+    });
     let runtime_override = read_runtime_override(args.runtime_override.as_deref())?;
     if let Some(dir) = &args.offline {
         let replay = polkadot_frame_trace_replay::Artifact::load(dir)

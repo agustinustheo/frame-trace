@@ -35,6 +35,14 @@ pub struct Rpc {
     inner: Arc<Inner>,
     // Per-client counters; forked clients share transport but isolate measured-run accounting.
     calls: Arc<AtomicUsize>,
+    activity: Arc<Activity>,
+}
+/// Calls of one client and its clones that are running, and when the last one ended.
+struct Activity(parking_lot::Mutex<(usize, std::time::Instant)>);
+impl Default for Activity {
+    fn default() -> Self {
+        Self(parking_lot::Mutex::new((0, std::time::Instant::now())))
+    }
 }
 struct Inner {
     url: String,
@@ -120,13 +128,22 @@ impl Rpc {
                 pool: OnceLock::new(),
             }),
             calls: Default::default(),
+            activity: Default::default(),
         })
     }
     pub fn fork(&self) -> Self {
         Self {
             inner: self.inner.clone(),
             calls: Default::default(),
+            activity: Default::default(),
         }
+    }
+    /// How long since a call of this client or its clones last ended, or since the client
+    /// was made. `None` while one is running. A replay that keeps the CPU busy this long is
+    /// running the runtime, not waiting on the node.
+    pub fn quiet_for(&self) -> Option<Duration> {
+        let (running, last) = *self.activity.0.lock();
+        (running == 0).then(|| last.elapsed())
     }
     pub fn parallelism(&self) -> usize {
         self.inner.sockets.len()
@@ -204,6 +221,15 @@ impl Rpc {
                 "state_call requires method, SCALE hex and explicit state hash".into(),
             ));
         }
+        struct Running<'a>(&'a Activity);
+        impl Drop for Running<'_> {
+            fn drop(&mut self) {
+                let mut activity = self.0.0.lock();
+                *activity = (activity.0 - 1, std::time::Instant::now());
+            }
+        }
+        self.activity.0.lock().0 += 1;
+        let _running = Running(&self.activity);
         runtime()?.block_on(async {
             tokio::select! {
                 biased;

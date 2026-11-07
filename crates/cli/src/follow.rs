@@ -36,6 +36,23 @@ impl std::fmt::Display for Reported {
 }
 impl std::error::Error for Reported {}
 
+/// The block a worker is replaying, from after it is admitted until its trace is ready.
+struct Replaying<'a>(&'a Mutex<Option<(u64, String, Instant)>>);
+impl<'a> Replaying<'a> {
+    fn new(slot: &'a Mutex<Option<(u64, String, Instant)>>, number: u64, hash: &str) -> Self {
+        *lock(slot) = Some((number, hash.into(), Instant::now()));
+        Self(slot)
+    }
+}
+impl Drop for Replaying<'_> {
+    fn drop(&mut self) {
+        *lock(self.0) = None;
+    }
+}
+fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
 /// A failure injected by the CLI tests. Debug builds only.
 fn fault(name: &str) -> bool {
     cfg!(debug_assertions)
@@ -588,11 +605,15 @@ fn follow(args: FollowArgs) -> Result<()> {
             shared.export(|trace| sender.send(trace))
         })
     });
+    // Each worker's client and the block it is replaying, for the deadline below.
+    let mut watched = Vec::new();
     let workers: Vec<_> = (0..args.workers)
-        .map(|_| {
+        .map(|index| {
             let receive = receive.clone();
             let active_floor = active_floor.clone();
             let rpc = rpc.fork();
+            let replaying = Arc::new(Mutex::new(None::<(u64, String, Instant)>));
+            watched.push((rpc.clone(), replaying.clone()));
             let cancel = cancel.clone();
             let session = session.clone();
             let shared = shared.clone();
@@ -600,6 +621,12 @@ fn follow(args: FollowArgs) -> Result<()> {
             thread::spawn(move || {
                 if fault("workers") {
                     return;
+                }
+                if index == 0 && fault("hung-replay") {
+                    *lock(&replaying) = Some((0, "0xtest".into(), Instant::now()));
+                    loop {
+                        thread::park();
+                    }
                 }
                 while !rpc.cancelled() {
                     let job = match receive.lock() {
@@ -625,6 +652,7 @@ fn follow(args: FollowArgs) -> Result<()> {
                             return Err(Skipped("queued block expired behind tip").into());
                         }
                         let start = Instant::now();
+                        let _replaying = Replaying::new(&replaying, job.number, &job.hash);
                         let replay =
                             polkadot_frame_trace_replay::online_with_session(&rpc, &job.hash, &session)?;
                         drop(cold_start);
@@ -682,6 +710,11 @@ fn follow(args: FollowArgs) -> Result<()> {
     let mut full = Streak::default();
     let mut status = (String::new(), None::<Instant>);
     let mut fatal = None;
+    let deadline = if fault("hung-replay") {
+        Duration::from_secs(1)
+    } else {
+        source::REPLAY_DEADLINE
+    };
     let process =
         |event: Event, entries: &mut BTreeMap<String, Entry>, totals: &mut Totals| match event {
             Event::Started(hash, generation) => {
@@ -719,16 +752,25 @@ fn follow(args: FollowArgs) -> Result<()> {
             process(event, &mut entries, &mut totals);
         }
         // Without these threads `follow` would keep polling while tracing nothing.
-        if workers.iter().all(|worker| worker.is_finished()) {
-            fatal = Some("all replay workers stopped");
+        if let Some((number, hash)) = watched.iter().find_map(|(rpc, replaying)| {
+            let (number, hash, start) = lock(replaying).clone()?;
+            (start.elapsed().min(rpc.quiet_for()?) > deadline).then_some((number, hash))
+        }) {
+            // The runtime cannot be interrupted: exit, so a supervisor starts a fresh process.
+            fatal = Some(format!(
+                "the replay of block #{number} {hash} ran the runtime for more than {} without finishing",
+                duration_text(deadline)
+            ));
+        } else if workers.iter().all(|worker| worker.is_finished()) {
+            fatal = Some("all replay workers stopped".into());
         } else if exporter.as_ref().is_some_and(|e| e.is_finished()) {
-            fatal = Some("the OTLP export thread stopped");
+            fatal = Some("the OTLP export thread stopped".into());
         } else if crate::log::broken() {
             // Without a log, a supervisor cannot see this run; exit so it restarts us with
             // fresh streams, for example after journald restarted.
-            fatal = Some("stderr cannot be written");
+            fatal = Some("stderr cannot be written".into());
         }
-        if let Some(reason) = fatal {
+        if let Some(reason) = &fatal {
             last_word!("follow: {reason}; stopping");
             break;
         }

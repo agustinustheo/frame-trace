@@ -1471,6 +1471,10 @@ fn follow_exits_1_with_a_summary_when_its_threads_die() {
     for (fault, reason) in [
         ("workers", "all replay workers stopped"),
         ("export-thread", "the OTLP export thread stopped"),
+        (
+            "hung-replay",
+            "the replay of block #0 0xtest ran the runtime for more than 1s without finishing",
+        ),
     ] {
         let log = std::env::temp_dir().join(format!(
             "polkadot-frame-trace-fault-{fault}-{}.log",
