@@ -23,7 +23,7 @@ updates:
           # Released on their own, not with the Polkadot SDK stable releases.
           - "frame-metadata"
           - "frame-decode"
-          - "frame-trace*"
+          - "polkadot-frame-trace*"
       opentelemetry:
         patterns:
           - "opentelemetry*"

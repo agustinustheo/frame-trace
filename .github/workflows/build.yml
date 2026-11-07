@@ -1,8 +1,8 @@
 name: Build release archives
 
-# Builds and packages frame-trace for each target. release.yml and nightly.yml
+# Builds and packages polkadot-frame-trace for each target. release.yml and nightly.yml
 # both call this workflow, so stable and nightly archives are built the same way.
-# Each archive is uploaded as the artifact frame-trace-<target>.
+# Each archive is uploaded as the artifact polkadot-frame-trace-<target>.
 
 on:
   workflow_call:
@@ -66,18 +66,18 @@ jobs:
 
       # No build cache here: release binaries are built from a clean state.
       # FRAME_TRACE_BUILD_VERSION is set only for nightly builds.
-      - name: Build frame-trace
+      - name: Build polkadot-frame-trace
         run: |
           if [ -n "$BUILD_VERSION" ]; then
             export FRAME_TRACE_BUILD_VERSION="$BUILD_VERSION"
           fi
-          cargo +1.93.0 build --release --locked -p frame-trace --target "$TARGET"
+          cargo +1.93.0 build --release --locked -p polkadot-frame-trace --target "$TARGET"
 
       - name: Check the binary runs
         run: |
-          bin="target/$TARGET/release/frame-trace"
+          bin="target/$TARGET/release/polkadot-frame-trace"
           printed=$("$bin" --version)
-          expected="frame-trace ${BUILD_VERSION:-$PACKAGE_VERSION}"
+          expected="polkadot-frame-trace ${BUILD_VERSION:-$PACKAGE_VERSION}"
           echo "$printed"
           if [ "$printed" != "$expected" ]; then
             echo "::error::--version printed '$printed', expected '$expected'"
@@ -87,14 +87,14 @@ jobs:
 
       - name: Package
         run: |
-          name="frame-trace-$PACKAGE_VERSION-$TARGET"
+          name="polkadot-frame-trace-$PACKAGE_VERSION-$TARGET"
           mkdir -p "dist/$name"
-          cp "target/$TARGET/release/frame-trace" README.md LICENSE "dist/$name/"
+          cp "target/$TARGET/release/polkadot-frame-trace" README.md LICENSE "dist/$name/"
           tar -C dist -czf "dist/$name.tar.gz" "$name"
 
       - name: Upload package
         uses: actions/upload-artifact@v7
         with:
-          name: frame-trace-${{ matrix.target }}
+          name: polkadot-frame-trace-${{ matrix.target }}
           path: dist/*.tar.gz
           if-no-files-found: error

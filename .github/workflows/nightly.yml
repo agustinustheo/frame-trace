@@ -4,7 +4,7 @@ name: Nightly
 # Westend relay chain nodes. If main changed since the last nightly and every check
 # passes, build the release targets and publish them as the "Nightly" prerelease
 # on the tag `nightly`. A failure opens or updates the issue "Nightly build failed".
-# Live failures can come from the public endpoints as well as from frame-trace.
+# Live failures can come from the public endpoints as well as from polkadot-frame-trace.
 # See dev/RELEASING.md.
 
 on:
@@ -75,12 +75,12 @@ jobs:
             exit 1
           fi
           crate=$(cargo +1.93.0 metadata --no-deps --format-version 1 --locked \
-            | jq -r '.packages[] | select(.name == "frame-trace") | .version')
+            | jq -r '.packages[] | select(.name == "polkadot-frame-trace") | .version')
           date=$(date -u +%Y%m%d)
           version="$crate-nightly.$date+${sha:0:7}"
           # The archives build.yml makes for each target, and SHA256SUMS.
           expected=$( { sed -n 's/^ *- target: *//p' .github/workflows/build.yml \
-            | sed 's/.*/frame-trace-nightly-&.tar.gz/'; echo SHA256SUMS; } | sort)
+            | sed 's/.*/polkadot-frame-trace-nightly-&.tar.gz/'; echo SHA256SUMS; } | sort)
           # A draft is not visible to this read-only token, so it counts as missing.
           if release=$(gh release view nightly --json isDraft,assets 2> /dev/null) \
             && [ "$(jq -r .isDraft <<< "$release")" = false ]; then
@@ -136,12 +136,12 @@ jobs:
         run: cargo +1.93.0 test --workspace --locked -- --ignored --skip bench_
 
       - name: Build release binary
-        run: cargo +1.93.0 build --release --locked -p frame-trace
+        run: cargo +1.93.0 build --release --locked -p polkadot-frame-trace
 
       - name: Trace the latest finalized block
         run: |
           json="$RUNNER_TEMP/block.json"
-          target/release/frame-trace block --rpc "$RPC_URL" --block finalized --json "$json"
+          target/release/polkadot-frame-trace block --rpc "$RPC_URL" --block finalized --json "$json"
           jq -e '.execution.root_check == true' "$json" > /dev/null || {
             echo "::error::root check did not pass for block $(jq -r .block_number "$json")"
             exit 1
@@ -179,7 +179,7 @@ jobs:
       - name: Download packages
         uses: actions/download-artifact@v8
         with:
-          pattern: frame-trace-*
+          pattern: polkadot-frame-trace-*
           path: dist
           merge-multiple: true
 
@@ -272,7 +272,8 @@ jobs:
           fi
           title="Nightly build failed"
           label=nightly-failure
-          # Only the issue this workflow opened, never one a person opened.
+          # Only the issue this workflow opened, never one a person opened. The marker keeps
+          # the old name so it still finds issues opened before the rename.
           marker="<!-- frame-trace-nightly -->"
           run_url="$GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
           today=$(date -u +%Y-%m-%d)
