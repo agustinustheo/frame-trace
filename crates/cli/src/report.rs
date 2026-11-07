@@ -120,8 +120,7 @@ pub fn run(args: ReportArgs) -> Result<()> {
         )?;
         let session =
             ReplaySession::with_cache_max_bytes(args.cache_dir.as_deref(), args.cache_max_bytes)?;
-        let head = rpc.call("chain_getFinalizedHead", serde_json::json!([]))?;
-        let header = rpc.call("chain_getHeader", serde_json::json!([head]))?;
+        let header = rpc.finalized_header()?;
         let finalized = u64::from_str_radix(
             header["number"]
                 .as_str()

@@ -736,8 +736,7 @@ fn follow(args: FollowArgs) -> Result<()> {
             let header = if args.best {
                 rpc.call("chain_getHeader", serde_json::json!([]))?
             } else {
-                let hash = rpc.call("chain_getFinalizedHead", serde_json::json!([]))?;
-                rpc.call("chain_getHeader", serde_json::json!([hash]))?
+                rpc.finalized_header()?
             };
             let tip = number(&header)?;
             floor = Some(

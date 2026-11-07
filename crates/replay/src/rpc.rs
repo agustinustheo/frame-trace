@@ -413,6 +413,30 @@ impl Rpc {
     pub fn count(&self) -> usize {
         self.calls.load(Ordering::SeqCst)
     }
+    /// The newest finalized header, checked to hash to the finalized hash the node announced.
+    /// A node behind a load balancer can answer the two requests from different nodes, so a
+    /// mismatch or a missing header is a failure that can pass.
+    pub fn finalized_header(&self) -> Result<Value> {
+        let hash: sp_core::H256 = serde_json::from_value(
+            self.call("chain_getFinalizedHead", json!([]))?,
+        )
+        .map_err(|e| Error::Rpc(format!("chain_getFinalizedHead: malformed response: {e}")))?;
+        let header = self.call("chain_getHeader", json!([hash]))?;
+        if header.is_null() {
+            return Err(Error::TransientRpc(format!(
+                "chain_getHeader: no header for the finalized block {hash:?}"
+            )));
+        }
+        let got = serde_json::from_value::<crate::Header>(header.clone())
+            .map_err(|e| Error::Rpc(format!("chain_getHeader: malformed response: {e}")))?
+            .hash();
+        if got != hash {
+            return Err(Error::TransientRpc(format!(
+                "chain_getHeader: asked for the finalized block {hash:?}, got the header of {got:?}"
+            )));
+        }
+        Ok(header)
+    }
 }
 /// An error and its causes, which can say why a connection failed.
 fn with_sources(error: &dyn std::error::Error) -> String {
@@ -639,6 +663,40 @@ mod tests {
             "{error}"
         );
         assert_eq!(rpc.count(), 1);
+        worker.join().unwrap();
+    }
+    #[test]
+    fn a_finalized_header_of_another_block_is_a_failure_that_can_pass() {
+        let header = |number| {
+            use sp_runtime::traits::Header as _;
+            serde_json::to_value(crate::Header::new(
+                number,
+                Default::default(),
+                Default::default(),
+                Default::default(),
+                Default::default(),
+            ))
+            .unwrap()
+        };
+        let (announced, other) = (header(1), header(2));
+        let hash = json!(
+            serde_json::from_value::<crate::Header>(announced.clone())
+                .unwrap()
+                .hash()
+        );
+        let reply = |result: &Value| -> &'static str {
+            Box::leak(format!(r#"{{"jsonrpc":"2.0","id":$ID,"result":{result}}}"#).into_boxed_str())
+        };
+        let (rpc, worker) = responses(vec![
+            (200, reply(&hash)),
+            (200, reply(&other)),
+            (200, reply(&hash)),
+            (200, reply(&announced)),
+        ]);
+        let error = rpc.finalized_header().unwrap_err();
+        assert!(error.is_transient(), "{error}");
+        assert!(error.to_string().contains("got the header of"), "{error}");
+        assert_eq!(rpc.finalized_header().unwrap(), announced);
         worker.join().unwrap();
     }
     #[test]
