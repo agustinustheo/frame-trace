@@ -28,39 +28,7 @@ After that, all three are ready in about 3 seconds.
 
 > **Warning:** Grafana opens without a login, as a viewer that can use Explore. Use this on your own machine only.
 
-`config.alloy` is the whole Alloy pipeline: receive OTLP, batch, send to Tempo.
-
-```text
-// Receive OTLP from polkadot-frame-trace, batch it, and send it to Tempo.
-
-otelcol.receiver.otlp "default" {
-  http {
-    endpoint = "0.0.0.0:4318"
-  }
-  grpc {
-    endpoint = "0.0.0.0:4317"
-  }
-
-  output {
-    traces = [otelcol.processor.batch.default.input]
-  }
-}
-
-otelcol.processor.batch "default" {
-  output {
-    traces = [otelcol.exporter.otlp.tempo.input]
-  }
-}
-
-otelcol.exporter.otlp "tempo" {
-  client {
-    endpoint = "tempo:4317"
-    tls {
-      insecure = true
-    }
-  }
-}
-```
+[`config.alloy`](https://github.com/agustinustheo/polkadot-frame-trace/blob/main/examples/alloy-tempo/config.alloy) is the whole Alloy pipeline: receive OTLP, batch, send to Tempo.
 
 ## 2. Send a trace
 
