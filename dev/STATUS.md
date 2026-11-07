@@ -47,7 +47,7 @@ Then open http://127.0.0.1:16686.
 
 1. **Constants (spec phase 4).** A macro approach was prototyped on branch `flight/constants-tracing` (commit d21a382) and dropped, because it needs changes to the runtime source and a `with-tracing` build. From `Get::get`, it emitted an `sp_tracing` event with target `frame_trace::constant` and the fields `constant` and `value`; the event reaches the host as a `wasm_tracing` event that capture already keeps. Inline `ConstU32` values and constants internal to a pallet stayed invisible. The alternative needs no runtime change: constant values are in the runtime metadata, so they could be listed per pallet, but that doesn't show which ones a block read. See [SPEC.md](SPEC.md#phases).
 2. **PolkaMeter integration (spec phase 5).** Attach a block trace to each load-test step. This changes the PolkaMeter repo.
-3. **First release, v0.1.0.** The release workflow is ready. Change `Unreleased` to the date in `CHANGELOG.md`, push the tag `v0.1.0`, check the draft release and publish it. See [RELEASING.md](RELEASING.md).
+3. **First release, v0.1.0.** The release workflow is ready. Change `Unreleased` to the date in `CHANGELOG.md`, push the tag `v0.1.0`, check the draft release and publish it. The same run publishes the crates to crates.io. See [RELEASING.md](RELEASING.md).
 
 ## Upstream
 
