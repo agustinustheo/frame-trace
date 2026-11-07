@@ -223,7 +223,7 @@ This run used `wss://asset-hub-paseo-rpc.n.dwellir.com`.
 
 The node took too long to answer one request.
 `--rpc-timeout` is the wait for one try, 30 seconds by default.
-A request gets four tries, so it fails after 2 minutes by default.
+A request gets at most four tries, with a total deadline of 2 minutes by default.
 The largest answer is the proof of the runtime code, about 2.7 MB.
 Public Westend nodes took 7 to 20 seconds to send it, and this node 25 to 35 seconds.
 

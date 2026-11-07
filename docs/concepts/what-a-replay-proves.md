@@ -55,7 +55,7 @@ When the root check fails, polkadot-frame-trace stops with an error and exports 
 
 ## What a pass means
 
-- Each value that the block read came from the real parent state. A proof checked each value.
+- Reads from chain state are checked against the parent's state root. Cache reads use the block's earlier writes.
 - The runtime that ran is the runtime on chain, unless you used a [runtime override](../guides/see-runtime-calls.md).
 - The writes of the block give the same state root that the chain recorded.
   Thus the reads and writes in the trace are complete, and in the real order.

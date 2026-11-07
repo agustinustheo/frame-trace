@@ -1,8 +1,8 @@
 # Offline replay fixtures
 
-Saved blocks and runtime API calls in the [version 1 artifact format](../../crates/replay/ARTIFACT.md). Tests replay them with no network and run the real root check.
+Saved blocks and runtime API calls in the [version 1 artifact format](../../crates/replay/ARTIFACT.md). Tests replay them with no network. Block replays check the state root; runtime API calls check their results.
 
-Proof nodes of 100,000 bytes or more, such as runtimes, are stored once under `blobs/<blake2-256>.zst`. An artifact refers to them as `blob:<hash>`. The loader limits decompression and checks each blob's hash. `Artifact::save` always writes a self-contained artifact.
+`blobify.py` moves proof nodes of 100,000 bytes or more, such as runtimes, into shared blobs under `blobs/<blake2-256>.zst`. Older fixtures may keep large nodes inside the artifact. An artifact refers to them as `blob:<hash>`. The loader limits decompression and checks each blob's hash. `Artifact::save` always writes a self-contained artifact.
 
 The local People fixtures come from experiment E2, recorded on 2026-10-25. Its provenance, Wasm hashes and scripts are in `dev/experiments/e2` at commit 2e5c243.
 

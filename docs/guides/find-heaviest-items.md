@@ -36,7 +36,7 @@ Top items by proof bytes
 | --- | --- |
 | `item` | The storage item, as `Pallet::Item`. `<unknown>` holds operations with no named key, such as computing the state root. Keys starting with `:` are well-known keys, such as `:code`. |
 | `reads: cache` | Reads answered from the block's own changes. See [Cache or trie](../concepts/cache-or-trie.md). |
-| `trie (already in proof)` | Reads that went to the chain state and added no new trie nodes. |
+| `trie (already in proof)` | Reads that went to the chain state and used only trie nodes seen earlier in this replay. A rollback may have removed them from the current proof. |
 | `trie (new)` | Reads that added new trie nodes to the proof. |
 | `unknown` | Reads with no origin recorded. |
 | `writes` | Writes, including deletes and appends. |

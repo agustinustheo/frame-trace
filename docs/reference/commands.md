@@ -54,7 +54,7 @@ The cache and metadata flags do not work with `--from-file` or `--from-json`.
 
 Without `--cache-dir`, downloaded state stays in memory only.
 Compiled runtimes are still kept in `$XDG_CACHE_HOME/polkadot-frame-trace/wasm`, or `~/.cache/polkadot-frame-trace/wasm`.
-Without `HOME`, they go to `polkadot-frame-trace-<uid>/wasm` in the temporary directory.
+Without both `XDG_CACHE_HOME` and `HOME`, they go to `polkadot-frame-trace-<uid>/wasm` in the temporary directory.
 
 These limits protect against a node that sends too much. They apply to every command that uses `--rpc`.
 
@@ -63,7 +63,7 @@ These limits protect against a node that sends too much. They apply to every com
 | One RPC response | 64 MiB | A larger response fails the request at once, without another try. The largest real one, the proof of the runtime, is about 5.5 MB. |
 | One WebSocket frame | 16 MiB | A response over `ws://` or `wss://` may come in one frame. A larger frame fails the request at once, without another try. |
 | State the node sends for one block | 1,000,000 pieces or 256 MiB | More fails the block. Recent blocks of Polkadot, Kusama, Westend and their Asset Hubs, and a Westend Asset Hub runtime upgrade, needed at most 3,656 pieces and 5.6 MB. |
-| Running the runtime for one block | 10 minutes | A runtime that never finishes cannot be stopped from inside polkadot-frame-trace. `block`, `summary`, `call` and `report` warn once and keep going: press Ctrl-C to stop them. `follow` exits with code 1, see [follow](#follow). Real blocks take seconds, and compiling a new runtime about a minute. |
+| One replay | 10 minutes | A runtime that never finishes cannot be stopped from inside polkadot-frame-trace. `block`, `summary`, `call` and `report` warn once after 10 minutes of elapsed replay time, including RPC waits, and keep going: press Ctrl-C to stop them. `follow` exits with code 1 when a replay runs 10 minutes without RPC activity, see [follow](#follow). Real blocks take seconds, and compiling a new runtime about a minute. |
 
 Output shows `--rpc` and `--otlp` URLs as scheme, host and port only.
 A user name, password or API key in the URL stays out of logs.
@@ -170,7 +170,7 @@ polkadot-frame-trace follow --rpc URL --best
 | Attempts per block | 4 | For failures that can pass, such as a timeout. Other failures stop the block at once. |
 | Status line | on change, and every 60 s | Printed at once when `retrying`, `stopped`, `skipped`, `reverted`, `export-rejected` or `export-failed` changes. A check for new blocks that waits on the node delays it. |
 | Repeated failure lines | first, then at most once a minute | For failed checks, failed exports and a full queue. A failure that comes back within the minute is not logged again. |
-| State kept in memory | 128 MiB | Downloaded state shared by all workers. Counts an upper estimate of what each piece and its index take in memory, so the real use is lower. When full, the least recently read piece goes first. With `--cache-dir`, the [disk cache](#disk-cache) still has it. |
+| State kept in memory | 128 MiB | Downloaded state shared by all workers. Counts an upper estimate of what each piece and its index take in memory, so the real use is lower. When full, the least recently read piece goes first. With `--cache-dir`, an evicted piece may still be in the [disk cache](#disk-cache). |
 | Traces waiting for export | 32 | Held while the receiver is down. Each holds all spans of one block in memory. When full, the oldest is dropped. |
 | Spans per export request | 512 | An acknowledged request is never sent again. A retry sends only the others. A lost acknowledgement can deliver the same spans twice. |
 | Wait between export tries | 1 s, doubling to 30 s | Each request of a try, with the exporter's own retries, takes at most the OTLP timeout. The block is not replayed again. |
@@ -237,6 +237,7 @@ If the file system gave the file more space, that space counts instead of the si
 When the disk cache is full, compiled runtimes not in use go first, then the oldest state file.
 The runtime in use is always kept, and so is space for state: 64 MiB, or a quarter of the limit if that is less.
 So the disk cache may go over a small limit.
+It may also go over the limit when files cannot be deleted, or when runtimes were compiled since the last check.
 `--cache-max-bytes 0` keeps no state on disk and deletes runtimes not in use.
 
 Use one polkadot-frame-trace per cache directory. Each process counts only its own files.

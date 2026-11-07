@@ -46,8 +46,8 @@ See [Phases of a block](../concepts/phases.md).
 | `put` | write | Write a value. |
 | `clear` | write | Delete a key. |
 | `append` | write | Add an item to a value. |
-| `clear_prefix` | write | Delete every key under a prefix. |
-| `kill_child` | write | Delete a whole child trie. |
+| `clear_prefix` | write | Delete keys under a prefix. The runtime may limit the deletion. |
+| `kill_child` | write | Delete child trie entries. The runtime may limit the deletion. |
 | `storage_root` | other | Compute a storage root. |
 | `index_transaction`, `renew_transaction_index` | other | Index a transaction for storage. |
 | `next_key` | other | Find the next key. The result can still change from pending writes. |

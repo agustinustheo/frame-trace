@@ -6,7 +6,7 @@ There are three origins. A fourth value, unknown, means there is no origin.
 | Origin | Meaning | Proof bytes |
 | --- | --- | --- |
 | **cache** | The block had already written this key, so the value came from the block's own changes in memory. | Always 0 |
-| **trie (already in proof)** | The read went to the chain state. Every trie node on its path was already in this block's proof. | Usually 0 |
+| **trie (already in proof)** | The read went to the chain state and used only trie nodes seen earlier in this replay. A rollback may have removed them from the current proof. | Usually 0 |
 | **trie (new)** | The read went to the chain state and needed trie nodes the block had not touched yet. | Usually more than 0 |
 | **unknown** | Not a read, or the input had no origin, for example a recorded `state_traceBlock` file. | n/a |
 

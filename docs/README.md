@@ -26,7 +26,7 @@ The picture shows block #4 of a People chain in Jaeger:
 ## How it works
 
 polkadot-frame-trace asks any node for the block and the state it needs, over normal RPC.
-It checks every value against the parent block's state root.
+Reads from chain state are checked against the parent's state root. Cache reads use the block's earlier writes.
 Then it runs the block with the chain's own runtime on your machine and records each storage call.
 
 [What a replay proves](concepts/what-a-replay-proves.md) shows the steps in a diagram.

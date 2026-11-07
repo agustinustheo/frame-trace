@@ -53,7 +53,7 @@ The storage operations are:
 | `put` | A **write** of a value. |
 | `append` | A **write** that adds to an existing value, such as `System::Events`. |
 | `clear` | A **write** that deletes one key. |
-| `clear_prefix` | A **write** that deletes every key under a prefix. |
+| `clear_prefix` | A **write** that deletes keys under a prefix. The runtime may limit the deletion. |
 | `iteration`, `next_key` | The runtime walking through keys. These are neither reads nor writes. |
 | `storage_root` | The runtime computing a state root. |
 

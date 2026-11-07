@@ -30,7 +30,7 @@ The project is named polkadot-frame-trace: the command, the crates, the OTLP ser
 - Limits against a node that sends too much: 64 MiB per RPC response and 16 MiB per WebSocket frame. One block may use 1,000,000 pieces of state or 256 MiB.
 - A replay deadline: `follow` exits 1 when a replay runs the runtime for 10 minutes, so a supervisor restarts it. Other commands warn once.
 - A warning when `--rpc` or `--otlp` is plain `ws://` or `http://` to another machine.
-- A private disk cache: polkadot-frame-trace creates the `--cache-dir` directory readable by you alone, and runs without one that another user owns or can write. Without `HOME`, compiled runtimes go to a per-user folder in the temporary directory.
+- A private disk cache: polkadot-frame-trace creates the `--cache-dir` directory readable by you alone, and runs without one that another user owns or can write. Without both `XDG_CACHE_HOME` and `HOME`, compiled runtimes go to a per-user folder in the temporary directory.
 - URL redaction: output and errors show `--rpc` and `--otlp` URLs as scheme, host and port only, so credentials and API keys stay out of logs. Error text from the node or the OTLP receiver is cut to 512 characters.
 
 Nightly users: delete `~/.cache/frame-trace` and `<cache-dir>/nodes`.

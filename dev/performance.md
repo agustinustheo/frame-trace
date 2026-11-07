@@ -8,11 +8,11 @@ These are the numbers behind the current defaults. All runs used Rust 1.93.0 rel
 
 Two 120-second windows on 2026-10-26 traced 49 and 38 consecutive blocks, with no blocks skipped. The chain advanced 56 and 46 heights. In the last 60 seconds the runs traced 40 and 37 blocks, so they kept up once startup was done. Peak RSS was 698–752 MB. The old default of 2 workers traced 20 and 18 blocks in the same window and skipped 22–24.
 
-Later runs agree. A 25-minute run with `--cache-dir` traced 145–150 blocks per 5 minutes, with a median replay of 6.3–6.6 s. A 150-minute run traced 3,306 blocks, and every root check passed.
+Later runs agree. A 25-minute run with `--cache-dir` traced 145–150 blocks in each of its first four 5-minute windows, with a median replay of 6.3–6.6 s. The final, shorter window traced 76 blocks, behind one slow block. A 150-minute run traced 3,306 blocks, and every root check passed.
 
 Eight is a judgement, not a measured optimum. A 12-worker run traced 46 blocks, but that window was on a loaded host and cannot separate the worker count from host load.
 
-The CLI limits Wasm compilation to 2 threads. On one block replayed cold three times each way, 2 threads took 26.2–27.0 s and the default 12 threads took 26.0–29.4 s. The cap lowered peak RSS by 71–137 MB.
+`follow` limits Wasm compilation to 2 threads. On one block replayed cold three times each way, 2 threads took 26.2–27.0 s and the default 12 threads took 26.0–29.4 s. The cap lowered peak RSS by 71–137 MB.
 
 ## Memory of a long follow
 

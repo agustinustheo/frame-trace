@@ -65,17 +65,19 @@ export PATH="$HOME/.local/bin:$PATH"
 
 ### Nightly binary
 
-The [Nightly](https://github.com/agustinustheo/polkadot-frame-trace/releases/tag/nightly) pre-release is rebuilt each night that the code changed and every check passed.
+The [Nightly](https://github.com/agustinustheo/polkadot-frame-trace/releases/tag/nightly) pre-release is rebuilt each night that the code changed.
 
-> **Warning:** Nightly builds are not tested between releases. They may change the command line or the JSON output without notice.
+> **Warning:** Nightly builds pass the automated checks before they are published, but they may change the command line or the JSON output without notice.
 
-Follow the same steps with `nightly` in place of the version:
+Download the nightly archive:
 
 ```sh
 TARGET=x86_64-unknown-linux-gnu
 curl -fsSLO "https://github.com/agustinustheo/polkadot-frame-trace/releases/download/nightly/polkadot-frame-trace-nightly-$TARGET.tar.gz"
 curl -fsSLO "https://github.com/agustinustheo/polkadot-frame-trace/releases/download/nightly/SHA256SUMS"
 ```
+
+Set `VERSION=nightly` before you repeat the checksum, unpack and copy steps.
 
 Its `--version` shows the build date and the first seven characters of the commit, for example `polkadot-frame-trace 0.1.0-nightly.20261106+<commit>`.
 

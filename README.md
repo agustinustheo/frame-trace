@@ -42,7 +42,7 @@ Find the storage items a block reads most, the reads it repeats, and the bytes e
 ## Highlights
 
 - Any node, no changes: safe RPC only, with the parent state as proofs from `state_getReadProof`.
-- Every value is checked against the parent's [state root](https://agustinustheodorus.com/polkadot-frame-trace/reference/glossary.html#state-root), and the [root check](https://agustinustheodorus.com/polkadot-frame-trace/concepts/what-a-replay-proves.html) must pass before anything is exported.
+- Reads from chain state are checked against the parent's [state root](https://agustinustheodorus.com/polkadot-frame-trace/reference/glossary.html#state-root). Cache reads use the block's earlier writes. The [root check](https://agustinustheodorus.com/polkadot-frame-trace/concepts/what-a-replay-proves.html) must pass before anything is exported.
 - The chain's own runtime runs in the Polkadot SDK executor, with signature checks on.
 - Every read and write, in order, with decoded names such as `System::Account(5Grw…)`.
 - For each read: whether the [cache or the trie](https://agustinustheodorus.com/polkadot-frame-trace/concepts/cache-or-trie.html) answered it, and the [proof bytes](https://agustinustheodorus.com/polkadot-frame-trace/concepts/proof-bytes.html) it added.

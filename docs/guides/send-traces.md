@@ -72,7 +72,7 @@ Search by span name, such as `extrinsic 2: Utility.batch`, or by attribute, such
 | `call` | One trace per call, rooted at `call <method> at #<number>`. |
 | `follow` | One trace per block, as each block is traced. |
 
-polkadot-frame-trace waits for the receiver to answer and fails if it rejects any span.
+`block` and `call` wait for the receiver to answer, and fail if it rejects any span.
 A receiver may still drop data later, for example through sampling or retention.
 
 If the receiver cannot be reached:
@@ -87,7 +87,7 @@ If it answers but rejects some spans:
 Error: exporting to http://127.0.0.1:4319: 5 of 428 spans rejected by the receiver: span attribute limit exceeded
 ```
 
-Both exit with code 1.
+`block` and `call` exit with code 1 in both cases. `follow` retries failed requests and counts rejected traces without stopping.
 
 See [Troubleshooting](../troubleshooting.md#n-of-m-spans-were-not-exported).
 
