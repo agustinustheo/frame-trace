@@ -17,7 +17,7 @@ const TABLE_SHARE: usize = 4;
 /// One table entry: the hash, the `Arc`, and two links.
 const ENTRY: usize = 56;
 
-/// At least the memory one allocation of `size` bytes takes, for the allocators frame-trace
+/// At least the memory one allocation of `size` bytes takes, for the allocators polkadot-frame-trace
 /// runs on. Up to 128 KiB it allows 32 bytes for a header (glibc adds 8, musl 4) and an eighth
 /// for size classes up to a quarter apart (musl), then rounds up to a quarter of the next power
 /// of two, or to 32 KiB above 32 KiB (macOS). Above 128 KiB every one of them maps pages or

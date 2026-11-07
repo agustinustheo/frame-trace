@@ -1,8 +1,8 @@
-//! Metadata-based decoding for frame-trace.
+//! Metadata-based decoding for polkadot-frame-trace.
 //!
 //! [`Metadata`] loads V14/V15/V16 runtime metadata (through `frame-metadata`) and names raw
 //! storage keys as `Pallet::Item(map keys…)` using `frame-decode`. It also names extrinsics.
-//! [`annotate`] applies it to a whole [`frame_trace_model::TracedBlock`].
+//! [`annotate`] applies it to a whole [`polkadot_frame_trace_model::TracedBlock`].
 
 mod annotate;
 mod key;

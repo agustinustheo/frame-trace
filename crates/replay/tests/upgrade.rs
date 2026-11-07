@@ -8,9 +8,11 @@
 #![allow(clippy::unwrap_used)]
 use codec::Decode;
 use frame_metadata::{RuntimeMetadata, RuntimeMetadataPrefixed};
-use frame_trace_decode::{AnnotatedBlock, Metadata, annotate};
-use frame_trace_model::TracedBlock;
-use frame_trace_replay::{Artifact, Replay, ReplaySession, replay_with_session, rpc::unhex};
+use polkadot_frame_trace_decode::{AnnotatedBlock, Metadata, annotate};
+use polkadot_frame_trace_model::TracedBlock;
+use polkadot_frame_trace_replay::{
+    Artifact, Replay, ReplaySession, replay_with_session, rpc::unhex,
+};
 use std::{collections::BTreeMap, path::PathBuf};
 
 const ENACTMENT: u64 = 18_985_169;
@@ -176,16 +178,17 @@ fn one_session_replays_blocks_on_different_runtimes() {
 #[test]
 #[ignore = "requires an archive Westend Asset Hub endpoint (FRAME_TRACE_WESTEND_AH_RPC)"]
 fn runtime_upgrade_enactment_and_next_block_live() {
-    let rpc = frame_trace_replay::rpc::Rpc::new(&westend_asset_hub_rpc()).unwrap();
+    let rpc = polkadot_frame_trace_replay::rpc::Rpc::new(&westend_asset_hub_rpc()).unwrap();
     let session = ReplaySession::new(None).unwrap();
     // In order, through one session, as `report` and `follow` do.
-    let enactment = frame_trace_replay::online_with_session(
+    let enactment = polkadot_frame_trace_replay::online_with_session(
         &rpc,
         "0xd0e2fe81d72dff6ba86daefdae21801ab0e7155760779c54c371db078d0ce55b",
         &session,
     )
     .unwrap();
-    let next = frame_trace_replay::online_with_session(&rpc, "18985170", &session).unwrap();
+    let next =
+        polkadot_frame_trace_replay::online_with_session(&rpc, "18985170", &session).unwrap();
 
     assert_eq!(enactment.block_number, ENACTMENT);
     assert!(enactment.root_check);
@@ -225,7 +228,7 @@ fn runtime_upgrade_enactment_and_next_block_live() {
 
     // Each block alone, in a fresh session, gives the same result.
     for shared in [&enactment, &next] {
-        let alone = frame_trace_replay::online_with_session(
+        let alone = polkadot_frame_trace_replay::online_with_session(
             &rpc,
             &shared.block_number.to_string(),
             &ReplaySession::new(None).unwrap(),

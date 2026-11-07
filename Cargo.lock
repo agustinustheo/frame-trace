@@ -2030,119 +2030,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "frame-trace"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "comfy-table",
- "ctrlc",
- "frame-trace-decode",
- "frame-trace-model",
- "frame-trace-otel",
- "frame-trace-replay",
- "rayon",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "frame-trace-decode"
-version = "0.1.0"
-dependencies = [
- "bs58",
- "frame-decode",
- "frame-metadata",
- "frame-trace-model",
- "hex",
- "parity-scale-codec",
- "scale-info",
- "scale-value",
- "serde",
- "serde_json",
- "sp-crypto-hashing",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "frame-trace-model"
-version = "0.1.0"
-dependencies = [
- "hex",
- "parity-scale-codec",
- "serde",
- "serde_json",
- "sp-crypto-hashing",
- "thiserror 2.0.21",
-]
-
-[[package]]
-name = "frame-trace-otel"
-version = "0.1.0"
-dependencies = [
- "async-trait",
- "frame-trace-decode",
- "frame-trace-model",
- "frame-trace-replay",
- "futures-executor",
- "opentelemetry",
- "opentelemetry-http",
- "opentelemetry-otlp",
- "opentelemetry-proto",
- "opentelemetry_sdk",
- "prost",
- "reqwest",
- "serde_json",
- "thiserror 2.0.21",
- "tokio",
-]
-
-[[package]]
-name = "frame-trace-replay"
-version = "0.1.0"
-dependencies = [
- "cumulus-primitives-proof-size-hostfunction",
- "frame-metadata",
- "frame-trace-decode",
- "frame-trace-model",
- "futures-util",
- "hash-db",
- "hex",
- "parity-scale-codec",
- "parking_lot",
- "rayon",
- "reqwest",
- "rustls",
- "sc-executor",
- "sc-executor-common",
- "schnellru",
- "serde",
- "serde_json",
- "sp-core",
- "sp-crypto-ec-utils",
- "sp-crypto-hashing",
- "sp-externalities",
- "sp-io",
- "sp-maybe-compressed-blob",
- "sp-panic-handler",
- "sp-runtime",
- "sp-state-machine",
- "sp-statement-store",
- "sp-trie",
- "thiserror 2.0.21",
- "tokio",
- "tokio-tungstenite",
- "tokio-util",
- "tracing",
- "tracing-core",
- "trie-db",
- "tungstenite",
- "wat",
- "webpki-roots 1.0.11",
- "zstd 0.13.3",
-]
-
-[[package]]
 name = "fs-err"
 version = "2.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3636,6 +3523,119 @@ name = "pkg-config"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f6b464fbc74e149a392436b17d523f769e057cb6877f6a5c4618bc6f11800548"
+
+[[package]]
+name = "polkadot-frame-trace"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "comfy-table",
+ "ctrlc",
+ "polkadot-frame-trace-decode",
+ "polkadot-frame-trace-model",
+ "polkadot-frame-trace-otel",
+ "polkadot-frame-trace-replay",
+ "rayon",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "polkadot-frame-trace-decode"
+version = "0.1.0"
+dependencies = [
+ "bs58",
+ "frame-decode",
+ "frame-metadata",
+ "hex",
+ "parity-scale-codec",
+ "polkadot-frame-trace-model",
+ "scale-info",
+ "scale-value",
+ "serde",
+ "serde_json",
+ "sp-crypto-hashing",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "polkadot-frame-trace-model"
+version = "0.1.0"
+dependencies = [
+ "hex",
+ "parity-scale-codec",
+ "serde",
+ "serde_json",
+ "sp-crypto-hashing",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "polkadot-frame-trace-otel"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "futures-executor",
+ "opentelemetry",
+ "opentelemetry-http",
+ "opentelemetry-otlp",
+ "opentelemetry-proto",
+ "opentelemetry_sdk",
+ "polkadot-frame-trace-decode",
+ "polkadot-frame-trace-model",
+ "polkadot-frame-trace-replay",
+ "prost",
+ "reqwest",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tokio",
+]
+
+[[package]]
+name = "polkadot-frame-trace-replay"
+version = "0.1.0"
+dependencies = [
+ "cumulus-primitives-proof-size-hostfunction",
+ "frame-metadata",
+ "futures-util",
+ "hash-db",
+ "hex",
+ "parity-scale-codec",
+ "parking_lot",
+ "polkadot-frame-trace-decode",
+ "polkadot-frame-trace-model",
+ "rayon",
+ "reqwest",
+ "rustls",
+ "sc-executor",
+ "sc-executor-common",
+ "schnellru",
+ "serde",
+ "serde_json",
+ "sp-core",
+ "sp-crypto-ec-utils",
+ "sp-crypto-hashing",
+ "sp-externalities",
+ "sp-io",
+ "sp-maybe-compressed-blob",
+ "sp-panic-handler",
+ "sp-runtime",
+ "sp-state-machine",
+ "sp-statement-store",
+ "sp-trie",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-tungstenite",
+ "tokio-util",
+ "tracing",
+ "tracing-core",
+ "trie-db",
+ "tungstenite",
+ "wat",
+ "webpki-roots 1.0.11",
+ "zstd 0.13.3",
+]
 
 [[package]]
 name = "polkavm"

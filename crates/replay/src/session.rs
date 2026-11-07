@@ -67,10 +67,10 @@ impl ReplaySession {
                 .map(PathBuf::from)
                 .or_else(|| std::env::var_os("HOME").map(|p| PathBuf::from(p).join(".cache")))
                 .unwrap_or_else(std::env::temp_dir)
-                .join("frame-trace")
+                .join("polkadot-frame-trace")
         });
         // The disk cache is disposable: a directory that cannot be used is a warning, and
-        // frame-trace runs without it.
+        // polkadot-frame-trace runs without it.
         let wasm_dir = base.join("wasm");
         let wasm_cache = match std::fs::create_dir_all(&wasm_dir) {
             Ok(()) => true,
@@ -539,7 +539,8 @@ mod disk_tests {
     }
     #[test]
     fn wasm_cache_is_measured_when_runtimes_change_and_active_runtime_is_pinned() {
-        let dir = std::env::temp_dir().join(format!("frame-trace-wasm-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("polkadot-frame-trace-wasm-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let session = ReplaySession::with_cache_max_bytes(Some(&dir), 1).expect("session");
         let wasm = b"runtime";
@@ -598,7 +599,10 @@ mod disk_tests {
     }
     #[test]
     fn unused_runtimes_go_before_proof_nodes() {
-        let dir = std::env::temp_dir().join(format!("frame-trace-pressure-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!(
+            "polkadot-frame-trace-pressure-{}",
+            std::process::id()
+        ));
         let _ = std::fs::remove_dir_all(&dir);
         let cap = 1024 * 1024;
         let session = ReplaySession::with_cache_max_bytes(Some(&dir), cap).expect("session");
@@ -622,7 +626,8 @@ mod disk_tests {
     }
     #[test]
     fn a_runtime_larger_than_the_limit_leaves_the_node_floor() {
-        let dir = std::env::temp_dir().join(format!("frame-trace-floor-{}", std::process::id()));
+        let dir =
+            std::env::temp_dir().join(format!("polkadot-frame-trace-floor-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         let cap = 1024 * 1024;
         let session = ReplaySession::with_cache_max_bytes(Some(&dir), cap).expect("session");
@@ -648,8 +653,10 @@ mod disk_tests {
     #[test]
     fn a_runtime_that_cannot_be_deleted_stays_in_the_node_budget() {
         use std::os::unix::fs::PermissionsExt;
-        let dir =
-            std::env::temp_dir().join(format!("frame-trace-stuck-wasm-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!(
+            "polkadot-frame-trace-stuck-wasm-{}",
+            std::process::id()
+        ));
         let _ = std::fs::remove_dir_all(&dir);
         let cap = 1024 * 1024;
         let session = ReplaySession::with_cache_max_bytes(Some(&dir), cap).expect("session");
@@ -673,7 +680,10 @@ mod disk_tests {
     }
     #[test]
     fn a_disabled_wasm_cache_is_not_maintained() {
-        let dir = std::env::temp_dir().join(format!("frame-trace-no-wasm-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!(
+            "polkadot-frame-trace-no-wasm-{}",
+            std::process::id()
+        ));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("mkdir");
         std::fs::write(dir.join("wasm"), b"not a folder").expect("write");
@@ -688,8 +698,10 @@ mod disk_tests {
     }
     #[test]
     fn runtimes_in_use_plus_the_node_floor_over_the_limit_warn() {
-        let dir =
-            std::env::temp_dir().join(format!("frame-trace-floor-warn-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!(
+            "polkadot-frame-trace-floor-warn-{}",
+            std::process::id()
+        ));
         let _ = std::fs::remove_dir_all(&dir);
         let cap = 1024 * 1024;
         let session = ReplaySession::with_cache_max_bytes(Some(&dir), cap).expect("session");
@@ -706,7 +718,10 @@ mod disk_tests {
     }
     #[test]
     fn an_unusable_cache_directory_is_a_warning() {
-        let dir = std::env::temp_dir().join(format!("frame-trace-unusable-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!(
+            "polkadot-frame-trace-unusable-{}",
+            std::process::id()
+        ));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("mkdir");
         // A file where the node folder should be.
@@ -716,7 +731,7 @@ mod disk_tests {
         std::fs::remove_dir_all(dir).expect("cleanup");
     }
     /// Cache maintenance at scale. Run with
-    /// `FT_BENCH_DIR=<empty dir> cargo test --release -p frame-trace-replay --lib bench_disk_cache -- --ignored --nocapture`.
+    /// `FT_BENCH_DIR=<empty dir> cargo test --release -p polkadot-frame-trace-replay --lib bench_disk_cache -- --ignored --nocapture`.
     /// The first run fills the directory; measure memory on a second run, a fresh process.
     /// `FT_BENCH_EVICT=1` also times dropping one segment, which deletes it.
     #[test]

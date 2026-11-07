@@ -1,5 +1,5 @@
 [package]
-name = "frame-trace-replay"
+name = "polkadot-frame-trace-replay"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -9,7 +9,7 @@ publish = false
 
 [dependencies]
 thiserror.workspace = true
-frame-trace-model.workspace = true
+polkadot-frame-trace-model.workspace = true
 zstd = "0.13"
 tokio-tungstenite = { version = "0.28", features = ["rustls-tls-webpki-roots"] }
 tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "sync", "macros"] }
@@ -51,4 +51,4 @@ workspace = true
 [dev-dependencies]
 tungstenite = "0.28"
 wat = "1"
-frame-trace-decode.workspace = true
+polkadot-frame-trace-decode.workspace = true

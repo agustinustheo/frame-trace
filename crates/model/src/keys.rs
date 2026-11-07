@@ -1,4 +1,4 @@
-//! Storage keys frame-trace needs to know without runtime metadata.
+//! Storage keys polkadot-frame-trace needs to know without runtime metadata.
 
 /// `:extrinsic_index` (`sp_storage::well_known_keys::EXTRINSIC_INDEX`).
 pub const EXTRINSIC_INDEX: &[u8] = b":extrinsic_index";

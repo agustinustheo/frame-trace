@@ -1,7 +1,9 @@
 //! Real signed blocks and the public parachain execute without a node or any network access.
 #![allow(clippy::unwrap_used)]
-use frame_trace_model::{OpKind, PhaseKind, ReplayEvent, TracedBlock, rpc::parse_trace_block};
-use frame_trace_replay::{Artifact, Error, replay};
+use polkadot_frame_trace_model::{
+    OpKind, PhaseKind, ReplayEvent, TracedBlock, rpc::parse_trace_block,
+};
+use polkadot_frame_trace_replay::{Artifact, Error, replay};
 use serde_json::Value;
 use std::{collections::BTreeMap, path::PathBuf};
 
@@ -138,8 +140,9 @@ fn check(name: &str, wasm: bool) {
             serde_json::from_slice(&read(name, "reference-events.json.zst")).unwrap();
         assert_eq!(keyed_events(&result.capture.events), keyed_events(&events));
     }
-    let metadata = frame_trace_decode::Metadata::from_hex(&result.artifact.metadata).unwrap();
-    let annotated = frame_trace_decode::annotate(&block, Some(&metadata));
+    let metadata =
+        polkadot_frame_trace_decode::Metadata::from_hex(&result.artifact.metadata).unwrap();
+    let annotated = polkadot_frame_trace_decode::annotate(&block, Some(&metadata));
     assert!(annotated.phases.iter().all(|p| p.call_error.is_none()));
     if name == "people-transfer" {
         assert!(
@@ -208,7 +211,10 @@ fn tampered_parent_and_missing_proof_fail() {
 }
 #[test]
 fn artifact_round_trip_and_version_rejection() {
-    let dir = std::env::temp_dir().join(format!("frame-trace-artifact-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!(
+        "polkadot-frame-trace-artifact-{}",
+        std::process::id()
+    ));
     let mut artifact = Artifact::load(&fixture("people-transfer")).unwrap();
     // Auxiliary metadata must not prevent a verified replay from being saved.
     artifact.metadata = "malformed auxiliary metadata".into();
@@ -238,8 +244,8 @@ fn public_network() {
         "FRAME_TRACE_WESTEND_AH_RPC",
         "wss://westend-asset-hub-rpc.polkadot.io",
     );
-    let rpc = frame_trace_replay::rpc::Rpc::new(&url).unwrap();
-    let result = frame_trace_replay::online(&rpc, "best").unwrap();
+    let rpc = polkadot_frame_trace_replay::rpc::Rpc::new(&url).unwrap();
+    let result = polkadot_frame_trace_replay::online(&rpc, "best").unwrap();
     assert!(result.root_check);
     assert_eq!(result.measured_rpc_count, 0);
 }
@@ -247,13 +253,14 @@ fn public_network() {
 #[ignore = "requires public network and recent parent state (FRAME_TRACE_WESTEND_RPC)"]
 fn public_relay_network() {
     let url = endpoint("FRAME_TRACE_WESTEND_RPC", "wss://westend-rpc.polkadot.io");
-    let rpc = frame_trace_replay::rpc::Rpc::new(&url).unwrap();
-    let result = frame_trace_replay::online(&rpc, "finalized").unwrap();
+    let rpc = polkadot_frame_trace_replay::rpc::Rpc::new(&url).unwrap();
+    let result = polkadot_frame_trace_replay::online(&rpc, "finalized").unwrap();
     assert!(result.root_check);
     assert_eq!(result.measured_rpc_count, 0);
     let block = TracedBlock::from_replay(&result.capture).unwrap();
-    let metadata = frame_trace_decode::Metadata::from_hex(&result.artifact.metadata).unwrap();
-    let annotated = frame_trace_decode::annotate(&block, Some(&metadata));
+    let metadata =
+        polkadot_frame_trace_decode::Metadata::from_hex(&result.artifact.metadata).unwrap();
+    let annotated = polkadot_frame_trace_decode::annotate(&block, Some(&metadata));
     assert!(annotated.all_phases().all(|p| p.call_error.is_none()));
     let labels: Vec<_> = annotated.all_phases().map(|p| p.label.as_str()).collect();
     assert_eq!(
@@ -304,7 +311,7 @@ fn missing_execution_node_is_an_error_with_sdk_panic_handler_in_subprocess() {
             HashDB::insert(
                 &mut memory,
                 EMPTY_PREFIX,
-                &frame_trace_replay::rpc::unhex(node).unwrap(),
+                &polkadot_frame_trace_replay::rpc::unhex(node).unwrap(),
             );
         }
         let parent: sp_runtime::generic::Header<u32, sp_runtime::traits::BlakeTwo256> =
@@ -317,7 +324,7 @@ fn missing_execution_node_is_an_error_with_sdk_panic_handler_in_subprocess() {
         .unwrap();
         let protected: std::collections::BTreeSet<_> = code
             .into_iter_nodes()
-            .map(|n| frame_trace_replay::rpc::hex0(&n))
+            .map(|n| polkadot_frame_trace_replay::rpc::hex0(&n))
             .collect();
         let index = original
             .proof_nodes
@@ -338,8 +345,9 @@ fn missing_execution_node_is_an_error_with_sdk_panic_handler_in_subprocess() {
                 "{error}"
             );
             assert!(!error.contains("offline proof cache miss"));
-            let hash =
-                sp_crypto_hashing::blake2_256(&frame_trace_replay::rpc::unhex(&missing).unwrap());
+            let hash = sp_crypto_hashing::blake2_256(
+                &polkadot_frame_trace_replay::rpc::unhex(&missing).unwrap(),
+            );
             assert!(error.contains(&hex::encode(hash)), "{error}");
         }
         return;
@@ -369,7 +377,10 @@ fn missing_execution_node_is_an_error_with_sdk_panic_handler_in_subprocess() {
 
 #[test]
 fn corrupt_artifact_files_and_limits_name_the_path() {
-    let dir = std::env::temp_dir().join(format!("frame-trace-corrupt-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!(
+        "polkadot-frame-trace-corrupt-{}",
+        std::process::id()
+    ));
     std::fs::create_dir_all(&dir).unwrap();
     let path = dir.join("artifact.json.zst");
     for bytes in [
@@ -409,7 +420,7 @@ fn corrupt_artifact_files_and_limits_name_the_path() {
 #[test]
 fn concurrent_artifact_saves_are_atomic_and_leave_no_temporary_files() {
     let dir = std::env::temp_dir().join(format!(
-        "frame-trace-concurrent-save-{}",
+        "polkadot-frame-trace-concurrent-save-{}",
         std::process::id()
     ));
     let original = Artifact::load(&fixture("people-transfer")).unwrap();
@@ -432,7 +443,7 @@ fn concurrent_artifact_saves_are_atomic_and_leave_no_temporary_files() {
     std::fs::remove_dir_all(dir).unwrap();
 }
 
-/// A runtime that imports a host function frame-trace lacks fails with the function's name,
+/// A runtime that imports a host function polkadot-frame-trace lacks fails with the function's name,
 /// not as a generic execution failure.
 #[test]
 fn missing_host_function_is_named_through_runtime_override() {
@@ -445,10 +456,10 @@ fn missing_host_function_is_named_through_runtime_override() {
         (func (export "Core_execute_block") (param i32 i32) (result i64) i64.const 0))"#,
     )
     .unwrap();
-    let session = frame_trace_replay::ReplaySession::new(None)
+    let session = polkadot_frame_trace_replay::ReplaySession::new(None)
         .unwrap()
         .with_runtime_override(Some(wasm));
-    let error = frame_trace_replay::replay_with_session(
+    let error = polkadot_frame_trace_replay::replay_with_session(
         Artifact::load(&fixture("westend-asset-hub")).unwrap(),
         None,
         &session,
@@ -464,13 +475,13 @@ fn missing_host_function_is_named_through_runtime_override() {
     assert!(hint.contains("runtime override may be the cause"), "{hint}");
     let text = error.to_string();
     assert!(
-        text.starts_with("the runtime needs host functions frame-trace does not have: env:ext_frame_trace_also_missing_version_2, "),
+        text.starts_with("the runtime needs host functions polkadot-frame-trace does not have: env:ext_frame_trace_also_missing_version_2, "),
         "{text}"
     );
     assert!(text.contains("fixed when it is built"), "{text}");
     assert!(
         text.contains(
-            "troubleshooting.html#the-runtime-needs-host-functions-frame-trace-does-not-have"
+            "troubleshooting.html#the-runtime-needs-host-functions-polkadot-frame-trace-does-not-have"
         ),
         "{text}"
     );

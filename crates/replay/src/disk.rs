@@ -683,7 +683,7 @@ fn remove_legacy(inner: &Inner, legacy: &Path) {
         return;
     };
     note!(
-        "disk cache: removing {}, left by an older frame-trace; the disk cache is now in {}",
+        "disk cache: removing {}, left by an older polkadot-frame-trace; the disk cache is now in {}",
         legacy.display(),
         inner.dir.display()
     );
@@ -704,7 +704,7 @@ fn remove_legacy(inner: &Inner, legacy: &Path) {
     }
     if kept || std::fs::remove_dir(legacy).is_err() {
         note!(
-            "disk cache: kept {}: it holds files frame-trace did not write",
+            "disk cache: kept {}: it holds files polkadot-frame-trace did not write",
             legacy.display()
         );
     }
@@ -839,8 +839,10 @@ mod tests {
         (H256::from(sp_io::hashing::blake2_256(&bytes)), bytes)
     }
     fn dir(name: &str) -> PathBuf {
-        let dir =
-            std::env::temp_dir().join(format!("frame-trace-disk-{name}-{}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!(
+            "polkadot-frame-trace-disk-{name}-{}",
+            std::process::id()
+        ));
         let _ = std::fs::remove_dir_all(&dir);
         dir
     }

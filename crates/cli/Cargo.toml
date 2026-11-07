@@ -1,5 +1,5 @@
 [package]
-name = "frame-trace"
+name = "polkadot-frame-trace"
 description = "OpenTelemetry traces of what a Polkadot SDK block did to storage"
 version.workspace = true
 edition.workspace = true
@@ -8,19 +8,19 @@ license.workspace = true
 repository.workspace = true
 
 [[bin]]
-name = "frame-trace"
+name = "polkadot-frame-trace"
 path = "src/main.rs"
 
 [dependencies]
 anyhow.workspace = true
 clap.workspace = true
 comfy-table.workspace = true
-frame-trace-decode.workspace = true
-frame-trace-model.workspace = true
-frame-trace-replay.workspace = true
+polkadot-frame-trace-decode.workspace = true
+polkadot-frame-trace-model.workspace = true
+polkadot-frame-trace-replay.workspace = true
 ctrlc = { version = "3.4", features = ["termination"] }
 rayon = "1"
-frame-trace-otel.workspace = true
+polkadot-frame-trace-otel.workspace = true
 serde_json.workspace = true
 serde.workspace = true
 

@@ -19,7 +19,7 @@ pub mod rpc;
 use backend::TracedBackend;
 use capture::Capture;
 use codec::{Decode, Encode};
-use frame_trace_model::ReplayCapture;
+use polkadot_frame_trace_model::ReplayCapture;
 use proof::ProofDb;
 use rpc::{Rpc, unhex};
 use sc_executor::{RuntimeVersion, WasmExecutor};
@@ -74,9 +74,9 @@ pub enum Error {
     CallExecution(String),
     /// The runtime imports host functions that this build's `HostFunctions` lacks.
     #[error(
-        "the runtime needs host functions frame-trace does not have: {functions}{hint}. \
-         frame-trace's host functions are fixed when it is built, so this chain needs a \
-         frame-trace build that adds them. See {MISSING_HOST_FUNCTIONS_DOCS}"
+        "the runtime needs host functions polkadot-frame-trace does not have: {functions}{hint}. \
+         polkadot-frame-trace's host functions are fixed when it is built, so this chain needs a \
+         polkadot-frame-trace build that adds them. See {MISSING_HOST_FUNCTIONS_DOCS}"
     )]
     MissingHostFunctions {
         /// The missing imports as the executor names them, for example `env:ext_foo_version_1`.
@@ -90,7 +90,7 @@ pub enum Error {
     Json(#[from] serde_json::Error),
 }
 
-const MISSING_HOST_FUNCTIONS_DOCS: &str = "https://agustinustheodorus.com/frame-trace/troubleshooting.html#the-runtime-needs-host-functions-frame-trace-does-not-have";
+const MISSING_HOST_FUNCTIONS_DOCS: &str = "https://agustinustheodorus.com/polkadot-frame-trace/troubleshooting.html#the-runtime-needs-host-functions-polkadot-frame-trace-does-not-have";
 
 /// The executor's message when the runtime imports a function the host does not provide.
 const MISSING_IMPORTS: &str =

@@ -1,10 +1,10 @@
-//! `frame-trace`: show what a Polkadot SDK block did to storage, as OpenTelemetry traces.
+//! `polkadot-frame-trace`: show what a Polkadot SDK block did to storage, as OpenTelemetry traces.
 
 use std::{fs, io::Write, path::PathBuf};
 
 use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
-use frame_trace_decode::AnnotatedBlock;
+use polkadot_frame_trace_decode::AnnotatedBlock;
 
 #[macro_use]
 mod log;
@@ -26,7 +26,7 @@ const fn build_version(set: Option<&'static str>) -> &'static str {
 }
 
 #[derive(Parser)]
-#[command(name = "frame-trace", version = VERSION, about)]
+#[command(name = "polkadot-frame-trace", version = VERSION, about)]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -36,27 +36,27 @@ struct Cli {
 enum Command {
     /// Compare storage use across saved blocks or a range of finalized blocks.
     #[command(
-        after_help = "Examples:\n  frame-trace report block-1.json block-2.json\n  frame-trace report --rpc URL --last 10"
+        after_help = "Examples:\n  polkadot-frame-trace report block-1.json block-2.json\n  polkadot-frame-trace report --rpc URL --last 10"
     )]
     Report(report::ReportArgs),
     /// Trace storage use and the result of a runtime API call.
     #[command(
-        after_help = "Examples:\n  frame-trace call --rpc URL --at finalized --method Core_version --data 0x --check-state-call\n  frame-trace call --offline fixtures/replay/call-people-nonce --summary"
+        after_help = "Examples:\n  polkadot-frame-trace call --rpc URL --at finalized --method Core_version --data 0x --check-state-call\n  polkadot-frame-trace call --offline fixtures/replay/call-people-nonce --summary"
     )]
     Call(call::CallArgs),
     /// Trace storage use in one block and export it to JSON or a trace viewer.
     #[command(
-        after_help = "Examples:\n  frame-trace block --rpc URL --block finalized --otlp\n  frame-trace block --offline fixtures/replay/people-traced --json block.json"
+        after_help = "Examples:\n  polkadot-frame-trace block --rpc URL --block finalized --otlp\n  polkadot-frame-trace block --offline fixtures/replay/people-traced --json block.json"
     )]
     Block(BlockArgs),
     /// Show storage use by block phase and storage item.
     #[command(
-        after_help = "Examples:\n  frame-trace summary --rpc URL --block finalized\n  frame-trace summary --from-json block.json"
+        after_help = "Examples:\n  polkadot-frame-trace summary --rpc URL --block finalized\n  polkadot-frame-trace summary --from-json block.json"
     )]
     Summary(SummaryArgs),
     /// Trace new finalized blocks as they arrive.
     #[command(
-        after_help = "Examples:\n  frame-trace follow --rpc URL --otlp\n  frame-trace follow --rpc URL --best"
+        after_help = "Examples:\n  polkadot-frame-trace follow --rpc URL --otlp\n  polkadot-frame-trace follow --rpc URL --best"
     )]
     Follow(FollowArgs),
 }
@@ -150,7 +150,7 @@ fn load(args: &source::SourceArgs) -> Result<AnnotatedBlock> {
     if loaded.metadata.is_none() {
         eprintln!("notice: metadata unavailable; storage keys and extrinsics will not be named");
     }
-    let mut block = frame_trace_decode::annotate_at_block(
+    let mut block = polkadot_frame_trace_decode::annotate_at_block(
         &traced,
         loaded.metadata.as_deref(),
         loaded.block_number,
@@ -193,7 +193,7 @@ fn emit(
         write_json(trace, path)?;
     }
     if let Some(endpoint) = otlp {
-        let spans = frame_trace_otel::export_otlp(trace, endpoint, Default::default())
+        let spans = polkadot_frame_trace_otel::export_otlp(trace, endpoint, Default::default())
             .with_context(|| format!("exporting to {endpoint}"))?;
         eprintln!("exported {spans} spans to {endpoint}");
     }
@@ -256,17 +256,20 @@ mod argument_tests {
             build_version(Some("0.1.0-nightly.20261106+abc1234")),
             "0.1.0-nightly.20261106+abc1234"
         );
-        let error = Cli::try_parse_from(["frame-trace", "--version"])
+        let error = Cli::try_parse_from(["polkadot-frame-trace", "--version"])
             .err()
             .expect("--version exits early");
         assert_eq!(error.kind(), clap::error::ErrorKind::DisplayVersion);
-        assert_eq!(error.to_string(), format!("frame-trace {VERSION}\n"));
+        assert_eq!(
+            error.to_string(),
+            format!("polkadot-frame-trace {VERSION}\n")
+        );
     }
 
     #[test]
     fn follow_workers_default_and_limits() {
         let Command::Follow(args) =
-            Cli::try_parse_from(["frame-trace", "follow", "--rpc", "ws://node"])
+            Cli::try_parse_from(["polkadot-frame-trace", "follow", "--rpc", "ws://node"])
                 .expect("default follow arguments")
                 .command
         else {
@@ -278,7 +281,7 @@ mod argument_tests {
         for workers in ["1", "4", "16"] {
             assert!(
                 Cli::try_parse_from([
-                    "frame-trace",
+                    "polkadot-frame-trace",
                     "follow",
                     "--rpc",
                     "ws://node",
@@ -291,7 +294,7 @@ mod argument_tests {
         for workers in ["0", "17", "256", "-1", "many"] {
             assert!(
                 Cli::try_parse_from([
-                    "frame-trace",
+                    "polkadot-frame-trace",
                     "follow",
                     "--rpc",
                     "ws://node",

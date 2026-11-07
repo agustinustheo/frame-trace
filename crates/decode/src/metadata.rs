@@ -670,13 +670,13 @@ mod hook_order_tests {
             md.hook_instances("pallet_balances", "on_idle", None)
                 .is_none()
         );
-        let raw = frame_trace_model::rpc::parse_trace_block(include_str!(
+        let raw = polkadot_frame_trace_model::rpc::parse_trace_block(include_str!(
             "../../../fixtures/model/two-extrinsics.json"
         ))
         .expect("trace");
-        let mut block = frame_trace_model::TracedBlock::from_trace(&raw).expect("block");
+        let mut block = polkadot_frame_trace_model::TracedBlock::from_trace(&raw).expect("block");
         block.runtime_spans = (1..=2)
-            .map(|id| frame_trace_model::RuntimeSpan {
+            .map(|id| polkadot_frame_trace_model::RuntimeSpan {
                 id,
                 parent_id: None,
                 name: "on_initialize".into(),
