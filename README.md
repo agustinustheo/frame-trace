@@ -1,6 +1,10 @@
+<img src="https://raw.githubusercontent.com/agustinustheo/polkadot-frame-trace/main/docs/images/logo.svg" alt="polkadot-frame-trace logo: pink petals in front of trace timeline bars" width="112">
+
 # polkadot-frame-trace
 
 Replay any block of a Polkadot SDK chain on your machine and see every storage read and write as a trace.
+
+[![CI](https://img.shields.io/github/actions/workflow/status/agustinustheo/polkadot-frame-trace/ci.yml?branch=main&label=CI)](https://github.com/agustinustheo/polkadot-frame-trace/actions/workflows/ci.yml?query=branch%3Amain) [![Nightly](https://img.shields.io/github/actions/workflow/status/agustinustheo/polkadot-frame-trace/nightly.yml?branch=main&label=nightly)](https://github.com/agustinustheo/polkadot-frame-trace/actions/workflows/nightly.yml) [![Latest release](https://img.shields.io/github/v/release/agustinustheo/polkadot-frame-trace?label=release)](https://github.com/agustinustheo/polkadot-frame-trace/releases/latest) [![crates.io](https://img.shields.io/crates/v/polkadot-frame-trace)](https://crates.io/crates/polkadot-frame-trace) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/agustinustheo/polkadot-frame-trace/blob/main/LICENSE) [![Docs](https://img.shields.io/badge/docs-mdBook-E6007A)](https://agustinustheodorus.com/polkadot-frame-trace/) [![GitHub stars](https://img.shields.io/github/stars/agustinustheo/polkadot-frame-trace?style=flat)](https://github.com/agustinustheo/polkadot-frame-trace) [![Contributors](https://img.shields.io/github/contributors/agustinustheo/polkadot-frame-trace)](https://github.com/agustinustheo/polkadot-frame-trace/graphs/contributors)
 
 ![A Utility.batch block in Jaeger. Callouts mark the block, a phase, the runtime calls, a storage read, its origin, its proof bytes and its duration.](https://raw.githubusercontent.com/agustinustheo/polkadot-frame-trace/main/docs/images/hero.png)
 
