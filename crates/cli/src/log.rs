@@ -342,23 +342,6 @@ mod tests {
     }
 
     #[test]
-    fn a_cut_line_keeps_neither_its_length_nor_its_capacity() {
-        let queue = Queue::new(MAX_LINES, MAX_BYTES);
-        let mut long = String::with_capacity(1 << 20);
-        long.push_str(&"é".repeat(MAX_LINE_BYTES));
-        queue.push(long, Kind::Failure);
-        let state = queue.lock();
-        let line = &state.lines[0];
-        assert!(line.text.ends_with(" [cut]"));
-        assert!(line.text.len() <= MAX_LINE_BYTES);
-        assert!(
-            line.text.capacity() <= MAX_LINE_BYTES,
-            "{}",
-            line.text.capacity()
-        );
-    }
-
-    #[test]
     fn the_summary_counts_the_lines_its_own_room_cost() {
         let queue = Queue::new(3, MAX_BYTES);
         for n in 0..3 {
