@@ -1,15 +1,15 @@
 [book]
-authors = ["frame-trace contributors"]
+authors = ["polkadot-frame-trace contributors"]
 language = "en"
 src = "docs"
-title = "frame-trace"
+title = "polkadot-frame-trace"
 
 [build]
 build-dir = "book"
 
 [output.html]
-git-repository-url = "https://github.com/agustinustheo/frame-trace"
-edit-url-template = "https://github.com/agustinustheo/frame-trace/edit/main/{path}"
+git-repository-url = "https://github.com/agustinustheo/polkadot-frame-trace"
+edit-url-template = "https://github.com/agustinustheo/polkadot-frame-trace/edit/main/{path}"
 additional-js = ["mermaid.min.js", "mermaid-init.js"]
 
 [preprocessor.mermaid]

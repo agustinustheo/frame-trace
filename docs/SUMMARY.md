@@ -38,7 +38,7 @@
 - [Span names and attributes](reference/spans.md)
 - [JSON output](reference/json.md)
 - [Saved block format](reference/saved-block-format.md)
-- [What frame-trace supports](reference/support.md)
+- [What polkadot-frame-trace supports](reference/support.md)
 - [Glossary](reference/glossary.md)
 
 # Troubleshooting

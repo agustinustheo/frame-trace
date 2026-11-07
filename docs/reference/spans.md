@@ -1,6 +1,6 @@
 # Span names and attributes
 
-Every trace uses the service name `frame-trace`.
+Every trace uses the service name `polkadot-frame-trace`.
 This page lists the span names and the attributes on each kind of span.
 
 ## Span tree

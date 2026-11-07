@@ -55,7 +55,7 @@ fixture that touches child state.
 The People calls execute against the existing transfer fixture's **parent state**,
 not block #2's resulting state. They use its original V14 metadata, so results
 remain hex; their recorded outputs are local executions, **not node oracle data**.
-`cargo +1.93.0 run -p frame-trace-replay --example record_calls` regenerates those
+`cargo +1.93.0 run -p polkadot-frame-trace-replay --example record_calls` regenerates those
 three artifacts offline. The recorder extracts proofs only for observed keys plus
 `:code`/`:heappages`, executes again with the reduced proof, and reuses shared blobs.
 Nonce is 0; query_info returns the saved runtime's dispatch info; metadata versions
@@ -121,8 +121,8 @@ each alone. Offline, `one_session_replays_blocks_on_different_runtimes` replays
 To replay #18,985,170 offline, save it again from an archive node:
 
 ```sh
-frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block 18985170 --save <dir>
-frame-trace block --offline <dir>
+polkadot-frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block 18985170 --save <dir>
+polkadot-frame-trace block --offline <dir>
 ```
 
 ## Making a fixture
@@ -171,8 +171,8 @@ exceeded`. With `--rpc-timeout 120`, each try waits up to 120 seconds and the ru
 Only the RPC time limits change; the replay and its checks are the same.
 
 ```sh
-cargo +1.93.0 build --release --locked -p frame-trace
-target/release/frame-trace block --rpc wss://asset-hub-paseo-rpc.n.dwellir.com \
+cargo +1.93.0 build --release --locked -p polkadot-frame-trace
+target/release/polkadot-frame-trace block --rpc wss://asset-hub-paseo-rpc.n.dwellir.com \
   --block 15366850 --rpc-timeout 120 --save <dir> --json <file>
 python3 -I fixtures/replay/blobify.py <dir> fixtures/replay/paseo-asset-hub-contract fixtures/replay/blobs 100000
 ```
@@ -195,6 +195,6 @@ the root, that no call fails to decode, that the first extrinsics are `Timestamp
 To replay the old block offline, save it again from an archive node:
 
 ```sh
-frame-trace block --rpc wss://westend-rpc.polkadot.io --block 33614892 --save <dir>
-frame-trace block --offline <dir>
+polkadot-frame-trace block --rpc wss://westend-rpc.polkadot.io --block 33614892 --save <dir>
+polkadot-frame-trace block --offline <dir>
 ```

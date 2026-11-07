@@ -3,11 +3,11 @@
 Open a block's storage reads and writes in Grafana, with a ready dashboard and TraceQL search.
 This is the recommended setup: it uses `grafana/otel-lgtm`, the same image Parity uses for its own local tracing.
 
-You need frame-trace [installed](../getting-started/install.md), Docker, and a copy of the frame-trace repository for the example files.
+You need polkadot-frame-trace [installed](../getting-started/install.md), Docker, and a copy of the polkadot-frame-trace repository for the example files.
 
 ## 1. Start Grafana
 
-Run this from the `frame-trace` directory:
+Run this from the `polkadot-frame-trace` directory:
 
 ```sh
 cd examples/grafana-lgtm
@@ -20,17 +20,17 @@ After that, Grafana and Tempo are ready in about 3 seconds.
 | Port | What |
 | --- | --- |
 | 3000 | Grafana |
-| 4318 | OTLP/HTTP, where frame-trace sends traces |
+| 4318 | OTLP/HTTP, where polkadot-frame-trace sends traces |
 
 > **Warning:** Grafana opens without a login, as a viewer that can use Explore. Use this on your own machine only.
 
 ## 2. Send a trace
 
-Go back to the `frame-trace` directory and replay the People block that ships with the repository:
+Go back to the `polkadot-frame-trace` directory and replay the People block that ships with the repository:
 
 ```sh
 cd ../..
-frame-trace block --offline fixtures/replay/people-traced --otlp
+polkadot-frame-trace block --offline fixtures/replay/people-traced --otlp
 ```
 
 ```text
@@ -47,16 +47,16 @@ The trace can be searched about a second later.
 A live block works the same way:
 
 ```sh
-frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block finalized --otlp
+polkadot-frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block finalized --otlp
 ```
 
 ## 3. Open the dashboard
 
 Open <http://127.0.0.1:3000>.
-The `frame-trace` dashboard opens.
+The `polkadot-frame-trace` dashboard opens.
 It shows every block you traced in the last hour.
 
-![The frame-trace dashboard in Grafana with two blocks. Callouts mark the totals, the block table and six panels.](../images/grafana-dashboard.png)
+![The polkadot-frame-trace dashboard in Grafana with two blocks. Callouts mark the totals, the block table and six panels.](../images/grafana-dashboard.png)
 
 1. Totals for the time range: blocks, storage operations, reads that added [proof bytes](../concepts/proof-bytes.md), repeated reads, proof bytes and writes.
 2. One row per block. Click a span ID to open that block's trace.
@@ -86,7 +86,7 @@ Click the first read of `System::Account(5FHn…94ty)`, then **Span attributes**
 2. A phase: extrinsic 2, a `Utility.batch`.
 3. Runtime calls: `batch`, then the first `transfer_keep_alive`. You see these because this block's runtime was built with tracing. See [See runtime calls inside extrinsics](see-runtime-calls.md).
 4. A read of Bob's account, `System::Account(5FHn…94ty)`.
-5. `frame.storage.origin`: `trie (new)`, so frame-trace looked it up in the chain state and it was not in the proof yet.
+5. `frame.storage.origin`: `trie (new)`, so polkadot-frame-trace looked it up in the chain state and it was not in the proof yet.
 6. `frame.storage.proof_bytes`: this read added 166 bytes to the block's proof.
 7. The read took 6.88 µs in the replay on your machine.
 
@@ -115,6 +115,6 @@ The container keeps traces inside itself, so stopping it deletes them.
 
 ## Use your own Grafana
 
-Import `examples/grafana-lgtm/dashboards/frame-trace.json` into any Grafana that has a Tempo data source with the UID `tempo`.
+Import `examples/grafana-lgtm/dashboards/polkadot-frame-trace.json` into any Grafana that has a Tempo data source with the UID `tempo`.
 The counts and bar charts use TraceQL metrics, so Tempo must answer metrics queries.
 The LGTM image and the [Alloy example](send-traces-through-alloy.md) both do.

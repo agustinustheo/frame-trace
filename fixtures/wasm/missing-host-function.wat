@@ -1,4 +1,4 @@
-;; A test runtime that imports a host function frame-trace does not provide.
+;; A test runtime that imports a host function polkadot-frame-trace does not provide.
 ;; It exists only to show the missing host function error.
 (module
   (import "env" "ext_frame_trace_missing_version_1" (func))

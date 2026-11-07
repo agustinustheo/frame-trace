@@ -1,7 +1,7 @@
 # Measure proof size
 
 A parachain block's proof of validity carries the trie nodes the block touched.
-frame-trace estimates the size of that storage proof and shows which phases, items and extrinsics made it grow.
+polkadot-frame-trace estimates the size of that storage proof and shows which phases, items and extrinsics made it grow.
 The number is an estimate of the recorded proof, not the exact PoV: the PoV also holds the block, and the proof is compacted and compressed.
 Use it to compare blocks and find what dominates.
 [Proof bytes](../concepts/proof-bytes.md) explains how the bytes are counted.
@@ -11,7 +11,7 @@ Use it to compare blocks and find what dominates.
 Every replay prints the estimated size of the block's storage proof:
 
 ```sh
-frame-trace block --offline fixtures/replay/people-traced
+polkadot-frame-trace block --offline fixtures/replay/people-traced
 ```
 
 ```text
@@ -26,7 +26,7 @@ A live Westend Asset Hub block in [Your first trace](../getting-started/first-tr
 ## 2. Per phase
 
 ```sh
-frame-trace summary --offline fixtures/replay/people-traced --top 5
+polkadot-frame-trace summary --offline fixtures/replay/people-traced --top 5
 ```
 
 ```text

@@ -4,10 +4,10 @@ This page walks through one trace on screen, region by region.
 It uses block #4 of a [People chain](../reference/glossary.md#people-chain), which ships with the repository.
 Its runtime was built with tracing, so you also see runtime calls such as `set`.
 
-Send it to Jaeger from the `frame-trace` directory:
+Send it to Jaeger from the `polkadot-frame-trace` directory:
 
 ```sh
-frame-trace block --offline fixtures/replay/people-traced --otlp
+polkadot-frame-trace block --offline fixtures/replay/people-traced --otlp
 ```
 
 ```text
@@ -18,7 +18,7 @@ state root: computed 0x47116eac39ac59ba0534a0e4d624f78c4c8c56af5c3084e71c98ca181
 exported 633 spans to http://127.0.0.1:4318
 ```
 
-Open the trace `frame-trace: block #4 (0x06618995…0637)` in Jaeger.
+Open the trace `polkadot-frame-trace: block #4 (0x06618995…0637)` in Jaeger.
 Collapse everything with `>>`, then open `block #4`, `extrinsic 1: Timestamp.set`, `apply_extrinsic` and `set`.
 Click the row `get Timestamp::Now`.
 

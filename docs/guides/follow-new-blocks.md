@@ -1,6 +1,6 @@
 # Follow new blocks
 
-`frame-trace follow` traces each new final block as it arrives and sends it to your trace viewer.
+`polkadot-frame-trace follow` traces each new final block as it arrives and sends it to your trace viewer.
 Leave it running next to Jaeger to watch a chain's storage work live.
 
 ## 1. Start following
@@ -8,7 +8,7 @@ Leave it running next to Jaeger to watch a chain's storage work live.
 Start Jaeger as in [Your first trace](../getting-started/first-trace.md), then run:
 
 ```sh
-frame-trace follow --rpc wss://westend-asset-hub-rpc.polkadot.io --otlp --cache-dir .frame-trace-cache
+polkadot-frame-trace follow --rpc wss://westend-asset-hub-rpc.polkadot.io --otlp --cache-dir .polkadot-frame-trace-cache
 ```
 
 Press Ctrl-C to stop.
@@ -43,7 +43,7 @@ Each traced block appears in Jaeger as its own trace.
 
 ## 2. Read the status line
 
-frame-trace checks the node for new final blocks and prints a status line.
+polkadot-frame-trace checks the node for new final blocks and prints a status line.
 It prints the line when a problem count changes, and otherwise at a fixed interval.
 The [reference](../reference/commands.md#follow) lists the intervals.
 
@@ -55,7 +55,7 @@ The [reference](../reference/commands.md#follow) lists the intervals.
 | `exported` | Traces the receiver accepted. Only with `--otlp`. |
 | `export-waiting` | Traces waiting to be sent. Only with `--otlp`. |
 | `export-rejected` | Traces the receiver refused in part. They are not sent again. Only with `--otlp`. |
-| `export-failed` | Traces whose export crashed inside frame-trace. They are not sent again. Only with `--otlp`. |
+| `export-failed` | Traces whose export crashed inside polkadot-frame-trace. They are not sent again. Only with `--otlp`. |
 | `export-dropped` | Traces dropped because too many were waiting. Only with `--otlp`. |
 | `retrying` | Blocks that failed for a passing reason, such as a dropped connection, and will be tried again. |
 | `stopped` | Blocks that failed for good, such as pruned state or a failed root check. |
@@ -76,7 +76,7 @@ If stderr was blocked long enough to lose log lines, the summary ends with `log-
 
 ## 3. Keep up with the chain
 
-frame-trace replays several blocks at once. Raise `--workers` when the queue keeps growing.
+polkadot-frame-trace replays several blocks at once. Raise `--workers` when the queue keeps growing.
 See the [worker and queue limits](../reference/commands.md#follow).
 The first replay runs on its own. Other workers wait until it finishes.
 If it fails, the next block also runs on its own.
@@ -89,8 +89,8 @@ These log lines tell you this is happening:
 
 | Line | Meaning |
 | --- | --- |
-| `follow queue full; sampling near the tip at replay speed` | The waiting queue is full. frame-trace stops queueing older blocks and prefers recent heights. |
-| `replay job skipped: queued block expired behind tip` | A waiting block fell outside the recent-height limit. frame-trace dropped it without replaying it. It counts as `skipped`. |
+| `follow queue full; sampling near the tip at replay speed` | The waiting queue is full. polkadot-frame-trace stops queueing older blocks and prefers recent heights. |
+| `replay job skipped: queued block expired behind tip` | A waiting block fell outside the recent-height limit. polkadot-frame-trace dropped it without replaying it. It counts as `skipped`. |
 | `skipped block <hash>: retry expired behind tip` | The same, for a block that was waiting to be retried. |
 
 These lines mean replays are falling behind the chain.
@@ -106,12 +106,12 @@ To go faster:
 
 `--best` follows the newest blocks instead of final ones.
 These can still be replaced by a reorg.
-When that happens, frame-trace logs the reorg and counts the replaced block as `reverted`.
+When that happens, polkadot-frame-trace logs the reorg and counts the replaced block as `reverted`.
 If a reverted block returns to the chain, it can be traced again.
 
 ## 5. When the node or the receiver goes away
 
-If a check for new blocks fails, frame-trace logs it and tries again.
+If a check for new blocks fails, polkadot-frame-trace logs it and tries again.
 It waits longer after each failure, and repeats the line at most once a minute.
 
 ```text
@@ -121,7 +121,7 @@ follow poll still failing after 6 attempts over 1m06s: RPC error: chain_getFinal
 
 `follow` keeps running until the node answers again, then logs `follow poll recovered after <N> failed attempt(s) over <time>`.
 
-If the OTLP receiver stops, frame-trace keeps replaying blocks and holds their traces.
+If the OTLP receiver stops, polkadot-frame-trace keeps replaying blocks and holds their traces.
 It sends them when the receiver is back. It does not replay the blocks again.
 Each trace goes out in several requests. A request the receiver acknowledged is never sent again.
 If an acknowledgement is lost, the receiver can get the same spans twice, with the same IDs.
@@ -142,7 +142,7 @@ The first failure of the outage was not logged, because a failure line had been 
 Each try can take several seconds, because the exporter itself retries until the OTLP timeout.
 So the time in the recovery line is longer than the waits between tries add up to.
 
-A long outage fills the waiting queue. frame-trace then drops the oldest trace and counts it as `export-dropped`.
+A long outage fills the waiting queue. polkadot-frame-trace then drops the oldest trace and counts it as `export-dropped`.
 The [reference](../reference/commands.md#follow) lists the queue size.
 If the receiver is still down when you stop `follow`, the waiting traces are not sent.
 The summary counts them as `export-unsent`.
@@ -155,31 +155,31 @@ Then `follow` sends waiting traces, prints its summary and exits with code 0.
 A second signal stops it at once.
 The [reference](../reference/commands.md#follow) lists the waits and exit codes.
 
-A minimal systemd unit, in `/etc/systemd/system/frame-trace-follow.service`:
+A minimal systemd unit, in `/etc/systemd/system/polkadot-frame-trace-follow.service`:
 
 ```ini
 [Unit]
-Description=frame-trace follow
+Description=polkadot-frame-trace follow
 After=network-online.target
 Wants=network-online.target
 StartLimitIntervalSec=300
 StartLimitBurst=5
 
 [Service]
-ExecStart=/usr/local/bin/frame-trace follow --rpc ws://127.0.0.1:9944 --otlp --cache-dir /var/cache/frame-trace
+ExecStart=/usr/local/bin/polkadot-frame-trace follow --rpc ws://127.0.0.1:9944 --otlp --cache-dir /var/cache/polkadot-frame-trace
 KillSignal=SIGTERM
 TimeoutStopSec=45
 Restart=on-failure
 RestartSec=10
 DynamicUser=yes
-CacheDirectory=frame-trace
+CacheDirectory=polkadot-frame-trace
 
 [Install]
 WantedBy=multi-user.target
 ```
 
-Start it with `sudo systemctl enable --now frame-trace-follow`.
-Read its log with `journalctl -u frame-trace-follow -f`.
+Start it with `sudo systemctl enable --now polkadot-frame-trace-follow`.
+Read its log with `journalctl -u polkadot-frame-trace-follow -f`.
 
 - `TimeoutStopSec=45` leaves time for the replay and export waits at stop.
 - `Restart=on-failure` restarts `follow` after exit code 1, for example when its threads stop.

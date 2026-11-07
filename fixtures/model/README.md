@@ -24,8 +24,8 @@ Other recorded fixtures live under `fixtures/<chain>/`.
 in a temporary detached worktree, using:
 
 ```sh
-cargo +1.93.0 build --locked -p frame-trace
-frame-trace block --from-file fixtures/model/two-extrinsics.json --json pre-e86f740.json
+cargo +1.93.0 build --locked -p polkadot-frame-trace
+polkadot-frame-trace block --from-file fixtures/model/two-extrinsics.json --json pre-e86f740.json
 ```
 
 No fields were removed to simulate legacy input. `summary.golden.txt` and

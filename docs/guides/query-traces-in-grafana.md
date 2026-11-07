@@ -9,7 +9,7 @@ You need traces in Tempo.
 To get the same counts, send only the fixture block:
 
 ```sh
-frame-trace block --offline fixtures/replay/people-traced --otlp
+polkadot-frame-trace block --offline fixtures/replay/people-traced --otlp
 ```
 
 ## Run a query
@@ -41,7 +41,7 @@ curl -s -G http://127.0.0.1:3000/api/datasources/proxy/uid/tempo/api/search \
 
 ## Write a query
 
-- frame-trace attributes are span attributes, so they start with `span.`, as in `span.frame.storage.item`.
+- polkadot-frame-trace attributes are span attributes, so they start with `span.`, as in `span.frame.storage.item`.
   [Span names and attributes](../reference/spans.md) lists them with their types.
 - Strings take quotes: `span.frame.storage.origin = "trie (new)"`.
 - Numbers and booleans do not: `span.frame.storage.proof_bytes > 0`, `span.frame.storage.duplicate_read = true`. With quotes they match nothing.
@@ -51,7 +51,7 @@ curl -s -G http://127.0.0.1:3000/api/datasources/proxy/uid/tempo/api/search \
 
 ## Reads that cost proof bytes
 
-**Trie reads that added proof bytes.** Reads frame-trace had to look up in the chain state and that made the proof bigger. See [Cache or trie](../concepts/cache-or-trie.md).
+**Trie reads that added proof bytes.** Reads polkadot-frame-trace had to look up in the chain state and that made the proof bigger. See [Cache or trie](../concepts/cache-or-trie.md).
 
 ```text
 { span.frame.storage.origin = "trie (new)" && span.frame.storage.proof_bytes > 0 }
@@ -164,12 +164,12 @@ The counts come from the commands under each query.
 Result: 1 span, the block span, after this run from [See runtime calls inside extrinsics](see-runtime-calls.md#try-it-with-the-shipped-people-runtime):
 
 ```sh
-frame-trace block --offline fixtures/replay/people-transfer --runtime-override people-traced.wasm --otlp
+polkadot-frame-trace block --offline fixtures/replay/people-transfer --runtime-override people-traced.wasm --otlp
 ```
 
 Add `>> { span.db.system.name = "substrate" }` to get its 421 storage operations.
 
-**Runtime API call traces.** Traces from `frame-trace call`.
+**Runtime API call traces.** Traces from `polkadot-frame-trace call`.
 
 ```text
 { span.frame.trace.kind = "call" }
@@ -178,12 +178,12 @@ Add `>> { span.db.system.name = "substrate" }` to get its 421 storage operations
 Result: 1 span after this run:
 
 ```sh
-frame-trace call --offline fixtures/replay/call-people-nonce --otlp
+polkadot-frame-trace call --offline fixtures/replay/call-people-nonce --otlp
 ```
 
 ## Root check failures
 
 There is no query for them, because spans do not carry the [root check](../concepts/what-a-replay-proves.md) result.
-frame-trace prints it as the `root check:` line and writes it to JSON as [`execution.root_check`](../reference/json.md#execution).
-When a block's own runtime finds a wrong root, it aborts, and frame-trace exports nothing.
+polkadot-frame-trace prints it as the `root check:` line and writes it to JSON as [`execution.root_check`](../reference/json.md#execution).
+When a block's own runtime finds a wrong root, it aborts, and polkadot-frame-trace exports nothing.
 See [Troubleshooting](../troubleshooting.md#runtime-execution-failed-root-mismatch-unsupported-host-function-or-invalid-block).

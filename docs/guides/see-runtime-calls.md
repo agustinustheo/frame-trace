@@ -1,6 +1,6 @@
 # See runtime calls inside extrinsics
 
-frame-trace always records every storage operation.
+polkadot-frame-trace always records every storage operation.
 It can only show the calls around them, such as `batch` and `transfer_keep_alive`, when the runtime reports them.
 A runtime does that only when it is built with the `with-tracing` feature.
 
@@ -47,12 +47,12 @@ Build it from the same source and version as the runtime on chain.
 
 `--runtime-override <wasm>` runs your Wasm instead of the chain's runtime.
 It works with `block`, `summary` and `call`.
-frame-trace still fetches and checks all state, including the chain's runtime code, then runs your file instead.
+polkadot-frame-trace still fetches and checks all state, including the chain's runtime code, then runs your file instead.
 
 For your own chain:
 
 ```sh
-frame-trace block --rpc <url> --block finalized \
+polkadot-frame-trace block --rpc <url> --block finalized \
   --runtime-override <path-to-your-traced-runtime.wasm> --otlp
 ```
 
@@ -61,7 +61,7 @@ frame-trace block --rpc <url> --block finalized \
 The repository ships a block from a People chain whose runtime has no tracing, `fixtures/replay/people-transfer`.
 It also ships the same runtime built with `with-tracing`, inside the saved block `fixtures/replay/people-traced`.
 It is the largest proof node in that file, so you can extract it with `zstd`, `jq` and `xxd`.
-Run this from the `frame-trace` directory:
+Run this from the `polkadot-frame-trace` directory:
 
 ```sh
 zstd -dc fixtures/replay/people-traced/artifact.json.zst \
@@ -69,12 +69,12 @@ zstd -dc fixtures/replay/people-traced/artifact.json.zst \
   | xxd -r -p > people-traced.wasm
 ```
 
-That runtime was built from the Individuality `next-people-paseo` runtime with one extra feature line, [`dev/experiments/e1/people-with-tracing.patch`](https://github.com/agustinustheo/frame-trace/blob/main/dev/experiments/e1/people-with-tracing.patch).
+That runtime was built from the Individuality `next-people-paseo` runtime with one extra feature line, [`dev/experiments/e1/people-with-tracing.patch`](https://github.com/agustinustheo/polkadot-frame-trace/blob/main/dev/experiments/e1/people-with-tracing.patch).
 
 Now replay the untraced block with it:
 
 ```sh
-frame-trace block --offline fixtures/replay/people-transfer \
+polkadot-frame-trace block --offline fixtures/replay/people-transfer \
   --runtime-override people-traced.wasm --otlp
 ```
 
@@ -95,7 +95,7 @@ With it, 533: the extra 105 are runtime calls and hooks.
 ## 4. Check the result
 
 - `runtime override: RuntimeVersion matches the chain's :code` means the versions agree.
-  If `spec_name`, `spec_version`, `transaction_version`, `system_version` or the API list differ, frame-trace prints a warning for each.
+  If `spec_name`, `spec_version`, `transaction_version`, `system_version` or the API list differ, polkadot-frame-trace prints a warning for each.
 - `root check: PASS with RUNTIME OVERRIDE` means your Wasm wrote exactly the same state as the chain's runtime.
   That is expected when it is the same source with tracing.
   A different runtime normally fails the [root check](../concepts/what-a-replay-proves.md), and the error says the override may be the cause.
