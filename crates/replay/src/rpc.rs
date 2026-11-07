@@ -1,6 +1,7 @@
 //! A small safe-RPC boundary, with cancellable deadlines, pooled connections and retries.
 use crate::{Error, Result};
 use futures_util::{SinkExt, StreamExt};
+use polkadot_frame_trace_model::redact::{endpoint, untrusted};
 use serde_json::{Value, json};
 use std::{
     sync::{
@@ -235,16 +236,16 @@ impl Rpc {
                         )));
                     }
                     if let Some(error) = body.get("error").filter(|e| !e.is_null()) {
-                        let text = error.to_string();
+                        let lower = error.to_string().to_lowercase();
                         if attempt < 3
-                            && (error["code"] == 429
-                                || text.to_lowercase().contains("too many requests"))
+                            && (error["code"] == 429 || lower.contains("too many requests"))
                         {
                             self.backoff(attempt, id).await;
                             continue;
                         }
-                        let lower = text.to_lowercase();
-                        let message = format!("{method}: {error}");
+                        // The node's text is printed: bounded, and without control characters.
+                        let text = untrusted(&error.to_string());
+                        let message = format!("{method}: {text}");
                         if lower.contains("state already discarded")
                             || lower.contains("state is not available")
                             || lower.contains("pruned")
@@ -262,7 +263,7 @@ impl Rpc {
                         return Err(Error::RpcResponse {
                             method: method.into(),
                             code: error["code"].as_i64().unwrap_or(-32603),
-                            message: error["message"].as_str().unwrap_or(&text).into(),
+                            message: error["message"].as_str().map_or(text, untrusted),
                         });
                     }
                     return body
@@ -304,10 +305,8 @@ impl Rpc {
                 .send()
                 .await
                 .map_err(|e| {
-                    (
-                        e.to_string(),
-                        e.is_timeout() || e.is_connect() || e.is_request(),
-                    )
+                    let transient = e.is_timeout() || e.is_connect() || e.is_request();
+                    (with_sources(&e.without_url()), transient)
                 })?;
             let status = response.status();
             if !status.is_success() {
@@ -321,7 +320,7 @@ impl Rpc {
             while let Some(chunk) = response
                 .chunk()
                 .await
-                .map_err(|e| (e.without_url().to_string(), true))?
+                .map_err(|e| (with_sources(&e.without_url()), true))?
             {
                 if body.len() + chunk.len() > MAX_RESPONSE_BYTES {
                     return Err((too_large(), false));
@@ -364,12 +363,12 @@ impl Rpc {
                     (
                         format!(
                             "connect {}: TCP/TLS/WebSocket handshake deadline exceeded",
-                            self.inner.url
+                            endpoint(&self.inner.url)
                         ),
                         true,
                     )
                 })?
-                .map_err(|e| (format!("connect {}: {e}", self.inner.url), true))?
+                .map_err(|e| (format!("connect {}: {e}", endpoint(&self.inner.url)), true))?
                 .0
             }
         };
@@ -414,6 +413,16 @@ impl Rpc {
     pub fn count(&self) -> usize {
         self.calls.load(Ordering::SeqCst)
     }
+}
+/// An error and its causes, which can say why a connection failed.
+fn with_sources(error: &dyn std::error::Error) -> String {
+    let mut text = error.to_string();
+    let mut source = error.source();
+    while let Some(cause) = source {
+        text = format!("{text}: {cause}");
+        source = cause.source();
+    }
+    text
 }
 fn too_large() -> String {
     format!("response larger than {MAX_RESPONSE_BYTES} bytes")

@@ -8,6 +8,7 @@ mod block;
 pub mod keys;
 mod op;
 mod phase;
+pub mod redact;
 pub mod replay;
 pub mod rpc;
 pub use replay::{MeasuredTiming, ReplayCapture, ReplayEvent, RuntimeSpan, SpanTransition};

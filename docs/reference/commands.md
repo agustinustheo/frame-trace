@@ -59,6 +59,9 @@ These limits protect against a node that sends too much. They apply to every com
 | One RPC response | 64 MiB | A larger response fails the request at once, without another try. The largest real one, the proof of the runtime, is about 5.5 MB. |
 | State the node sends for one block | 1,000,000 pieces or 256 MiB | More fails the block. Recent blocks of Polkadot, Kusama, Westend and their Asset Hubs, and a Westend Asset Hub runtime upgrade, needed at most 3,656 pieces and 5.6 MB. |
 
+Output shows `--rpc` and `--otlp` URLs as scheme, host and port only, so a user name, password or API key in the URL stays out of logs.
+Text from the node or the OTLP receiver in error lines is cut to 512 characters.
+
 ## summary
 
 ```sh
