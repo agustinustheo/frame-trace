@@ -62,39 +62,44 @@ impl ReplaySession {
     /// Bound the combined node/Wasm disk cache (default 1 GiB). Returns without reading the
     /// node cache: its index loads in the background, and lookups miss until it is ready.
     pub fn with_cache_max_bytes(cache_dir: Option<&Path>, cache_max_bytes: u64) -> Result<Self> {
-        let base = cache_dir.map(Path::to_path_buf).unwrap_or_else(|| {
-            std::env::var_os("XDG_CACHE_HOME")
-                .map(PathBuf::from)
-                .or_else(|| std::env::var_os("HOME").map(|p| PathBuf::from(p).join(".cache")))
-                .unwrap_or_else(std::env::temp_dir)
-                .join("polkadot-frame-trace")
-        });
-        // The disk cache is disposable: a directory that cannot be used is a warning, and
-        // polkadot-frame-trace runs without it.
-        let wasm_dir = base.join("wasm");
-        let wasm_cache = match std::fs::create_dir_all(&wasm_dir) {
-            Ok(()) => true,
-            Err(e) => {
-                note!(
-                    "warning: disk cache: {}: {e}; runtimes are compiled again each run",
-                    wasm_dir.display()
-                );
-                false
-            }
-        };
-        let disk = cache_dir.and_then(|p| {
-            let dir = p.join("proof-nodes");
-            match crate::disk::NodeStore::open(&dir, cache_max_bytes, Some(p.join("nodes"))) {
-                Ok(store) => Some(Arc::new(store)),
-                Err(e) => {
-                    note!(
-                        "warning: disk cache: {}: {e}; running without it",
-                        dir.display()
-                    );
-                    None
+        // The disk cache is disposable: a directory that cannot be used, or that another user
+        // could write to, is a warning, and polkadot-frame-trace runs without it. Wasmtime loads
+        // native code from `wasm/`, so a directory others can write would let them run code here.
+        let (base, wasm_cache, disk) =
+            match private_cache(cache_dir) {
+                Ok(base) => {
+                    let wasm_cache = match private_dir(&base.join("wasm")) {
+                        Ok(()) => true,
+                        Err(e) => {
+                            note!("warning: disk cache: {e}; runtimes are compiled again each run");
+                            false
+                        }
+                    };
+                    let disk = cache_dir.map(|_| base.join("proof-nodes")).and_then(|dir| {
+                        match private_dir(&dir).and_then(|()| {
+                            crate::disk::NodeStore::open(
+                                &dir,
+                                cache_max_bytes,
+                                Some(base.join("nodes")),
+                            )
+                            .map_err(|e| format!("{}: {e}", dir.display()))
+                        }) {
+                            Ok(store) => Some(Arc::new(store)),
+                            Err(e) => {
+                                note!("warning: disk cache: {e}; running without it");
+                                None
+                            }
+                        }
+                    });
+                    (base, wasm_cache, disk)
                 }
-            }
-        });
+                Err(e) => {
+                    note!("warning: disk cache: {e}; running without it");
+                    (PathBuf::new(), false, None)
+                }
+            };
+        #[cfg(test)]
+        let wasm_dir = wasm_cache.then(|| base.join("wasm"));
         let session = Self {
             nodes: Default::default(),
             hints: Default::default(),
@@ -116,14 +121,16 @@ impl ReplaySession {
             #[cfg(test)]
             metadata_runs: Default::default(),
             #[cfg(test)]
-            executor: Arc::new(
-                Executor::builder()
+            executor: Arc::new({
+                let builder = Executor::builder()
                     .with_max_runtime_instances(2)
                     .with_runtime_cache_size(4)
-                    .with_allow_missing_host_functions(false)
-                    .with_cache_path(wasm_dir)
-                    .build(),
-            ),
+                    .with_allow_missing_host_functions(false);
+                match wasm_dir {
+                    Some(dir) => builder.with_cache_path(dir).build(),
+                    None => builder.build(),
+                }
+            }),
         };
         // Wasm eviction waits until authenticated :code identifies the active runtime.
         // Pruning here could delete the very module about to be loaded.
@@ -274,7 +281,10 @@ impl ReplaySession {
         }
         let mut modules = std::mem::take(&mut self.wasm.lock().modules);
         let nodes = self.disk.as_ref().map_or(0, |d| d.total());
-        let mut failed = None;
+        // Deletes below `wasm/` only while it is a real directory, never through a symlink.
+        let mut failed = (self.wasm_cache
+            && std::fs::symlink_metadata(&root).is_ok_and(|m| !m.file_type().is_dir()))
+        .then(|| format!("{}: is not a directory", root.display()));
         let pinned_bytes = {
             // Held while deleting, so no runtime can be loaded from a folder being deleted.
             let executors = self.executors.lock();
@@ -362,6 +372,64 @@ impl ReplaySession {
             .as_ref()
             .map_err(|e| Error::Invalid(e.clone()))
     }
+}
+
+/// The disk cache root: `cache_dir`, the user's cache directory, or a per-user folder in the
+/// temporary directory. Created private, then resolved through symlinks, so a root that links
+/// elsewhere (systemd's `CacheDirectory` with `DynamicUser`) is checked where it really is.
+fn private_cache(cache_dir: Option<&Path>) -> std::result::Result<PathBuf, String> {
+    let base = cache_dir.map(Path::to_path_buf).unwrap_or_else(|| {
+        match std::env::var_os("XDG_CACHE_HOME")
+            .map(PathBuf::from)
+            .or_else(|| std::env::var_os("HOME").map(|p| PathBuf::from(p).join(".cache")))
+        {
+            Some(dir) => dir.join("polkadot-frame-trace"),
+            None => std::env::temp_dir().join(format!(
+                "polkadot-frame-trace-{}",
+                rustix::process::getuid().as_raw()
+            )),
+        }
+    });
+    use std::os::unix::fs::DirBuilderExt;
+    std::fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o700)
+        .create(&base)
+        .and_then(|()| base.canonicalize())
+        .map_err(|e| format!("{}: {e}", base.display()))
+        .and_then(|base| private_dir(&base).map(|()| base))
+}
+
+/// Creates `dir` with mode 0700 if missing. Refuses a symlink, a directory another user owns,
+/// and one that group or others can write.
+fn private_dir(dir: &Path) -> std::result::Result<(), String> {
+    use std::os::unix::fs::{DirBuilderExt, MetadataExt};
+    let fail = |why: &dyn std::fmt::Display| format!("{}: {why}", dir.display());
+    match std::fs::DirBuilder::new().mode(0o700).create(dir) {
+        Err(e) if e.kind() != std::io::ErrorKind::AlreadyExists => return Err(fail(&e)),
+        _ => {}
+    }
+    let meta = std::fs::symlink_metadata(dir).map_err(|e| fail(&e))?;
+    if meta.file_type().is_symlink() {
+        return Err(fail(&"is a symlink"));
+    }
+    if !meta.file_type().is_dir() {
+        return Err(fail(&"is not a directory"));
+    }
+    let uid = rustix::process::getuid().as_raw();
+    if meta.uid() != uid {
+        return Err(fail(&format_args!(
+            "owned by user {}, not by this user ({uid})",
+            meta.uid()
+        )));
+    }
+    if meta.mode() & 0o022 != 0 {
+        return Err(fail(&format_args!(
+            "group or others can write to it (mode {:o})",
+            meta.mode() & 0o777
+        )));
+    }
+    Ok(())
 }
 
 #[derive(Default)]
@@ -677,6 +745,46 @@ mod disk_tests {
         assert!(errors == 1, "{errors} errors: the failure is reported once");
         // 600 KiB of runtime that could not go leaves under 400 KiB for state.
         assert!(nodes <= cap - 600 * 1024, "{nodes} bytes of state");
+    }
+    #[test]
+    fn a_cache_others_could_write_or_that_links_elsewhere_is_refused() {
+        use std::os::unix::fs::{PermissionsExt, symlink};
+        let dir =
+            std::env::temp_dir().join(format!("polkadot-frame-trace-trust-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let used = |root: &Path| {
+            let session = ReplaySession::with_cache_max_bytes(Some(root), 0).expect("session");
+            (session.wasm_cache, session.disk.is_some())
+        };
+        // A new root is private; a symlink to it is checked where it leads, as systemd's
+        // `CacheDirectory` with `DynamicUser` makes.
+        let fresh = dir.join("fresh");
+        assert_eq!(used(&fresh), (true, true));
+        let mode = std::fs::metadata(&fresh)
+            .expect("root")
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777, 0o700);
+        symlink(&fresh, dir.join("alias")).expect("symlink");
+        assert_eq!(used(&dir.join("alias")), (true, true));
+        // A `wasm` folder that links elsewhere is not used, and nothing there is deleted.
+        let outside = dir.join("outside").join("module");
+        std::fs::create_dir_all(&outside).expect("mkdir");
+        std::fs::write(outside.join("file"), [0; 64]).expect("write");
+        let linked = dir.join("linked");
+        std::fs::create_dir(&linked).expect("mkdir");
+        symlink(dir.join("outside"), linked.join("wasm")).expect("symlink");
+        let session = ReplaySession::with_cache_max_bytes(Some(&linked), 0).expect("session");
+        assert!(!session.wasm_cache);
+        let _active = session.executor_for(b"runtime");
+        session.prune_disk_cache().expect("prune");
+        assert!(outside.join("file").exists());
+        // A root the group can write is refused whole.
+        let shared = dir.join("shared");
+        std::fs::create_dir(&shared).expect("mkdir");
+        std::fs::set_permissions(&shared, std::fs::Permissions::from_mode(0o775)).expect("chmod");
+        assert_eq!(used(&shared), (false, false));
+        std::fs::remove_dir_all(dir).expect("cleanup");
     }
     #[test]
     fn a_disabled_wasm_cache_is_not_maintained() {

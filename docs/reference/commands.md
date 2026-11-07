@@ -50,7 +50,7 @@ Without `--otlp` or `--json`, `block` prints a one-line count of phases and oper
 
 Flags that do not apply to the chosen source are refused, with exit code 2: `--block`, `--proof-concurrency` and `--rpc-timeout` need `--rpc`, `--metadata` needs `--from-file`, and the cache and metadata flags do not work with `--from-file` or `--from-json`.
 
-Without `--cache-dir`, compiled runtimes are still kept in `$XDG_CACHE_HOME/polkadot-frame-trace/wasm` (or `~/.cache/polkadot-frame-trace/wasm`), and downloaded state stays in memory only. See [Disk cache](#disk-cache) for the limits.
+Without `--cache-dir`, compiled runtimes are still kept in `$XDG_CACHE_HOME/polkadot-frame-trace/wasm` (or `~/.cache/polkadot-frame-trace/wasm`, or `polkadot-frame-trace-<uid>/wasm` in the temporary directory when `HOME` is not set), and downloaded state stays in memory only. See [Disk cache](#disk-cache) for the limits.
 
 ## summary
 
@@ -203,6 +203,12 @@ They are hidden from `--help`.
 
 `--cache-dir <DIR>` keeps two things between blocks and runs: chain state downloaded from the node, with its proofs, in `<DIR>/proof-nodes`, and compiled runtimes in `<DIR>/wasm`.
 `--cache-max-bytes` limits both together.
+
+The cache directory must be private, because compiled runtimes are native code that polkadot-frame-trace runs.
+polkadot-frame-trace creates the directory, `wasm` and `proof-nodes` with mode 0700, readable and writable by you alone.
+It refuses a directory owned by another user or writable by group or others, and a `wasm` or `proof-nodes` that is a symlink.
+It then logs one warning and runs without that part of the disk cache.
+A symlink as the cache directory itself is followed, and the directory it leads to is checked.
 
 | Limit | Value |
 | --- | --- |

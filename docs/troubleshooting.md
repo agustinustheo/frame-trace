@@ -277,8 +277,8 @@ The first run also compiles the runtime.
 ## `disk cache: removing <dir>/nodes, left by an older polkadot-frame-trace`
 
 ```text
-disk cache: removing .polkadot-frame-trace-cache/nodes, left by an older polkadot-frame-trace; the disk cache is now in .polkadot-frame-trace-cache/proof-nodes
-disk cache: kept .polkadot-frame-trace-cache/nodes: it holds files polkadot-frame-trace did not write
+disk cache: removing /private/tmp/pft-docs/.polkadot-frame-trace-cache/nodes, left by an older polkadot-frame-trace; the disk cache is now in /private/tmp/pft-docs/.polkadot-frame-trace-cache/proof-nodes
+disk cache: kept /private/tmp/pft-docs/.polkadot-frame-trace-cache/nodes: it holds files polkadot-frame-trace did not write
 ```
 
 **What it means.** Earlier versions kept the [disk cache](reference/commands.md#disk-cache) as one file per piece of state.
@@ -314,8 +314,8 @@ polkadot-frame-trace keeps both, so the disk cache stays above the limit. See [D
 ## `warning: disk cache: old files in <dir> cannot be deleted; not writing until they can`
 
 ```text
-warning: disk cache: stuck/proof-nodes/0000000000.seg: Permission denied (os error 13)
-warning: disk cache: old files in stuck/proof-nodes cannot be deleted; not writing until they can
+warning: disk cache: /private/tmp/pft-docs/stuck/proof-nodes/0000000000.seg: Permission denied (os error 13)
+warning: disk cache: old files in /private/tmp/pft-docs/stuck/proof-nodes cannot be deleted; not writing until they can
 ```
 
 **What it means.** The disk cache is full, and polkadot-frame-trace could not delete its oldest file. It still counts that file, and stops writing new state so the disk cache does not grow.
@@ -324,13 +324,26 @@ polkadot-frame-trace tries again before each write, and writes again once the fi
 
 **Fix.** Give your user permission to delete files in the folder named in the message.
 
+## `warning: disk cache: <dir>: group or others can write to it …; running without it`
+
+```text
+warning: disk cache: /private/tmp/pft-docs/shared: group or others can write to it (mode 775); running without it
+```
+
+**What it means.** The [disk cache](reference/commands.md#disk-cache) directory must be private, because compiled runtimes in it are native code that polkadot-frame-trace runs.
+This one can be written by other users, so polkadot-frame-trace does not use it. A directory owned by another user gets `owned by user <uid>, not by this user` instead.
+Traces are not affected, but each run compiles the runtime again and asks the node for everything.
+
+**Fix.** Run `chmod go-w <dir>`, or point `--cache-dir` at a directory only you can write to.
+
 ## `warning: disk cache: <dir>/proof-nodes: …; running without it`
 
 ```text
-warning: disk cache: blocked/proof-nodes: File exists (os error 17); running without it
+warning: disk cache: /private/tmp/pft-docs/blocked/proof-nodes: is not a directory; running without it
 ```
 
 **What it means.** polkadot-frame-trace could not create or open the folder for downloaded state, here because a file has that name.
+A symlink there is refused too, with `is a symlink`.
 It runs without keeping state on disk. Traces are not affected, but each block asks the node for everything.
 
 **Fix.** Remove what is in the way, or point `--cache-dir` at another directory.
@@ -338,17 +351,17 @@ It runs without keeping state on disk. Traces are not affected, but each block a
 ## `warning: disk cache: <dir>/wasm: …; runtimes are compiled again each run`
 
 ```text
-warning: disk cache: nowasm/wasm: File exists (os error 17); runtimes are compiled again each run
+warning: disk cache: /private/tmp/pft-docs/nowasm/wasm: is not a directory; runtimes are compiled again each run
 ```
 
-**What it means.** polkadot-frame-trace could not create the folder for compiled runtimes. Each run compiles the runtime again, which can take a few seconds per block's first replay.
+**What it means.** polkadot-frame-trace could not create the folder for compiled runtimes, or it is a symlink, which is refused. Each run compiles the runtime again, which can take a few seconds per block's first replay.
 
 **Fix.** Remove what is in the way, or point `--cache-dir` at another directory.
 
 ## `warning: disk cache: skipping <file>: …`
 
 ```text
-warning: disk cache: skipping ro/proof-nodes/0000000000.seg: Permission denied (os error 13)
+warning: disk cache: skipping /private/tmp/pft-docs/ro/proof-nodes/0000000000.seg: Permission denied (os error 13)
 ```
 
 **What it means.** One file of the disk cache could not be opened. polkadot-frame-trace leaves it alone and does not count it towards `--cache-max-bytes`.
