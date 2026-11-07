@@ -209,8 +209,9 @@ impl ReplaySession {
         self.runtime_override = wasm.map(Arc::new);
         self
     }
-    /// Disable throw-away speculative passes when debugging strict execution-driven paging.
-    pub fn with_speculative_discovery(mut self, enabled: bool) -> Self {
+    /// Disable throw-away speculative passes, to test strict execution-driven paging.
+    #[cfg(test)]
+    pub(crate) fn with_speculative_discovery(mut self, enabled: bool) -> Self {
         self.speculative_discovery = enabled;
         self
     }
