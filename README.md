@@ -17,7 +17,17 @@ Replay any block of a Polkadot SDK chain on your machine and see every storage r
 - **The busiest storage items, repeated reads and costs per extrinsic**, for one block or a range of thousands.
 - **A trace you can trust.** polkadot-frame-trace checks every value it fetches against the chain's [state root](https://agustinustheodorus.com/polkadot-frame-trace/reference/glossary.html#state-root). After the replay, the root check confirms your machine reached the same state as the chain.
 
-It works with any node over normal RPC, with no unsafe methods or special node build.
+## How it works
+
+1. **Fetch.** polkadot-frame-trace asks a node for the block over normal RPC. It fetches the parent block's state as proofs with `state_getReadProof`. It needs no unsafe RPC methods and no special node build.
+2. **Check.** Every proof is checked against the parent block's [state root](https://agustinustheodorus.com/polkadot-frame-trace/reference/glossary.html#state-root) before a value is used. That includes the runtime code.
+3. **Replay.** Your machine runs the block with the chain's own runtime Wasm in the Polkadot SDK executor. Signature checks and the runtime's final checks stay on.
+4. **Record.** Every storage read and write is recorded in order, with the [proof bytes](https://agustinustheodorus.com/polkadot-frame-trace/concepts/proof-bytes.html) it added. A read also shows where it was answered: from the [cache or the trie](https://agustinustheodorus.com/polkadot-frame-trace/concepts/cache-or-trie.html).
+5. **Root check.** The state root the replay computed must equal the one in the block header. If it does not, polkadot-frame-trace stops and exports nothing.
+6. **Export.** The trace has a span for the block, each [phase](https://agustinustheodorus.com/polkadot-frame-trace/concepts/phases.html) and each storage operation. Each extrinsic is its own phase. A runtime built with `with-tracing` adds a span per [runtime call](https://agustinustheodorus.com/polkadot-frame-trace/guides/see-runtime-calls.html), such as `transfer_keep_alive`. Send it over OTLP to Jaeger or Grafana Tempo, or write it as JSON.
+
+Timings come from a final replay on your machine that makes no network calls.
+[What a replay proves](https://agustinustheodorus.com/polkadot-frame-trace/concepts/what-a-replay-proves.html) shows these steps in a diagram and says what a pass does not mean.
 
 ## Five-minute start
 
@@ -77,6 +87,16 @@ You will see the block's [phases](https://agustinustheodorus.com/polkadot-frame-
 Each phase holds its storage reads and writes.
 Click any read to see where it was answered and its proof bytes.
 
+## Use it with any chain
+
+Chain teams need no code changes and no special node build.
+Point `--rpc` at the RPC URL of any Polkadot SDK chain's node.
+For old blocks, the node must keep their state, so use an [archive node](https://agustinustheodorus.com/polkadot-frame-trace/reference/glossary.html#archive-node).
+
+Tested on Westend Asset Hub, including a runtime upgrade, the Westend relay chain, Paseo Asset Hub, Paseo People Next and a local People chain.
+Every tested block passed the root check.
+[What polkadot-frame-trace supports](https://agustinustheodorus.com/polkadot-frame-trace/reference/support.html) lists the tested blocks, chain requirements and the RPC methods it sends.
+
 ## Learn more
 
 The [documentation](https://agustinustheodorus.com/polkadot-frame-trace/) has a [glossary](https://agustinustheodorus.com/polkadot-frame-trace/reference/glossary.html) and:
@@ -94,8 +114,6 @@ The [documentation](https://agustinustheodorus.com/polkadot-frame-trace/) has a 
 - The RPC URL of a node for the chain. For old blocks, the node must keep their state, so use an archive node.
 - A Polkadot SDK chain with Blake2 headers and `u32` block numbers. Decoded names need metadata V14, V15 or V16.
 - Docker, or any trace viewer that accepts OTLP over HTTP. JSON output needs neither.
-
-[What polkadot-frame-trace supports](https://agustinustheodorus.com/polkadot-frame-trace/reference/support.html) lists the chain requirements, the RPC methods polkadot-frame-trace sends, the host functions and the tested chains.
 
 ## Contributing
 
