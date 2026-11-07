@@ -1,5 +1,5 @@
 //! Reusable, bounded acquisition and compiled-runtime caches. Each replay authenticates its own root.
-use crate::{Error, Executor, Result};
+use crate::{Error, Executor, Result, nodes::Nodes};
 use parking_lot::Mutex;
 use sp_core::H256;
 use std::{
@@ -11,7 +11,6 @@ use std::{
 /// Metadata dependencies are authenticated again at each new state root. Pure metadata
 /// exports have an empty dependency list and reuse solely by code hash.
 type MetadataRead = (Vec<u8>, Option<Vec<u8>>, Option<H256>);
-#[derive(Clone)]
 pub(crate) struct MetadataEntry {
     pub metadata: String,
     pub reads: Vec<MetadataRead>,
@@ -19,27 +18,9 @@ pub(crate) struct MetadataEntry {
     pub iteration_root: Option<H256>,
     pub proof_nodes: Vec<Vec<u8>>,
 }
-type MetadataCache = BTreeMap<H256, MetadataEntry>;
+/// Shared: a hit copies only the metadata text into the block's artifact.
+type MetadataCache = BTreeMap<H256, Arc<MetadataEntry>>;
 
-const MAX_SHARED_BYTES: usize = 256 * 1024 * 1024;
-#[derive(Default)]
-pub(crate) struct Nodes {
-    pub nodes: BTreeMap<H256, Arc<[u8]>>,
-    bytes: usize,
-}
-impl Nodes {
-    pub fn insert(&mut self, hash: H256, bytes: Arc<[u8]>) {
-        if self.nodes.contains_key(&hash) {
-            return;
-        }
-        if self.bytes + bytes.len() > MAX_SHARED_BYTES {
-            self.nodes.clear();
-            self.bytes = 0;
-        }
-        self.bytes += bytes.len();
-        self.nodes.insert(hash, bytes);
-    }
-}
 /// Keep one session across blocks. SDK compilation is keyed by authenticated code hash and heap settings.
 #[derive(Clone)]
 pub struct ReplaySession {
@@ -232,7 +213,9 @@ impl ReplaySession {
         if let Some(executor) = executors.get(&hash) {
             return executor.clone();
         }
-        if executors.len() >= 4
+        // Runtimes in use stay. Once they are idle again, the next new runtime drops as many as
+        // it takes to get back to four.
+        while executors.len() >= 4
             && let Some(old) = executors
                 .iter()
                 .find(|(_, e)| Arc::strong_count(e) == 1)
@@ -367,6 +350,10 @@ impl ReplaySession {
             disk.set_budget(self.cache_max_bytes.saturating_sub(runtimes).max(floor));
         }
         result
+    }
+    /// Proof nodes kept in memory for all replays of this session, within a fixed budget.
+    pub fn memory_cache(&self) -> crate::MemoryCacheStats {
+        self.nodes.lock().stats()
     }
     pub(crate) fn shared() -> Result<&'static Self> {
         static SESSION: OnceLock<std::result::Result<ReplaySession, String>> = OnceLock::new();
@@ -587,6 +574,17 @@ mod disk_tests {
         assert!(!stray.exists());
         drop(active);
         std::fs::remove_dir_all(dir).expect("cleanup");
+    }
+    #[test]
+    fn idle_runtimes_above_four_go_when_the_next_one_loads() {
+        let session = ReplaySession::new(None).expect("session");
+        // Six runtimes in use at once: all stay.
+        let busy: Vec<_> = (0..6u8).map(|i| session.executor_for(&[i])).collect();
+        assert_eq!(session.executors.lock().len(), 6);
+        drop(busy);
+        // Once idle, one more runtime brings the map back to four, not five.
+        let _next = session.executor_for(b"next");
+        assert_eq!(session.executors.lock().len(), 4);
     }
     fn persist(session: &ReplaySession, nodes: impl Iterator<Item = u32>) {
         let db = crate::proof::ProofDb::with_session(None, H256::zero(), session.clone());

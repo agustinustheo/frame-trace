@@ -201,12 +201,7 @@ impl ProofDb {
         let mut shared = self.session.nodes.lock();
         for (hash, bytes) in fetched {
             // Keep one immutable allocation per content hash across active replays.
-            let bytes = shared
-                .nodes
-                .get(&hash)
-                .cloned()
-                .unwrap_or_else(|| bytes.into());
-            shared.insert(hash, bytes.clone());
+            let bytes = shared.intern(hash, bytes);
             nodes.entry(hash).or_insert(bytes);
         }
     }
@@ -218,7 +213,7 @@ impl ProofDb {
         if self.rpc.is_none() {
             return Ok(None);
         }
-        let cached = self.session.nodes.lock().nodes.get(hash).cloned();
+        let cached = self.session.nodes.lock().get(hash);
         if let Some(node) = cached {
             self.nodes.lock().insert(*hash, node.clone());
             return Ok(Some(node.to_vec()));
@@ -237,25 +232,23 @@ impl ProofDb {
             }
         }
     }
-    /// Predictable full keys/storage prefixes are acquired in batches, across a bounded pool.
+    /// Predictable full keys/storage prefixes are acquired in batches, on the shared request
+    /// threads. Each group of batches is one round.
     pub fn prefetch(&self, keys: &[Vec<u8>]) -> Result<()> {
-        let concurrency = self.rpc.as_ref().map_or(1, Rpc::parallelism);
+        let Some(rpc) = &self.rpc else {
+            return keys
+                .chunks(32)
+                .try_for_each(|keys| self.fetch_inner(None, keys, false));
+        };
         let batches: Vec<_> = keys.chunks(32).collect();
-        for group in batches.chunks(concurrency) {
-            let before = self.rpc.as_ref().map_or(0, Rpc::count);
-            std::thread::scope(|scope| {
-                let handles: Vec<_> = group
+        for group in batches.chunks(rpc.parallelism()) {
+            let before = rpc.count();
+            rpc.run_all(
+                group
                     .iter()
-                    .map(|keys| scope.spawn(|| self.fetch_inner(None, keys, false)))
-                    .collect();
-                for handle in handles {
-                    handle.join().map_err(|_| {
-                        Error::Invalid("proof acquisition worker panicked".into())
-                    })??;
-                }
-                Ok::<_, Error>(())
-            })?;
-            if self.rpc.as_ref().map_or(0, Rpc::count) > before {
+                    .map(|keys| || self.fetch_inner(None, keys, false)),
+            )?;
+            if rpc.count() > before {
                 self.round_trips.fetch_add(1, Ordering::Relaxed);
             }
         }
@@ -359,7 +352,7 @@ impl TrieBackendStorage<Blake2Hasher> for ProofDb {
                 if let Some(key) = &*h.borrow()
                     // On warm blocks fetch only the missing branch of :code. Requesting the
                     // full key would download the unchanged multi-megabyte Wasm again.
-                    && (key != b":code" || bytes == key.as_slice() || self.session.nodes.lock().nodes.is_empty())
+                    && (key != b":code" || bytes == key.as_slice() || self.session.nodes.lock().is_empty())
                     && key.starts_with(bytes)
                     && prefix
                         .1
@@ -528,7 +521,7 @@ mod prediction_tests {
         ));
         assert!(Arc::ptr_eq(
             &first.nodes.lock()[&hash],
-            &session.nodes.lock().nodes[&hash]
+            session.nodes.lock().peek(&hash).expect("shared")
         ));
         let offline = ProofDb::with_session(None, H256::repeat_byte(1), session);
         assert!(offline.cached(&hash).expect("offline").is_none());

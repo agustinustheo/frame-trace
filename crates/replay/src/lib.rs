@@ -6,6 +6,8 @@ mod artifact;
 pub mod call;
 mod disk;
 mod metadata;
+mod nodes;
+pub use nodes::MemoryCacheStats;
 mod session;
 pub use session::ReplaySession;
 mod backend;
@@ -444,17 +446,20 @@ pub fn online_with_session(rpc: &Rpc, selector: &str, session: &ReplaySession) -
     Ok(replay)
 }
 
-// Both calls are pinned to the block's parent and independent of each other. Join before
-// returning even on failure, so no context request can leak into timed replay accounting.
+// Both calls are pinned to the block's parent and independent of each other. Both finish
+// before this returns, even on failure, so no context request can leak into timed replay
+// accounting.
 fn parent_context(rpc: &Rpc, parent: H256) -> Result<(Value, Value)> {
-    std::thread::scope(|scope| {
-        let version = scope.spawn(|| rpc.call("state_getRuntimeVersion", json!([parent])));
-        let header = rpc.call("chain_getHeader", json!([parent]));
-        let version = version
-            .join()
-            .map_err(|_| Error::Invalid("context RPC worker panicked".into()))?;
-        Ok((header?, version?))
-    })
+    let mut results = rpc
+        .run_all(
+            ["chain_getHeader", "state_getRuntimeVersion"]
+                .map(|method| move || rpc.call(method, json!([parent]))),
+        )?
+        .into_iter();
+    match (results.next(), results.next()) {
+        (Some(header), Some(version)) => Ok((header, version)),
+        _ => Err(Error::Invalid("context requests returned no result".into())),
+    }
 }
 
 pub fn offline(dir: &Path) -> Result<Replay> {
@@ -509,7 +514,7 @@ fn replay_inner(
         let mut hints = session.predicted_keys();
         hints.extend(storage_hints(&artifact.metadata));
         // Fetch missing full paths before even loading :code: its ancestor nodes change each block.
-        if session.nodes.lock().nodes.is_empty() {
+        if session.nodes.lock().is_empty() {
             hints.extend([b":code".to_vec(), b":heappages".to_vec()]);
         }
         db.prefetch(&hints.into_iter().take(4096).collect::<Vec<_>>())?;

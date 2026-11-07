@@ -152,7 +152,7 @@ fn load(args: &source::SourceArgs) -> Result<AnnotatedBlock> {
     }
     let mut block = frame_trace_decode::annotate_at_block(
         &traced,
-        loaded.metadata.as_ref(),
+        loaded.metadata.as_deref(),
         loaded.block_number,
     );
     let undecoded = block
