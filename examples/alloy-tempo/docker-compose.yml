@@ -1,4 +1,4 @@
-# Grafana Alloy receives OTLP from frame-trace and forwards it to Grafana Tempo.
+# Grafana Alloy receives OTLP from polkadot-frame-trace and forwards it to Grafana Tempo.
 # Grafana shows the traces. The same shape as a cluster with Alloy as the agent.
 # Run from this directory: docker compose up -d
 services:
@@ -12,7 +12,7 @@ services:
     volumes:
       - ./config.alloy:/etc/alloy/config.alloy:ro
     ports:
-      - "4318:4318"   # OTLP/HTTP, where frame-trace sends traces
+      - "4318:4318"   # OTLP/HTTP, where polkadot-frame-trace sends traces
       - "12345:12345" # Alloy web page: pipeline and health
     depends_on:
       - tempo
@@ -35,7 +35,7 @@ services:
       GF_AUTH_DISABLE_LOGIN_FORM: "true"
       # Let viewers use Explore to run their own TraceQL queries.
       GF_USERS_VIEWERS_CAN_EDIT: "true"
-      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/frame-trace.json
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/polkadot-frame-trace.json
     volumes:
       - ./grafana/datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml:ro
       - ./grafana/dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml:ro
