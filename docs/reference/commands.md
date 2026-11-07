@@ -222,9 +222,11 @@ polkadot-frame-trace creates the directory, `wasm` and `proof-nodes` with mode 0
 It refuses a directory owned by another user or writable by group or others, and a `wasm` or `proof-nodes` that is a symlink.
 It then logs one warning and runs without that part of the disk cache.
 A symlink as the cache directory itself is followed, and the directory it leads to is checked.
+Every directory above it must be owned by root or by you, and not writable by group or others unless it has the sticky bit, as `/tmp` does. Otherwise another user could replace the whole cache.
 
 | Limit | Value |
 | --- | --- |
+| Directories above the cache | Owned by root or by you. Not writable by group or others, unless sticky. |
 | What counts | Bytes on disk of both folders. Each file counts its size rounded up to 4 KiB, or the space the file system gave it if that is more, plus 4 KiB. |
 | State file size | The limit divided by 16, at least 64 KiB and at most 64 MiB. |
 | Largest piece of state kept | A sixteenth of the state file size: 4 MiB at the default limit. Larger pieces stay in memory only. |

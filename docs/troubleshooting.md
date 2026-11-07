@@ -328,13 +328,15 @@ polkadot-frame-trace tries again before each write, and writes again once the fi
 
 ```text
 warning: disk cache: /private/tmp/pft-docs/shared: group or others can write to it (mode 775); running without it
+warning: disk cache: /private/tmp/pft-docs/team: group or others can write to it (mode 775) and it is not sticky, so another user could replace the cache below it; running without it
 ```
 
 **What it means.** The [disk cache](reference/commands.md#disk-cache) directory must be private, because compiled runtimes in it are native code that polkadot-frame-trace runs.
 This one can be written by other users, so polkadot-frame-trace does not use it. A directory owned by another user gets `owned by user <uid>, not by this user` instead.
+The second line names a directory above the cache: anyone who can write there could rename the cache away and put their own in its place.
 Traces are not affected, but each run compiles the runtime again and asks the node for everything.
 
-**Fix.** Run `chmod go-w <dir>`, or point `--cache-dir` at a directory only you can write to.
+**Fix.** Run `chmod go-w <dir>` on the directory named, or `chmod +t` on a shared parent, or point `--cache-dir` at a directory only you can write to.
 
 ## `warning: disk cache: <dir>/proof-nodes: …; running without it`
 

@@ -397,7 +397,41 @@ fn private_cache(cache_dir: Option<&Path>) -> std::result::Result<PathBuf, Strin
         .create(&base)
         .and_then(|()| base.canonicalize())
         .map_err(|e| format!("{}: {e}", base.display()))
-        .and_then(|base| private_dir(&base).map(|()| base))
+        .and_then(|base| {
+            private_dir(&base)
+                .and_then(|()| trusted_ancestors(&base))
+                .map(|()| base)
+        })
+}
+
+/// The StrictModes rule of OpenSSH and sudo, for every directory above the cache root: owned
+/// by root or this user, and not writable by group or others unless sticky, as `/tmp` is.
+/// Otherwise another user could rename the cache away and put their own in its place.
+fn trusted_ancestors(root: &Path) -> std::result::Result<(), String> {
+    use std::os::unix::fs::MetadataExt;
+    let uid = rustix::process::getuid().as_raw();
+    for dir in root.ancestors().skip(1) {
+        let fail = |why: std::fmt::Arguments| {
+            format!(
+                "{}: {why}, so another user could replace the cache below it",
+                dir.display()
+            )
+        };
+        let meta = std::fs::symlink_metadata(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+        if meta.uid() != 0 && meta.uid() != uid {
+            return Err(fail(format_args!(
+                "owned by user {}, not by root or this user ({uid})",
+                meta.uid()
+            )));
+        }
+        if meta.mode() & 0o022 != 0 && meta.mode() & 0o1000 == 0 {
+            return Err(fail(format_args!(
+                "group or others can write to it (mode {:o}) and it is not sticky",
+                meta.mode() & 0o7777
+            )));
+        }
+    }
+    Ok(())
 }
 
 /// Creates `dir` with mode 0700 if missing. Refuses a symlink, a directory another user owns,
@@ -784,6 +818,12 @@ mod disk_tests {
         std::fs::create_dir(&shared).expect("mkdir");
         std::fs::set_permissions(&shared, std::fs::Permissions::from_mode(0o775)).expect("chmod");
         assert_eq!(used(&shared), (false, false));
+        // So is one below a parent the group can write: they could swap the whole cache. A
+        // sticky parent, as `/tmp` is, lets no one rename what another user owns.
+        let below = shared.join("cache");
+        assert_eq!(used(&below), (false, false));
+        std::fs::set_permissions(&shared, std::fs::Permissions::from_mode(0o1775)).expect("chmod");
+        assert_eq!(used(&below), (true, true));
         std::fs::remove_dir_all(dir).expect("cleanup");
     }
     #[test]
