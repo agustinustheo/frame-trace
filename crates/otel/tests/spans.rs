@@ -278,8 +278,19 @@ fn scripted_receiver(script: Vec<(u16, Duration)>) -> (String, Seen) {
                 if reader.read_exact(&mut body).is_err() {
                     return;
                 }
-                let ids = ExportTraceServiceRequest::decode(body.as_slice())
-                    .unwrap()
+                let request = ExportTraceServiceRequest::decode(body.as_slice()).unwrap();
+                // Dashboards filter on the service name, so every request must carry it.
+                // A request without it gets status 599, which breaks the test's status checks.
+                let named = request.resource_spans.iter().all(|r| {
+                    r.resource.as_ref().is_some_and(|resource| {
+                        resource.attributes.iter().any(|kv| {
+                            kv.key == "service.name"
+                                && format!("{:?}", kv.value).contains("polkadot-frame-trace")
+                        })
+                    })
+                });
+                let status = if named { status } else { 599 };
+                let ids = request
                     .resource_spans
                     .iter()
                     .flat_map(|r| &r.scope_spans)
