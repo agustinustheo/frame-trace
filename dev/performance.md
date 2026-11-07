@@ -837,10 +837,10 @@ Its index, `Arc` headers and allocator rounding were not counted.
 What changed:
 
 - The shared node cache is a `schnellru` LRU map (already in `Cargo.lock` through
-  `sc-executor`). Each node is charged its `Arc<[u8]>` allocation rounded to the
-  macOS size classes (16 B up to 1008 B, then 512 B), plus the table's real
-  allocation. The default limit is 128 MiB charged. When a new node would go over,
-  the least recently read nodes go one at a time.
+  `sc-executor`). Each node is charged an upper estimate of its `Arc<[u8]>`
+  allocation, plus an upper estimate of the table's allocation; see "Upper estimate
+  of the charge" below. The default limit is 128 MiB charged. When a new node would
+  go over, the least recently read nodes go one at a time.
 - The table may take at most a quarter of the limit, and holds at most half the
   entries of its largest allowed size. Above half full, a hashbrown table in a fixed
   allocation cannot reuse its deleted slots without a rehash. Refused growth makes
@@ -869,8 +869,10 @@ Per-entry cost, measured with `malloc_zone_statistics` on 300k synthetic nodes o
 
 A `HashMap` is not cheaper than the `BTreeMap`: its power-of-two capacity leaves up to
 half of it empty. The LRU map costs about as much as a B-tree plus a FIFO queue. The
-charge formula matched `malloc_size` exactly for every node, and charged bytes covered
-98.5% of the heap the map really used.
+first charge formula, a model of the macOS size classes up to 1 KiB, matched
+`malloc_size` there, and charged bytes covered 98.5% of the heap the map really used
+for these node sizes. It undercounted above 32 KiB; the charge is now an upper
+estimate.
 
 ### Before and after, run side by side
 
@@ -936,6 +938,49 @@ Earlier 130-minute run of the new code before the half-full limit (same settings
 alone on the host): the cache reached 108 MiB and 404k nodes at minute 60, then fell
 to 234k as described above. The heap reached 281 MiB at minute 60 during blocks of
 80–400 RPC calls, and `footprint` stayed at 325 MiB after it.
+
+### Upper estimate of the charge (2026-11-07)
+
+Review found the charge undercounted. On macOS 15.8.1 arm64 a 40,000-byte node, a
+40,016-byte request, takes 65,536 bytes but was charged 40,448. 5,000 such nodes
+reported 127.97 MiB while their live allocations were 207.09 MiB. The table charge
+left out allocator rounding too.
+
+`malloc_size` for every request up to 300,000 bytes, then every 1,024 up to 40 MiB:
+
+| request | macOS rounds to |
+| --- | --- |
+| up to 1,024 B | 16 B |
+| 1,025 B to 32 KiB | 512 B |
+| 32 KiB to 8 MiB | 32 KiB |
+| above 8 MiB | 16 KiB |
+
+The charge is now an upper estimate on macOS, glibc and musl. Up to 128 KiB it adds
+32 bytes and an eighth, then rounds up to a quarter of the next power of two, or to
+32 KiB above 32 KiB. Above 128 KiB it adds 4 KiB and rounds up to 64 KiB. The table is
+charged the same way. A test checks it against that macOS table and against glibc and
+musl size classes, with 4 KiB and 64 KiB pages: every request up to 140,000 bytes, then
+every 997 up to 41 MiB. It overestimates nodes of 200 to 600 bytes by about 43% on
+macOS, 1 to 4 KiB by about 23%.
+
+With the reviewer's reproduction, now using the new code, charged / live allocations:
+
+| nodes | entries | charged | live |
+| --- | --- | --- | --- |
+| 5,000 × 40,000 B | 2,044 | 128.00 MiB | 128.00 MiB |
+| 2M of 40–600 B | 211,779 | 128.00 MiB | 97.79 MiB |
+| 300k × 1,500 B | 61,856 | 128.00 MiB | 97.77 MiB |
+| 3,000 × 100,000 B | 1,022 | 127.94 MiB | 127.88 MiB |
+| 2,000 × 200,000 B | 511 | 127.84 MiB | 111.84 MiB |
+
+A table rounded by the small-size rule would have been charged 48 MiB for 29.9 MiB,
+halving the entry limit. The page rule keeps it at 30 MiB and 229,376 entries.
+
+On Westend Asset Hub, 80 minutes alone with the same settings as above: the cache
+reached the entry limit at minute 40. It stayed at 229,376 pieces and 99–108 MiB
+charged, against 75–77 MiB with the old charge. The entries, and so the memory really
+used, are the same: the entry limit still binds first. Heap in use was 139–150 MiB from
+minute 40 to 70. `state-from-memory` was 46–48%. 1,799 blocks traced, all roots passed.
 
 ### Exact commands and retained evidence
 
