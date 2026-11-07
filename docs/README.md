@@ -1,3 +1,5 @@
+<img src="images/logo.svg" alt="polkadot-frame-trace logo: pink petals in front of trace timeline bars" width="112">
+
 # polkadot-frame-trace
 
 Replay any block of a Polkadot SDK chain on your machine and see every storage read and write as a trace.

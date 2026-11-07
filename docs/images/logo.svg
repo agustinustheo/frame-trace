@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128" role="img" aria-label="polkadot-frame-trace">
+  <title>polkadot-frame-trace</title>
+  <line x1="6" y1="40.0" x2="124" y2="40.0" stroke="#E6007A" stroke-opacity="0.30" stroke-width="1" stroke-linecap="round"/>
+  <rect x="64.0" y="36.5" width="58.0" height="7" rx="3.5" fill="#E6007A"/>
+  <line x1="6" y1="52.0" x2="124" y2="52.0" stroke="#E6007A" stroke-opacity="0.30" stroke-width="1" stroke-linecap="round"/>
+  <rect x="70.0" y="48.5" width="32.0" height="7" rx="3.5" fill="#EE2A8C"/>
+  <line x1="6" y1="64.0" x2="124" y2="64.0" stroke="#E6007A" stroke-opacity="0.30" stroke-width="1" stroke-linecap="round"/>
+  <rect x="78.0" y="60.5" width="16.0" height="7" rx="3.5" fill="#F5509F"/>
+  <rect x="98.0" y="60.5" width="18.0" height="7" rx="3.5" fill="#F5509F"/>
+  <line x1="6" y1="76.0" x2="124" y2="76.0" stroke="#E6007A" stroke-opacity="0.30" stroke-width="1" stroke-linecap="round"/>
+  <rect x="86.0" y="72.5" width="22.0" height="7" rx="3.5" fill="#FA74B3"/>
+  <line x1="6" y1="88.0" x2="124" y2="88.0" stroke="#E6007A" stroke-opacity="0.30" stroke-width="1" stroke-linecap="round"/>
+  <rect x="92.0" y="84.5" width="10.0" height="7" rx="3.5" fill="#FF96C6"/>
+  <path d="M51.87 55.28 L64.29 40.92 A8.50 8.50 0 1 0 49.39 34.75 L48.02 53.68 A2.20 2.20 0 0 0 51.87 55.28 Z" fill="#FB6AB0"/>
+  <path d="M56.32 61.98 L75.25 60.61 A8.50 8.50 0 1 0 69.08 45.71 L54.72 58.13 A2.20 2.20 0 0 0 56.32 61.98 Z" fill="#E14C96"/>
+  <path d="M54.72 69.87 L69.08 82.29 A8.50 8.50 0 1 0 75.25 67.39 L56.32 66.02 A2.20 2.20 0 0 0 54.72 69.87 Z" fill="#BC2272"/>
+  <path d="M48.02 74.32 L49.39 93.25 A8.50 8.50 0 1 0 64.29 87.08 L51.87 72.72 A2.20 2.20 0 0 0 48.02 74.32 Z" fill="#A20458"/>
+  <path d="M40.13 72.72 L27.71 87.08 A8.50 8.50 0 1 0 42.61 93.25 L43.98 74.32 A2.20 2.20 0 0 0 40.13 72.72 Z" fill="#A20458"/>
+  <path d="M35.68 66.02 L16.75 67.39 A8.50 8.50 0 1 0 22.92 82.29 L37.28 69.87 A2.20 2.20 0 0 0 35.68 66.02 Z" fill="#BC2272"/>
+  <path d="M37.28 58.13 L22.92 45.71 A8.50 8.50 0 1 0 16.75 60.61 L35.68 61.98 A2.20 2.20 0 0 0 37.28 58.13 Z" fill="#E14C96"/>
+  <path d="M43.98 53.68 L42.61 34.75 A8.50 8.50 0 1 0 27.71 40.92 L40.13 55.28 A2.20 2.20 0 0 0 43.98 53.68 Z" fill="#FB6AB0"/>
+  <circle cx="46.0" cy="64.0" r="4" fill="#E6007A"/>
+</svg>
