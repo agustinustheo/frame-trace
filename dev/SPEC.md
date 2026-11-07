@@ -1,15 +1,15 @@
-# frame-trace: spec
+# polkadot-frame-trace: spec
 
-frame-trace shows what a Polkadot SDK chain did, step by step, as OpenTelemetry traces: for each block and each extrinsic, which storage items it read and wrote, in what order, how big the values were, and (later) how long each step took.
+polkadot-frame-trace shows what a Polkadot SDK chain did, step by step, as OpenTelemetry traces: for each block and each extrinsic, which storage items it read and wrote, in what order, how big the values were, and (later) how long each step took.
 
 Research notes behind every decision here are in [`research/`](research/).
 
 ## Goals
 
-1. **Works on existing nodes, with safe RPC only.** frame-trace re-executes a block itself, outside the node, with the Polkadot SDK's own executor. It fetches the parent state on demand as authenticated trie proofs (`state_getReadProof`), so it works against any node, including public RPC endpoints, without `--rpc-methods unsafe`. The block's real `Core_execute_block` runs, including the storage-root check, so the replay is provably faithful. (Experiment E2.)
+1. **Works on existing nodes, with safe RPC only.** polkadot-frame-trace re-executes a block itself, outside the node, with the Polkadot SDK's own executor. It fetches the parent state on demand as authenticated trie proofs (`state_getReadProof`), so it works against any node, including public RPC endpoints, without `--rpc-methods unsafe`. The block's real `Core_execute_block` runs, including the storage-root check, so the replay is provably faithful. (Experiment E2.)
 2. **Readable.** Raw keys become `System::Account(5Grw…)`. Extrinsics are named `Balances.transfer_keep_alive`. A trace opens in Jaeger, Tempo or any OTLP viewer.
 3. **Complete and real.** Every storage access, including deletions by prefix, child tries and iteration, in order, with measured timings, and nested under runtime spans when the runtime was built with `with-tracing`.
-4. **Reuse, don't rebuild.** sc-executor, sp-state-machine, sp-trie and sp-io do the execution. subxt and frame-decode decode metadata and keys. The OpenTelemetry SDK exports OTLP. frame-trace is the glue.
+4. **Reuse, don't rebuild.** sc-executor, sp-state-machine, sp-trie and sp-io do the execution. subxt and frame-decode decode metadata and keys. The OpenTelemetry SDK exports OTLP. polkadot-frame-trace is the glue.
 5. **Reproducible.** A replay can be saved as an artifact (block + proof nodes) and replayed offline later, with no network.
 
 ## Non-goals (for now)
@@ -20,7 +20,7 @@ Research notes behind every decision here are in [`research/`](research/).
 
 ## Why not `state_traceBlock`
 
-E1 showed the node's block-trace RPC is not enough on its own: it needs unsafe RPC, drops every storage event without a key (prefix deletions, child-trie kills, storage roots), never traces iteration, returns no timing and no span nesting, and in omni-node dev mode cannot replay signed parachain blocks at all. frame-trace keeps it as a secondary source (`--source trace-block`) and as the test oracle.
+E1 showed the node's block-trace RPC is not enough on its own: it needs unsafe RPC, drops every storage event without a key (prefix deletions, child-trie kills, storage roots), never traces iteration, returns no timing and no span nesting, and in omni-node dev mode cannot replay signed parachain blocks at all. polkadot-frame-trace keeps it as a secondary source (`--source trace-block`) and as the test oracle.
 
 ## What we reuse
 
@@ -64,15 +64,15 @@ Raw keys and values can identify accounts. Keys are on by default (needed for de
 ## Command line
 
 ```sh
-frame-trace block   --rpc wss://… --block <number|hash> [--otlp http://127.0.0.1:4318] [--json out.json] [--save <artifact-dir>]
-frame-trace block   --offline <artifact-dir> [--otlp …]          # replay a saved artifact, no network
-frame-trace call    --rpc wss://… [--at finalized] --method AccountNonceApi_account_nonce --data <hex> [--oracle] [--save <artifact-dir>]
-frame-trace call    --offline <artifact-dir> [--summary] [--otlp …]
-frame-trace follow  --rpc wss://… [--otlp …]                    # trace each new block
-frame-trace summary --rpc … --block …                            # terminal tables: top items, duplicate reads, per extrinsic
-frame-trace summary --from-json block.json                       # no replay
-frame-trace report  blocks/*.json --json report.json               # aggregate saved traces
-frame-trace report  --rpc wss://… --last 20                        # finalized range, shared caches
+polkadot-frame-trace block   --rpc wss://… --block <number|hash> [--otlp http://127.0.0.1:4318] [--json out.json] [--save <artifact-dir>]
+polkadot-frame-trace block   --offline <artifact-dir> [--otlp …]          # replay a saved artifact, no network
+polkadot-frame-trace call    --rpc wss://… [--at finalized] --method AccountNonceApi_account_nonce --data <hex> [--oracle] [--save <artifact-dir>]
+polkadot-frame-trace call    --offline <artifact-dir> [--summary] [--otlp …]
+polkadot-frame-trace follow  --rpc wss://… [--otlp …]                    # trace each new block
+polkadot-frame-trace summary --rpc … --block …                            # terminal tables: top items, duplicate reads, per extrinsic
+polkadot-frame-trace summary --from-json block.json                       # no replay
+polkadot-frame-trace report  blocks/*.json --json report.json               # aggregate saved traces
+polkadot-frame-trace report  --rpc wss://… --last 20                        # finalized range, shared caches
 ```
 
 ## Phases
@@ -80,7 +80,11 @@ frame-trace report  --rpc wss://… --last 20                        # finalized
 1. **Replay exporter (now).** Self-replay source, `block`, `follow`, `summary`, offline artifacts. Tested offline against saved artifacts from a local People chain and public Westend Asset Hub.
 2. **Runtime spans.** Nest storage ops under dispatch and hook spans when the runtime has `with-tracing`; build such runtimes on demand for debugging.
 3. **State queries.** `call` executes runtime APIs at a selected state, using authenticated proofs, measured storage/runtime spans, metadata argument/result decoding, optional safe `state_call` comparison, and offline artifacts. Calls have no block root assertion. A standalone storage query/trie-depth view is deferred; see README.
-4. **Constants.** Plain `#[pallet::constant]` values are compiled in and never touch storage. Tracing them needs an opt-in macro or instrumented runtime. Only `parameter_types! { storage … }` and dynamic parameters are visible as storage today.
+4. **Constants.** Plain `#[pallet::constant]` values are compiled into the runtime and never touch storage, so a replay can't see them. Only `parameter_types! { storage … }` and dynamic parameters show up, as storage.
+   - A macro approach was prototyped on branch `flight/constants-tracing` (commit d21a382) and dropped, because it needs changes to the runtime source and a `with-tracing` build.
+   - How it worked: a drop-in `parameter_types!` made `Get::get` emit an `sp_tracing` event with target `frame_trace::constant` and the fields `constant` (the name) and `value` (the SCALE-encoded value). The event reaches the host as a `wasm_tracing` event, which capture already keeps.
+   - Its limits: inline `ConstU32` values and constants internal to a pallet stay invisible.
+   - The alternative needs no runtime change: constant values are in the runtime metadata, so they could be listed per pallet. That shows the values, not which ones a block read.
 5. **PolkaMeter integration.** Attach a block trace to each load-test step, link spans by extrinsic hash.
 
 ## Repository layout
@@ -92,7 +96,7 @@ crates/
   replay/    self-replay: safe-RPC proof fetching, executor, capture
   source/    (optional) state_traceBlock client, used as the test oracle
   otel/      model → OpenTelemetry spans and OTLP export
-  cli/       the frame-trace binary
+  cli/       the polkadot-frame-trace binary
 fixtures/    recorded state_traceBlock responses + metadata for tests
 docs/        user docs (mdBook)
 dev/         internal notes: this spec, status, research, experiments, upstream drafts

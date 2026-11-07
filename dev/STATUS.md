@@ -1,10 +1,10 @@
 # Status
 
-Last updated 6 November 2026.
+Last updated 7 November 2026.
 
 ## What works
 
-frame-trace replays a Polkadot SDK block, or a runtime API call, outside the node and shows every storage access as an OpenTelemetry trace.
+polkadot-frame-trace replays a Polkadot SDK block, or a runtime API call, outside the node and shows every storage access as an OpenTelemetry trace.
 
 - **Any node, safe RPC only.** It fetches the parent state as authenticated trie proofs (`state_getReadProof`) and runs the block's real `Core_execute_block` with the Polkadot SDK executor. The storage-root check must pass, so a trace is a faithful copy of what the chain did. Tested on public Westend Asset Hub (including a runtime upgrade), the Westend relay chain, Paseo Asset Hub (a contract call with child trie reads and writes), Paseo People Next and a local individuality People chain. See the [support page](../docs/reference/support.md#tested-chains).
 - **Every storage op, in order, timed.** Reads, writes, prefix deletions, child tries and iteration, including the events the node's own `state_traceBlock` drops.
@@ -20,8 +20,8 @@ Try it:
 ```sh
 docker run --rm -p 16686:16686 -p 4318:4318 jaegertracing/jaeger:latest
 cargo +1.93.0 build --release --locked
-target/release/frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block best --otlp http://127.0.0.1:4318
-target/release/frame-trace summary --offline fixtures/replay/people-traced
+target/release/polkadot-frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block best --otlp http://127.0.0.1:4318
+target/release/polkadot-frame-trace summary --offline fixtures/replay/people-traced
 ```
 
 Then open http://127.0.0.1:16686.
@@ -45,10 +45,9 @@ Then open http://127.0.0.1:16686.
 
 ## Decisions for you
 
-1. **Constants (spec phase 4).** Tracing constants needs either an opt-in macro in pallets or an instrumented runtime build. Worth designing now?
+1. **Constants (spec phase 4).** A macro approach was prototyped on branch `flight/constants-tracing` (commit d21a382) and dropped, because it needs changes to the runtime source and a `with-tracing` build. From `Get::get`, it emitted an `sp_tracing` event with target `frame_trace::constant` and the fields `constant` and `value`; the event reaches the host as a `wasm_tracing` event that capture already keeps. Inline `ConstU32` values and constants internal to a pallet stayed invisible. The alternative needs no runtime change: constant values are in the runtime metadata, so they could be listed per pallet, but that doesn't show which ones a block read. See [SPEC.md](SPEC.md#phases).
 2. **PolkaMeter integration (spec phase 5).** Attach a block trace to each load-test step. This changes the PolkaMeter repo.
 3. **First release, v0.1.0.** The release workflow is ready. Change `Unreleased` to the date in `CHANGELOG.md`, push the tag `v0.1.0`, check the draft release and publish it. See [RELEASING.md](RELEASING.md).
-4. **Publish to crates.io?** Today users install from a clone. `frame-trace-replay` has `publish = false`, and `frame-trace` depends on it, so publishing needs all five crates published, or the library crates folded into one.
 
 ## Upstream
 
@@ -58,7 +57,7 @@ Then open http://127.0.0.1:16686.
 | `state_traceBlock` drops keyless events with an empty filter | [#13595](https://github.com/paritytech/polkadot-sdk/issues/13595) | [#13666](https://github.com/paritytech/polkadot-sdk/pull/13666): sc-tracing keeps events without the filtered field when the filter is empty | Merged 2 November 2026. Issue closed. |
 
 The first fix PRs, #13596 and #13597, were closed without merging.
-frame-trace does not depend on either fix: it replays blocks itself from safe RPC.
+polkadot-frame-trace does not depend on either fix: it replays blocks itself from safe RPC.
 
 ## Done since 25 October 2026
 
