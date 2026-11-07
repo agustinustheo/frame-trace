@@ -1,10 +1,10 @@
 {
-  "uid": "frame-trace",
-  "title": "frame-trace",
+  "uid": "polkadot-frame-trace",
+  "title": "polkadot-frame-trace",
   "tags": [
-    "frame-trace"
+    "polkadot-frame-trace"
   ],
-  "description": "Storage reads and writes of Polkadot SDK blocks traced with frame-trace.",
+  "description": "Storage reads and writes of Polkadot SDK blocks traced with polkadot-frame-trace.",
   "editable": false,
   "graphTooltip": 0,
   "schemaVersion": 41,
@@ -916,7 +916,7 @@
       "id": 13,
       "type": "table",
       "title": "Slowest storage operations",
-      "description": "Storage operations that took more than 20 µs. Times are from the replay on the machine that ran frame-trace, not from a node.",
+      "description": "Storage operations that took more than 20 µs. Times are from the replay on the machine that ran polkadot-frame-trace, not from a node.",
       "gridPos": {
         "x": 12,
         "y": 31,
@@ -1049,7 +1049,7 @@
     {
       "title": "TraceQL cookbook",
       "type": "link",
-      "url": "https://agustinustheodorus.com/frame-trace/guides/query-traces-in-grafana.html",
+      "url": "https://agustinustheodorus.com/polkadot-frame-trace/guides/query-traces-in-grafana.html",
       "targetBlank": true
     }
   ]

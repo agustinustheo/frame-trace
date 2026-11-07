@@ -6,7 +6,7 @@ services:
     image: grafana/otel-lgtm:0.11.16
     ports:
       - "3000:3000" # Grafana
-      - "4318:4318" # OTLP/HTTP, where frame-trace sends traces
+      - "4318:4318" # OTLP/HTTP, where polkadot-frame-trace sends traces
       - "4317:4317" # OTLP/gRPC, for other tools
     environment:
       # Open Grafana without a login, as a viewer. For a local machine only.
@@ -15,7 +15,7 @@ services:
       GF_AUTH_DISABLE_LOGIN_FORM: "true"
       # Let viewers use Explore to run their own TraceQL queries.
       GF_USERS_VIEWERS_CAN_EDIT: "true"
-      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /otel-lgtm/frame-trace/frame-trace.json
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /otel-lgtm/polkadot-frame-trace/polkadot-frame-trace.json
     volumes:
-      - ./provisioning/frame-trace.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/frame-trace.yaml:ro
-      - ./dashboards:/otel-lgtm/frame-trace:ro
+      - ./provisioning/polkadot-frame-trace.yaml:/otel-lgtm/grafana/conf/provisioning/dashboards/polkadot-frame-trace.yaml:ro
+      - ./dashboards:/otel-lgtm/polkadot-frame-trace:ro
