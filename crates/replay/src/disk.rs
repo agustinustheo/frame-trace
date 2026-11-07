@@ -306,7 +306,6 @@ impl NodeStore {
         std::thread::Builder::new()
             .name("node-cache-load".into())
             .spawn(move || {
-                hold_for_test(&inner);
                 load(&inner);
                 inner.loaded.store(true, Ordering::SeqCst);
                 if let Some(legacy) = legacy {
@@ -639,20 +638,6 @@ impl NodeStore {
             );
             std::thread::sleep(std::time::Duration::from_millis(1));
         }
-    }
-}
-
-/// Tests of a signal during startup hold the background load while this file exists.
-/// Debug builds only.
-fn hold_for_test(inner: &Inner) {
-    if !cfg!(debug_assertions) {
-        return;
-    }
-    let Some(path) = std::env::var_os("FRAME_TRACE_TEST_HOLD_CACHE_LOAD") else {
-        return;
-    };
-    while Path::new(&path).exists() && !inner.closed.load(Ordering::SeqCst) {
-        std::thread::sleep(std::time::Duration::from_millis(10));
     }
 }
 
