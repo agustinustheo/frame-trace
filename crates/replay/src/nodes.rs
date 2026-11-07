@@ -1,9 +1,10 @@
 //! Proof nodes shared in memory by all replays of a session, within a byte budget.
 //!
-//! Each node is charged what it costs the process: its allocation, rounded as the allocator
-//! rounds it, with the `Arc` header, plus the hash table that indexes it. When a new node would
-//! exceed the budget, the least recently used nodes go first, one at a time. The disk cache,
-//! when there is one, still has them.
+//! Each node is charged an upper estimate of what it costs the process: its allocation with the
+//! `Arc` header, rounded up past the size classes of the macOS, glibc and musl allocators, plus
+//! the hash table that indexes it, estimated the same way. When a new node would exceed the
+//! budget, the least recently used nodes go first, one at a time. The disk cache, when there is
+//! one, still has them.
 use schnellru::{Limiter, LruMap};
 use sp_core::H256;
 use std::sync::Arc;
@@ -16,17 +17,31 @@ const TABLE_SHARE: usize = 4;
 /// One table entry: the hash, the `Arc`, and two links.
 const ENTRY: usize = 56;
 
-/// The memory one `Arc<[u8]>` of `len` bytes takes: two reference counts, then the bytes,
-/// rounded to the size classes of the macOS allocator. glibc rounds to 16 bytes as well,
-/// with an 8-byte header that the 16-byte reference counts partly cover.
+/// At least the memory one allocation of `size` bytes takes, for the allocators frame-trace
+/// runs on. Up to 128 KiB it allows 32 bytes for a header (glibc adds 8, musl 4) and an eighth
+/// for size classes up to a quarter apart (musl), then rounds up to a quarter of the next power
+/// of two, or to 32 KiB above 32 KiB (macOS). Above 128 KiB every one of them maps pages or
+/// rounds to at most 32 KiB, so it allows 4 KiB and rounds up to 64 KiB. It overestimates: by
+/// about 40% for nodes of 200 to 600 bytes on macOS.
+pub(crate) fn allocation(size: usize) -> usize {
+    if size > 128 * 1024 {
+        return (size + 4096).next_multiple_of(64 * 1024);
+    }
+    let estimate = size + 32 + size / 8;
+    if estimate <= 64 {
+        return estimate.next_multiple_of(16);
+    }
+    let mut step = (estimate.next_power_of_two() / 4).max(16);
+    if size > 32 * 1024 {
+        step = step.max(32 * 1024);
+    }
+    estimate.next_multiple_of(step)
+}
+
+/// The memory one `Arc<[u8]>` of `len` bytes takes, at most: two reference counts, then the
+/// bytes.
 pub(crate) fn charge(len: usize) -> usize {
-    let size = len + 2 * std::mem::size_of::<usize>();
-    let quantum = match size {
-        0..=1008 => 16,
-        1009..=131_072 => 512,
-        _ => 16 * 1024,
-    };
-    size.div_ceil(quantum) * quantum
+    allocation(len + 2 * std::mem::size_of::<usize>())
 }
 
 /// Bytes of node allocations, plus the table's own allocation.
@@ -81,6 +96,7 @@ impl Limiter<H256, Arc<[u8]>> for Budget {
     }
     fn on_grow(&mut self, table: usize) -> bool {
         // Nodes over the budget after growing are dropped one by one, oldest first.
+        let table = allocation(table);
         let grow = table <= self.budget / TABLE_SHARE;
         if grow {
             self.table = table;
@@ -92,7 +108,7 @@ impl Limiter<H256, Arc<[u8]>> for Budget {
 /// What the shared node memory holds and how often replays found a node there.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct MemoryCacheStats {
-    /// Bytes charged: node allocations and the table.
+    /// Bytes charged: an upper estimate of node allocations and the table.
     pub bytes: u64,
     pub budget: u64,
     pub entries: u64,
@@ -115,10 +131,13 @@ impl Default for Nodes {
 }
 impl Nodes {
     pub fn with_budget(budget: usize) -> Self {
-        // The largest table within its share: 56-byte entries and a control byte per bucket,
-        // in a power of two of buckets, seven eighths of which can be full.
-        let table =
-            LruMap::<H256, Arc<[u8]>, Budget>::memory_usage_for_memory_budget(budget / TABLE_SHARE);
+        // The largest table whose charge is within its share: 56-byte entries and a control
+        // byte per bucket, in a power of two of buckets, seven eighths of which can be full.
+        let share = budget / TABLE_SHARE;
+        let mut table = LruMap::<H256, Arc<[u8]>, Budget>::memory_usage_for_memory_budget(share);
+        while table > 0 && allocation(table) > share {
+            table = LruMap::<H256, Arc<[u8]>, Budget>::memory_usage_for_memory_budget(table - 1);
+        }
         let buckets = match table / (ENTRY + 1) {
             0 => 0,
             n => 1 << n.ilog2(),
@@ -153,8 +172,8 @@ impl Nodes {
         }
         let node: Arc<[u8]> = bytes.into();
         self.map.insert(hash, node.clone());
-        // Whatever the table really allocated, so the charge stays exact.
-        let table = self.map.memory_usage();
+        // What the table really asked for, so its charge follows each change.
+        let table = allocation(self.map.memory_usage());
         self.map.limiter_mut().table = table;
         while self.map.limiter().is_over_the_limit(self.map.len())
             && self.map.pop_oldest().is_some()
@@ -189,14 +208,66 @@ mod tests {
         bytes[..8].copy_from_slice(&i.to_le_bytes());
         (H256::from(sp_io::hashing::blake2_256(&bytes)), bytes)
     }
+    /// macOS 15 on arm64, measured with `malloc_size` for every request up to 300,000 bytes
+    /// and every 1,024 bytes after that, up to 40 MiB.
+    fn macos(size: usize) -> usize {
+        let quantum = match size {
+            0..=1024 => 16,
+            1025..=32_768 => 512,
+            32_769..=8_388_608 => 32 * 1024,
+            _ => 16 * 1024,
+        };
+        size.max(1).next_multiple_of(quantum)
+    }
+    /// glibc: an 8-byte header, 16-byte chunks of at least 32 bytes, and whole pages from the
+    /// 128 KiB mapping threshold.
+    fn glibc(size: usize, page: usize) -> usize {
+        let chunk = (size + 8).next_multiple_of(16).max(32);
+        if size >= 128 * 1024 {
+            chunk.max((size + 16).next_multiple_of(page))
+        } else {
+            chunk
+        }
+    }
+    /// musl's mallocng size classes, in 16-byte units, with a 4-byte header; larger
+    /// allocations are mapped whole pages. From its `size_classes` table.
+    fn musl(size: usize, page: usize) -> usize {
+        const CLASSES: [usize; 48] = [
+            1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 18, 20, 25, 31, 36, 42, 50, 63, 72, 84, 102,
+            127, 146, 170, 204, 255, 292, 340, 409, 511, 584, 682, 818, 1023, 1169, 1364, 1637,
+            2047, 2340, 2730, 3276, 4095, 4680, 5460, 6552, 8191,
+        ];
+        CLASSES
+            .iter()
+            .map(|c| c * 16)
+            .find(|c| c - 4 >= size)
+            .unwrap_or((size + 16).next_multiple_of(page))
+    }
     #[test]
-    fn the_charge_includes_the_arc_header_rounding_and_the_table() {
-        assert_eq!(charge(0), 16);
-        assert_eq!(charge(1), 32);
-        assert_eq!(charge(100), 128);
-        assert_eq!(charge(532), 560);
-        assert_eq!(charge(1000), 1024);
-        assert_eq!(charge(4000), 4096);
+    fn the_charge_is_at_least_every_allocator_size_class_and_includes_the_table() {
+        // Measured on macOS: a 40,000-byte node is a 40,016-byte request in a 64 KiB class.
+        assert_eq!(macos(40_016), 65_536);
+        assert!(charge(40_000) >= 65_536);
+        let boundaries = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 32_768, 131_072];
+        let sizes = (1..140_000)
+            .chain((140_000..41 << 20).step_by(997))
+            .chain(boundaries.iter().flat_map(|b| [b - 1, *b, b + 1]))
+            .chain([8_388_608, 8_388_609, 8_389_600]);
+        for size in sizes {
+            let estimate = allocation(size);
+            for (allocator, real) in [
+                ("macOS", macos(size)),
+                ("glibc, 4 KiB pages", glibc(size, 4096)),
+                ("glibc, 64 KiB pages", glibc(size, 64 * 1024)),
+                ("musl, 4 KiB pages", musl(size, 4096)),
+                ("musl, 64 KiB pages", musl(size, 64 * 1024)),
+            ] {
+                assert!(
+                    estimate >= real,
+                    "{size} bytes: charged {estimate}, {allocator} uses {real}"
+                );
+            }
+        }
         let mut nodes = Nodes::with_budget(64 * 1024 * 1024);
         let mut payload = 0;
         for i in 0..1000 {
@@ -206,13 +277,16 @@ mod tests {
         }
         let stats = nodes.stats();
         assert_eq!(stats.entries, 1000);
-        // 300 bytes of payload cost 320 with the header, and the table at least 56 per entry.
+        // 300 bytes of payload take 320 with the header, and the table at least 57 per entry.
         assert!(
-            stats.bytes >= payload as u64 + 1000 * (20 + 56),
+            stats.bytes >= payload as u64 + 1000 * (20 + 57),
             "{} charged for {payload} bytes of payload",
             stats.bytes
         );
-        assert_eq!(stats.bytes, 1000 * 320 + nodes.map.memory_usage() as u64);
+        assert_eq!(
+            stats.bytes,
+            1000 * charge(300) as u64 + allocation(nodes.map.memory_usage()) as u64
+        );
     }
     #[test]
     fn a_randomized_workload_stays_within_the_budget() {
@@ -243,7 +317,7 @@ mod tests {
             }
             let stats = nodes.stats();
             assert!(stats.bytes <= budget as u64, "{stats:?}");
-            assert!(nodes.map.memory_usage() <= budget / TABLE_SHARE);
+            assert!(allocation(nodes.map.memory_usage()) <= budget / TABLE_SHARE);
             most = most.max(stats.bytes);
         }
         // Not trivially small either: eviction keeps the memory in use.
@@ -251,7 +325,10 @@ mod tests {
         let stats = nodes.stats();
         assert!(stats.evicted > 0 && stats.hits > 0 && stats.misses > 0);
         let values: usize = nodes.map.iter().map(|(_, v)| charge(v.len())).sum();
-        assert_eq!(stats.bytes as usize, values + nodes.map.memory_usage());
+        assert_eq!(
+            stats.bytes as usize,
+            values + allocation(nodes.map.memory_usage())
+        );
     }
     #[test]
     fn eviction_drops_the_least_recently_used_and_keeps_recent_nodes() {
@@ -281,7 +358,7 @@ mod tests {
         let stats = nodes.stats();
         assert!(stats.evicted > 0);
         // Not cleared at once: most of the budget is still in use, by the newest nodes.
-        assert!(stats.entries > 1000, "{stats:?}");
+        assert!(stats.bytes > stats.budget * 3 / 4, "{stats:?}");
         let kept = stats.entries as usize - 1;
         assert!(
             hashes[hashes.len() - kept..]
@@ -306,7 +383,7 @@ mod tests {
                 "{before} then {stats:?}"
             );
             assert!(stats.bytes <= budget as u64);
-            assert!(nodes.map.memory_usage() <= budget / TABLE_SHARE);
+            assert!(allocation(nodes.map.memory_usage()) <= budget / TABLE_SHARE);
             most = most.max(stats.entries);
         }
         let stats = nodes.stats();
@@ -351,7 +428,10 @@ mod tests {
         let nodes = nodes.lock();
         let stats = nodes.stats();
         let values: usize = nodes.map.iter().map(|(_, v)| charge(v.len())).sum();
-        assert_eq!(stats.bytes as usize, values + nodes.map.memory_usage());
+        assert_eq!(
+            stats.bytes as usize,
+            values + allocation(nodes.map.memory_usage())
+        );
         assert!(stats.bytes <= budget as u64);
     }
 }

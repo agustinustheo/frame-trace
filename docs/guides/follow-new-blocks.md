@@ -15,30 +15,28 @@ Press Ctrl-C to stop.
 Here is output from a three-minute run that sent traces to a local OTLP receiver.
 
 ```text
-follow: queued=1 in-flight=0 traced=0 exported=0 export-waiting=0 export-rejected=0 export-failed=0 export-dropped=0 retrying=0 stopped=0 skipped=0 reverted=0 state-memory=0MiB state-pieces=0 state-from-memory=0% up=2s
-replay #19068435: fetching state (shared limit: 16 concurrent RPC requests)
-replay #19068435: loading runtime and preparing state
-root check: PASS; RPC calls: 100 (timed replay: 0); execution proof: 85364 bytes
-fetching state #19068435: 62 proof request rounds; 100 RPC calls
-state root: computed 0x8f88a88dd02b0eba5da124ce7f05527d76cacea3fbe6e0a85394b25f7d98ac98; header 0x8f88a88dd02b0eba5da124ce7f05527d76cacea3fbe6e0a85394b25f7d98ac98
-traced finalized block #19068435 0x6166ad2385f35523fc97f4527c5a8e57334a78e2b3ea9c5eec274e049861c29e: 572 storage operations in 44.914s
+follow: queued=1 in-flight=0 traced=0 exported=0 export-waiting=0 export-rejected=0 export-failed=0 export-dropped=0 retrying=0 stopped=0 skipped=0 reverted=0 state-memory=0MiB state-pieces=0 state-from-memory=0% up=1s
+replay #19079015: fetching state (shared limit: 16 concurrent RPC requests)
+replay #19079015: loading runtime and preparing state
+root check: PASS; RPC calls: 70 (timed replay: 0); execution proof: 89976 bytes
+fetching state #19079015: 49 proof request rounds; 70 RPC calls
+state root: computed 0xb7429407e4d537352a6d2a59e8226f97f4bb6b1adb441735f3e920433e9e69af; header 0xb7429407e4d537352a6d2a59e8226f97f4bb6b1adb441735f3e920433e9e69af
+traced finalized block #19079015 0xc8364c098607d2b02067a415d162d3f6324877c5ad03baeca91961783b8a10bd: 569 storage operations in 15.435s
 ...
-traced finalized block #19068441 0x022ee201d22a06a6fb7d75e3b093fe1d19892af3fa8ec30889ec5916f216383e: 572 storage operations in 10.439s
+traced finalized block #19079016 0x33b9bd4c96d7f1a342d87fe16cdc9e36f90e123e75d49a02e8d6653d88298236: 569 storage operations in 6.258s
 ...
-follow: queued=20 in-flight=8 traced=3 exported=3 export-waiting=0 export-rejected=0 export-failed=0 export-dropped=0 retrying=0 stopped=0 skipped=0 reverted=0 state-memory=4MiB state-pieces=3777 state-from-memory=33% up=1m02s
+follow: queued=0 in-flight=6 traced=25 exported=25 export-waiting=0 export-rejected=0 export-failed=0 export-dropped=0 retrying=0 stopped=0 skipped=0 reverted=0 state-memory=7MiB state-pieces=9237 state-from-memory=33% up=1m01s
 ...
-follow: queued=19 in-flight=8 traced=34 exported=34 export-waiting=0 export-rejected=0 export-failed=0 export-dropped=0 retrying=0 stopped=0 skipped=0 reverted=0 state-memory=7MiB state-pieces=12506 state-from-memory=42% up=2m02s
+follow: queued=0 in-flight=3 traced=58 exported=58 export-waiting=0 export-rejected=0 export-failed=0 export-dropped=0 retrying=0 stopped=0 skipped=0 reverted=0 state-memory=10MiB state-pieces=16938 state-from-memory=36% up=2m01s
 ...
 follow: stopping (signal again to exit now)
-follow: waiting up to 10s for 2 block(s) still being replayed
 replay job cancelled
-replay job cancelled
-follow stopped after 3m00s: traced=83 exported=83 export-rejected=0 export-failed=0 export-dropped=0 export-unsent=0 stopped=0 skipped=0 reverted=0 cancelled=2 poll-failures=0
+follow stopped after 3m00s: traced=88 exported=88 export-rejected=0 export-failed=0 export-dropped=0 export-unsent=0 stopped=0 skipped=0 reverted=0 cancelled=1 poll-failures=0
 ```
 
-The cache directory was kept from an earlier run, so the first block took 45 seconds on a slow node.
-The next took 10 seconds.
-The two blocks still being replayed when the stop began count as `cancelled`.
+The cache directory was kept from an earlier run, so the first block took 15 seconds.
+The next took 6 seconds.
+The block still waiting on the node when the stop began counts as `cancelled`.
 Each time covers loading state and replaying it on this machine.
 It does not include sending the trace, or time spent waiting for the first replay.
 Each traced block appears in Jaeger as its own trace.
@@ -63,7 +61,7 @@ The [reference](../reference/commands.md#follow) lists the intervals.
 | `stopped` | Blocks that failed for good, such as pruned state or a failed root check. |
 | `skipped` | Blocks not replayed, or not retried, because newer blocks arrived first. |
 | `reverted` | Blocks that left the chain in a reorg, counted once whatever their state. Only with `--best`. |
-| `state-memory` | Memory used by downloaded state kept for all workers, in MiB. It stops growing at the [limit](../reference/commands.md#follow). |
+| `state-memory` | Memory used by downloaded state kept for all workers, in MiB. An upper estimate: the real use is lower. It stops growing at the [limit](../reference/commands.md#follow). |
 | `state-pieces` | Pieces of downloaded state kept in memory. |
 | `state-from-memory` | Share of the state replays needed that was already in memory, since the start. The rest came from the disk cache or the node. |
 | `up` | Time since `follow` started. |
