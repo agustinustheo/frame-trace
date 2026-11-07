@@ -2,16 +2,16 @@
 
 Replay any block of a Polkadot SDK chain on your machine and see every storage read and write as a trace.
 
-![A Utility.batch block in Jaeger. Callouts mark the block, a phase, the runtime calls, a storage read, its origin, its proof bytes and its duration.](docs/images/hero.png)
+![A Utility.batch block in Jaeger. Callouts mark the block, a phase, the runtime calls, a storage read, its origin, its proof bytes and its duration.](https://raw.githubusercontent.com/agustinustheo/polkadot-frame-trace/main/docs/images/hero.png)
 
 *Block #4 of a People chain in Jaeger: (1) the block, (2) the `Utility.batch` extrinsic, (3) the runtime calls inside it, (4) a read of Bob's account, (5) where it was answered, (6) the bytes it added to the proof, (7) its duration.*
 
 ## What you get
 
 - **Every storage read and write of a block**, in order, with decoded names such as `System::Account(5Grw…)`.
-- **Why each read cost what it did**: answered from the block's own [cache](docs/reference/glossary.md#cache) or from the [trie](docs/reference/glossary.md#trie), and how many bytes it added to the block's proof.
+- **Why each read cost what it did**: answered from the block's own [cache](https://agustinustheodorus.com/polkadot-frame-trace/reference/glossary.html#cache) or from the [trie](https://agustinustheodorus.com/polkadot-frame-trace/reference/glossary.html#trie), and how many bytes it added to the block's proof.
 - **The busiest storage items, repeated reads and costs per extrinsic**, for one block or a range of thousands.
-- **A trace you can trust.** polkadot-frame-trace checks every value it fetches against the chain's [state root](docs/reference/glossary.md#state-root). After the replay, the root check confirms your machine reached the same state as the chain.
+- **A trace you can trust.** polkadot-frame-trace checks every value it fetches against the chain's [state root](https://agustinustheodorus.com/polkadot-frame-trace/reference/glossary.html#state-root). After the replay, the root check confirms your machine reached the same state as the chain.
 
 It works with any node over normal RPC, with no unsafe methods or special node build.
 
@@ -31,7 +31,7 @@ mkdir -p ~/.local/bin && cp "polkadot-frame-trace-$VERSION-$TARGET/polkadot-fram
 
 Only `sha256sum` prints a line, which ends in `OK` when the archive is intact.
 
-[Install](docs/getting-started/install.md) has the commands for ARM64 Linux, macOS and nightly builds, and how to add `~/.local/bin` to your `PATH`.
+[Install](https://agustinustheodorus.com/polkadot-frame-trace/getting-started/install.html) has the commands for ARM64 Linux, macOS and nightly builds, and how to add `~/.local/bin` to your `PATH`.
 
 Or build it from source with Rust. The first build takes several minutes.
 
@@ -47,7 +47,7 @@ Start Jaeger:
 docker run -d --rm --name jaeger -p 16686:16686 -p 4318:4318 jaegertracing/jaeger:latest
 ```
 
-Trace the latest finalized [Westend Asset Hub](docs/reference/glossary.md#westend-asset-hub) block and send it to Jaeger:
+Trace the latest finalized [Westend Asset Hub](https://agustinustheodorus.com/polkadot-frame-trace/reference/glossary.html#westend-asset-hub) block and send it to Jaeger:
 
 ```sh
 polkadot-frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block finalized --otlp
@@ -69,20 +69,20 @@ So the trace shows what the block really did.
 
 Open <http://127.0.0.1:16686>, pick the service `polkadot-frame-trace` and click **Find Traces**.
 Open the trace named `polkadot-frame-trace: block #<number> (0x…)`.
-You will see the block's [phases](docs/concepts/phases.md): initialization, the required extrinsics, post inherents and finalization (this block has only inherents, so post inherents is its own phase).
+You will see the block's [phases](https://agustinustheodorus.com/polkadot-frame-trace/concepts/phases.html): initialization, the required extrinsics, post inherents and finalization (this block has only inherents, so post inherents is its own phase).
 Each phase holds its storage reads and writes.
 Click any read to see where it was answered and its proof bytes.
 
 ## Learn more
 
-The [documentation](https://agustinustheodorus.com/polkadot-frame-trace/) has a [glossary](docs/reference/glossary.md) and:
+The [documentation](https://agustinustheodorus.com/polkadot-frame-trace/) has a [glossary](https://agustinustheodorus.com/polkadot-frame-trace/reference/glossary.html) and:
 
-- **Getting started:** [install](docs/getting-started/install.md), [your first trace](docs/getting-started/first-trace.md), [reading a trace](docs/getting-started/reading-a-trace.md).
-- **Guides** named after the job: [find repeated reads](docs/guides/find-repeated-reads.md), [measure proof size](docs/guides/measure-proof-size.md), [trace a runtime API call](docs/guides/trace-a-runtime-api-call.md), [analyse many blocks](docs/guides/analyse-many-blocks.md) and [more](docs/SUMMARY.md).
-- **Grafana:** [send traces to Grafana](docs/guides/send-traces-to-grafana.md) for a ready dashboard, [find storage problems with TraceQL](docs/guides/query-traces-in-grafana.md), or [send them through Grafana Alloy to Tempo](docs/guides/send-traces-through-alloy.md). Ready setups are in [`examples/`](examples/).
-- **Concepts:** [what a replay proves](docs/concepts/what-a-replay-proves.md), [phases](docs/concepts/phases.md), [cache or trie](docs/concepts/cache-or-trie.md), [proof bytes](docs/concepts/proof-bytes.md), [timings](docs/concepts/timings.md).
-- **Reference:** [commands and flags](docs/reference/commands.md), [span attributes](docs/reference/spans.md), [JSON output](docs/reference/json.md).
-- **[Troubleshooting](docs/troubleshooting.md)**, one section per error message.
+- **Getting started:** [install](https://agustinustheodorus.com/polkadot-frame-trace/getting-started/install.html), [your first trace](https://agustinustheodorus.com/polkadot-frame-trace/getting-started/first-trace.html), [reading a trace](https://agustinustheodorus.com/polkadot-frame-trace/getting-started/reading-a-trace.html).
+- **Guides** named after the job: [find repeated reads](https://agustinustheodorus.com/polkadot-frame-trace/guides/find-repeated-reads.html), [measure proof size](https://agustinustheodorus.com/polkadot-frame-trace/guides/measure-proof-size.html), [trace a runtime API call](https://agustinustheodorus.com/polkadot-frame-trace/guides/trace-a-runtime-api-call.html), [analyse many blocks](https://agustinustheodorus.com/polkadot-frame-trace/guides/analyse-many-blocks.html) and [more](https://agustinustheodorus.com/polkadot-frame-trace/).
+- **Grafana:** [send traces to Grafana](https://agustinustheodorus.com/polkadot-frame-trace/guides/send-traces-to-grafana.html) for a ready dashboard, [find storage problems with TraceQL](https://agustinustheodorus.com/polkadot-frame-trace/guides/query-traces-in-grafana.html), or [send them through Grafana Alloy to Tempo](https://agustinustheodorus.com/polkadot-frame-trace/guides/send-traces-through-alloy.html). Ready setups are in [`examples/`](https://github.com/agustinustheo/polkadot-frame-trace/tree/main/examples).
+- **Concepts:** [what a replay proves](https://agustinustheodorus.com/polkadot-frame-trace/concepts/what-a-replay-proves.html), [phases](https://agustinustheodorus.com/polkadot-frame-trace/concepts/phases.html), [cache or trie](https://agustinustheodorus.com/polkadot-frame-trace/concepts/cache-or-trie.html), [proof bytes](https://agustinustheodorus.com/polkadot-frame-trace/concepts/proof-bytes.html), [timings](https://agustinustheodorus.com/polkadot-frame-trace/concepts/timings.html).
+- **Reference:** [commands and flags](https://agustinustheodorus.com/polkadot-frame-trace/reference/commands.html), [span attributes](https://agustinustheodorus.com/polkadot-frame-trace/reference/spans.html), [JSON output](https://agustinustheodorus.com/polkadot-frame-trace/reference/json.html).
+- **[Troubleshooting](https://agustinustheodorus.com/polkadot-frame-trace/troubleshooting.html)**, one section per error message.
 
 ## Requirements
 
@@ -91,14 +91,14 @@ The [documentation](https://agustinustheodorus.com/polkadot-frame-trace/) has a 
 - A Polkadot SDK chain with Blake2 headers and `u32` block numbers. Decoded names need metadata V14, V15 or V16.
 - Docker, or any trace viewer that accepts OTLP over HTTP. JSON output needs neither.
 
-[What polkadot-frame-trace supports](docs/reference/support.md) lists the chain requirements, the RPC methods polkadot-frame-trace sends, the host functions and the tested chains.
+[What polkadot-frame-trace supports](https://agustinustheodorus.com/polkadot-frame-trace/reference/support.html) lists the chain requirements, the RPC methods polkadot-frame-trace sends, the host functions and the tested chains.
 
 ## Contributing
 
-Internal notes, research and design documents are in [`dev/`](dev/README.md).
+Internal notes, research and design documents are in [`dev/`](https://github.com/agustinustheo/polkadot-frame-trace/blob/main/dev/README.md).
 Run `cargo test --workspace` before sending a change.
-Docs follow [docs/STYLE.md](docs/STYLE.md). Build them with `mdbook build`, using `mdbook` 0.4.52 and `mdbook-mermaid` 0.16.0.
+Docs follow [docs/STYLE.md](https://github.com/agustinustheo/polkadot-frame-trace/blob/main/docs/STYLE.md). Build them with `mdbook build`, using `mdbook` 0.4.52 and `mdbook-mermaid` 0.16.0.
 
 ## License
 
-Apache-2.0. See [LICENSE](LICENSE).
+Apache-2.0. See [LICENSE](https://github.com/agustinustheo/polkadot-frame-trace/blob/main/LICENSE).
