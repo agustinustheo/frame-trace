@@ -29,7 +29,14 @@ The project is named polkadot-frame-trace: the command, the crates, the OTLP ser
 - Nightly builds of `main` for the same four systems as releases, in the `Nightly` pre-release on GitHub. `polkadot-frame-trace --version` shows the date and commit they were built from.
 - Tested on relay chains and on blocks that upgrade the runtime, see [What polkadot-frame-trace supports](https://agustinustheodorus.com/polkadot-frame-trace/reference/support.html).
 
+- Limits against a node that sends too much: 64 MiB per RPC response, and 1,000,000 pieces of state or 256 MiB for one block.
+- A replay deadline: `follow` exits 1 when a replay runs the runtime for 10 minutes, so a supervisor restarts it. Other commands warn once.
+- A warning when `--rpc` or `--otlp` is plain `ws://` or `http://` to another machine.
+
 ### Changed
+
+- The disk cache directory must be private: polkadot-frame-trace creates it readable by you alone, and runs without one that another user owns or can write. Without `HOME`, compiled runtimes are kept in a per-user folder in the temporary directory.
+- Output and errors show `--rpc` and `--otlp` URLs as scheme, host and port only, so credentials and API keys in them stay out of logs. Error text from the node or the OTLP receiver is cut to 512 characters.
 
 - For anyone running builds from `main`: compiled runtimes are kept in `~/.cache/polkadot-frame-trace`. You can delete `~/.cache/frame-trace`.
 - For anyone running builds from `main`: the disk cache of `--cache-dir` keeps downloaded state in a few files of up to 64 MiB, not one file per piece. `--cache-max-bytes` now counts bytes used on disk, by state and compiled runtimes together. Runtimes in use plus the space kept for state, files polkadot-frame-trace cannot delete, runtimes compiled since the last check, the old `nodes` folder until it is deleted, and another polkadot-frame-trace on the same directory can take it over the limit; see [Disk cache](https://agustinustheodorus.com/polkadot-frame-trace/reference/commands.html#disk-cache). A long `follow` no longer slows down as the disk cache grows, and starts at once with a full one. The files the old version wrote in `nodes` are deleted in the background.
