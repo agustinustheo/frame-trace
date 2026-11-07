@@ -28,8 +28,9 @@
 
 ---
 
-polkadot-frame-trace runs a block again on your machine, with the chain's own runtime and state it fetches from any node over normal RPC.
-It records every storage read and write, checks that the replay reached the block's state root, and exports the result as an OpenTelemetry trace for Jaeger or Grafana Tempo, or as JSON.
+polkadot-frame-trace runs a block again on your machine, with the chain's own runtime and state from any node's normal RPC.
+It records every storage read and write and checks that the replay reached the block's state root.
+It exports the result as an OpenTelemetry trace for Jaeger or Grafana Tempo, or as JSON.
 
 It is for runtime and pallet developers and chain teams who want to know why a block costs what it does.
 Find the storage items a block reads most, the reads it repeats, and the bytes each one adds to the proof.
@@ -40,13 +41,12 @@ Find the storage items a block reads most, the reads it repeats, and the bytes e
 
 ## Highlights
 
-- **Any node, no changes.** Safe RPC only: the block, and the parent state as proofs from `state_getReadProof`. No unsafe RPC, no special node build.
-- **Checked.** Every value is checked against the parent's [state root](https://agustinustheodorus.com/polkadot-frame-trace/reference/glossary.html#state-root). The [root check](https://agustinustheodorus.com/polkadot-frame-trace/concepts/what-a-replay-proves.html) must pass before anything is exported.
-- **The chain's own runtime.** The runtime Wasm from the parent state runs in the Polkadot SDK executor, with signature checks on.
-- **Every read and write, in order,** with decoded names such as `System::Account(5Grw…)`.
-- **Why a read cost what it did:** answered from the [cache or the trie](https://agustinustheodorus.com/polkadot-frame-trace/concepts/cache-or-trie.html), and the [proof bytes](https://agustinustheodorus.com/polkadot-frame-trace/concepts/proof-bytes.html) it added.
-- **Spans per [phase](https://agustinustheodorus.com/polkadot-frame-trace/concepts/phases.html) and extrinsic,** and per runtime call when the runtime is built with [`with-tracing`](https://agustinustheodorus.com/polkadot-frame-trace/guides/see-runtime-calls.html).
-- **One block or thousands.** Tables of the busiest items, repeated reads and costs per extrinsic, and a mode that follows new blocks.
+- Any node, no changes: safe RPC only, with the parent state as proofs from `state_getReadProof`.
+- Every value is checked against the parent's [state root](https://agustinustheodorus.com/polkadot-frame-trace/reference/glossary.html#state-root), and the [root check](https://agustinustheodorus.com/polkadot-frame-trace/concepts/what-a-replay-proves.html) must pass before anything is exported.
+- The chain's own runtime runs in the Polkadot SDK executor, with signature checks on.
+- Every read and write, in order, with decoded names such as `System::Account(5Grw…)`.
+- For each read: whether the [cache or the trie](https://agustinustheodorus.com/polkadot-frame-trace/concepts/cache-or-trie.html) answered it, and the [proof bytes](https://agustinustheodorus.com/polkadot-frame-trace/concepts/proof-bytes.html) it added.
+- Spans per [phase](https://agustinustheodorus.com/polkadot-frame-trace/concepts/phases.html) and extrinsic, and per runtime call when the runtime is built with [`with-tracing`](https://agustinustheodorus.com/polkadot-frame-trace/guides/see-runtime-calls.html).
 
 ## Install
 
@@ -62,9 +62,9 @@ tar -xzf "polkadot-frame-trace-$VERSION-$TARGET.tar.gz"
 mkdir -p ~/.local/bin && cp "polkadot-frame-trace-$VERSION-$TARGET/polkadot-frame-trace" ~/.local/bin/
 ```
 
-Other targets are `aarch64-unknown-linux-gnu`, `aarch64-apple-darwin` and `x86_64-apple-darwin`; on macOS, check with `shasum -a 256` instead.
+Other targets are `aarch64-unknown-linux-gnu`, `aarch64-apple-darwin` and `x86_64-apple-darwin`. On macOS, check with `shasum -a 256`.
 The Linux binaries need glibc 2.35 or newer.
-[Install](https://agustinustheodorus.com/polkadot-frame-trace/getting-started/install.html) covers nightly builds and your `PATH`.
+[Install](https://agustinustheodorus.com/polkadot-frame-trace/getting-started/install.html) covers nightly builds, your `PATH` and building from source.
 
 ## Tour
 
@@ -141,26 +141,8 @@ Every block below passed the root check.
 
 ## Build from source
 
-```sh
-git clone https://github.com/agustinustheo/polkadot-frame-trace
-cd polkadot-frame-trace
-cargo test --workspace
-cargo install --locked --path crates/cli
-```
-
-`rust-toolchain.toml` pins Rust 1.93.0 and `rustup` installs it. The first build takes several minutes.
-
-| Path | What |
-| --- | --- |
-| `crates/cli` | the `polkadot-frame-trace` command |
-| `crates/replay` | replays blocks and runtime API calls from checked state proofs, records every storage operation |
-| `crates/model` | the trace model: storage operations, phases and stats |
-| `crates/decode` | storage key and extrinsic names from metadata |
-| `crates/otel` | turns traces into OpenTelemetry spans and exports them over OTLP |
-| `docs/` | the [documentation](https://agustinustheodorus.com/polkadot-frame-trace/), built with `mdbook build` |
-| `examples/` | ready Jaeger, Grafana and Alloy setups |
-
-Docs follow [docs/STYLE.md](https://github.com/agustinustheo/polkadot-frame-trace/blob/main/docs/STYLE.md). Design notes are in [`dev/`](https://github.com/agustinustheo/polkadot-frame-trace/blob/main/dev/README.md).
+See [Install](https://agustinustheodorus.com/polkadot-frame-trace/getting-started/install.html#build-from-source).
+Docs follow [docs/STYLE.md](https://github.com/agustinustheo/polkadot-frame-trace/blob/main/docs/STYLE.md), and developer notes are in [`dev/`](https://github.com/agustinustheo/polkadot-frame-trace/blob/main/dev/README.md).
 
 ## License
 
