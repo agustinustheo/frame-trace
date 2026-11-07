@@ -1,7 +1,7 @@
 # Follow new blocks
 
-`polkadot-frame-trace follow` traces each new final block as it arrives and sends it to your trace viewer.
-Leave it running next to Jaeger to watch a chain's storage work live.
+`polkadot-frame-trace follow` traces each new finalized block and sends it to your trace viewer.
+Run it next to Jaeger to see a chain's storage work live.
 
 ## 1. Start following
 
@@ -34,18 +34,13 @@ replay job cancelled
 follow stopped after 3m00s: traced=88 exported=88 export-rejected=0 export-failed=0 export-dropped=0 export-unsent=0 stopped=0 skipped=0 reverted=0 cancelled=1 poll-failures=0
 ```
 
-The cache directory was kept from an earlier run, so the first block took 15 seconds.
-The next took 6 seconds.
-The block still waiting on the node when the stop began counts as `cancelled`.
-Each time covers loading state and replaying it on this machine.
-It does not include sending the trace, or time spent waiting for the first replay.
-Each traced block appears in Jaeger as its own trace.
+The disk cache was kept from an earlier run. The first block took 15 seconds and the next 6 seconds.
+Each time covers loading state and the replay on this machine, not the export.
+Each traced block shows in Jaeger as its own trace.
 
 ## 2. Read the status line
 
-polkadot-frame-trace checks the node for new final blocks and prints a status line.
-It prints the line when a problem count changes, and otherwise at a fixed interval.
-The [reference](../reference/commands.md#follow) lists the intervals.
+`follow` prints a status line when a problem count changes, and otherwise at a fixed [interval](../reference/commands.md#follow).
 
 | Field | Meaning |
 | --- | --- |
@@ -58,7 +53,7 @@ The [reference](../reference/commands.md#follow) lists the intervals.
 | `export-failed` | Traces whose export crashed inside polkadot-frame-trace. They are not sent again. Only with `--otlp`. |
 | `export-dropped` | Traces dropped because too many were waiting. Only with `--otlp`. |
 | `retrying` | Blocks that failed for a passing reason, such as a dropped connection, and will be tried again. |
-| `stopped` | Blocks that failed for good, such as pruned state or a failed root check. |
+| `stopped` | Blocks that failed for good, such as pruned state or a failed root check. The log says `stopped retrying block <hash> after <N> attempt(s)`. |
 | `skipped` | Blocks not replayed, or not retried, because newer blocks arrived first. |
 | `reverted` | Blocks that left the chain in a reorg, counted once whatever their state. Only with `--best`. |
 | `state-memory` | Memory used by downloaded state kept for all workers, in MiB. An upper estimate: the real use is lower. It stops growing at the [limit](../reference/commands.md#follow). |
@@ -68,24 +63,21 @@ The [reference](../reference/commands.md#follow) lists the intervals.
 
 All counts except `queued`, `in-flight`, `retrying`, `export-waiting`, `state-memory` and `state-pieces` are totals since the start.
 
-When you stop `follow`, the last line sums up the run.
-It adds `cancelled` and `poll-failures`, the failed checks for new blocks.
-`cancelled` counts blocks that were waiting, waiting on the node, or still running when the stop wait ended.
-With `--otlp`, `export-unsent` counts traces not yet sent when the stop ended.
-If stderr was blocked long enough to lose log lines, the summary ends with `log-dropped`, the number lost.
+The last line sums up the run when you stop `follow`. It adds these counts:
+
+- `cancelled`: blocks still waiting, or still running when the stop wait ended;
+- `poll-failures`: failed checks for new blocks;
+- `export-unsent`: traces not sent when the stop ended, with `--otlp`;
+- `log-dropped`: log lines lost because stderr was blocked. It shows only when lines were lost.
 
 ## 3. Keep up with the chain
 
-polkadot-frame-trace replays several blocks at once. Raise `--workers` when the queue keeps growing.
-See the [worker and queue limits](../reference/commands.md#follow).
-The first replay runs on its own. Other workers wait until it finishes.
-If it fails, the next block also runs on its own.
+`follow` replays several blocks at once, 8 by default.
+The first replay runs alone, and the other workers wait for it.
+If replays stay slower than the chain, older blocks are skipped: `follow` samples recent blocks and does not promise every block.
+For a complete range, use [`report`](analyse-many-blocks.md).
 
-If replays remain slower than the chain, older blocks are skipped.
-A full queue makes `follow` sample recent blocks at replay speed; it does not promise every block.
-For a complete range, use [`report`](analyse-many-blocks.md) instead.
-
-These log lines tell you this is happening:
+These log lines show that replays fall behind:
 
 | Line | Meaning |
 | --- | --- |
@@ -93,38 +85,30 @@ These log lines tell you this is happening:
 | `replay job skipped: queued block expired behind tip` | A waiting block fell outside the recent-height limit. polkadot-frame-trace dropped it without replaying it. It counts as `skipped`. |
 | `skipped block <hash>: retry expired behind tip` | The same, for a block that was waiting to be retried. |
 
-These lines mean replays are falling behind the chain.
-
-To go faster:
-
-- keep `--cache-dir`, so each block reuses state that earlier blocks downloaded, and asks the node only for the rest;
-- raise `--workers` to replay more blocks at once;
-- raise `--proof-concurrency` on a fast connection to send more requests at once;
-- use a node close to you.
+To go faster, keep `--cache-dir` and raise `--workers`.
+On a fast connection, raise `--proof-concurrency`. A node close to you also helps.
+The [reference](../reference/commands.md#follow) lists the limits.
 
 ## 4. Follow the newest blocks with `--best`
 
-`--best` follows the newest blocks instead of final ones.
-These can still be replaced by a reorg.
-When that happens, polkadot-frame-trace logs the reorg and counts the replaced block as `reverted`.
-If a reverted block returns to the chain, it can be traced again.
+`--best` follows the newest blocks instead of finalized ones.
+A reorg may replace them. `follow` then logs the reorg and counts the replaced block as `reverted`.
+If a reverted block comes back to the chain, `follow` may trace it again.
 
 ## 5. When the node or the receiver goes away
 
-If a check for new blocks fails, polkadot-frame-trace logs it and tries again.
-It waits longer after each failure, and repeats the line at most once a minute.
+If a check for new blocks fails, `follow` logs it and tries again. It waits longer after each failure.
 
 ```text
 follow poll failed: RPC error: chain_getFinalizedHead: connect ws://127.0.0.1:9: IO error: Connection refused (os error 61); retrying in 2s
 follow poll still failing after 6 attempts over 1m06s: RPC error: chain_getFinalizedHead: connect ws://127.0.0.1:9: IO error: Connection refused (os error 61); retrying in 1m00s
 ```
 
-`follow` keeps running until the node answers again, then logs `follow poll recovered after <N> failed attempt(s) over <time>`.
+When the node answers again, it logs `follow poll recovered after <N> failed attempt(s) over <time>`.
 
-If the OTLP receiver stops, polkadot-frame-trace keeps replaying blocks and holds their traces.
-It sends them when the receiver is back. It does not replay the blocks again.
-Each trace goes out in several requests. A request the receiver acknowledged is never sent again.
-If an acknowledgement is lost, the receiver can get the same spans twice, with the same IDs.
+If the OTLP receiver stops, `follow` keeps replaying blocks and holds their traces, up to the [queue size](../reference/commands.md#follow).
+It sends them when the receiver is back, without replaying the blocks, and never sends an acknowledged request again.
+Traces still waiting at the stop count as `export-unsent`, and traces dropped from a full queue as `export-dropped`.
 
 In the run from step 1, the receiver refused one request with a 400, then was stopped for 30 seconds:
 
@@ -136,24 +120,10 @@ OTLP export failed (2 attempt(s) in a row): 575 of 575 spans were not exported (
 OTLP export recovered after 3 failed attempt(s) over 27s; 17 trace(s) waiting
 ```
 
-The first line comes from the refused request: the trace's first request was accepted, so only the other 63 spans were sent again.
-The first failure of the outage was not logged, because a failure line had been printed less than a minute before.
-
-Each try can take several seconds, because the exporter itself retries until the OTLP timeout.
-So the time in the recovery line is longer than the waits between tries add up to.
-
-A long outage fills the waiting queue. polkadot-frame-trace then drops the oldest trace and counts it as `export-dropped`.
-The [reference](../reference/commands.md#follow) lists the queue size.
-If the receiver is still down when you stop `follow`, the waiting traces are not sent.
-The summary counts them as `export-unsent`.
-
 ## 6. Run it as a service
 
-`follow` stops cleanly on `SIGTERM` and `SIGHUP`, as on Ctrl-C. `SIGHUP` does not reload anything.
-Replays waiting on the node end at once. Replays running on the CPU get a short wait to finish.
-Then `follow` sends waiting traces, prints its summary and exits with code 0.
-A second signal stops it at once.
-The [reference](../reference/commands.md#follow) lists the waits and exit codes.
+`follow` stops cleanly on `SIGTERM` and `SIGHUP`, as on Ctrl-C. It sends waiting traces, prints its summary and exits with code 0.
+The [reference](../reference/commands.md#follow) lists the stop waits and exit codes.
 
 A minimal systemd unit, in `/etc/systemd/system/polkadot-frame-trace-follow.service`:
 
@@ -200,20 +170,8 @@ WantedBy=multi-user.target
 Start it with `sudo systemctl enable --now polkadot-frame-trace-follow`.
 Read its log with `journalctl -u polkadot-frame-trace-follow -f`.
 
-- `TimeoutStopSec=45` leaves time for the replay and export waits at stop.
-- `Restart=on-failure` restarts `follow` after exit code 1, for example when its threads stop, or when a replay passes the [replay deadline](../reference/commands.md#follow).
-  `follow` also exits 1 when it can no longer write its log, for example after journald restarts, so the restart gives it a working log again.
-  A stop by `SIGTERM` or `SIGHUP` exits 0, so the service stays stopped.
-- `StartLimitBurst=5` within `StartLimitIntervalSec=300` gives up after five failed starts in five minutes, for example with a wrong URL.
-- `CacheDirectoryMode=0700` and `UMask=0077` keep the [disk cache](../reference/commands.md#disk-cache) private, as polkadot-frame-trace requires.
-- The other options take away what `follow` does not need: other users' files, devices, kernel settings and privileges.
-  `MemoryDenyWriteExecute=yes` is left out on purpose: the runtime is compiled to machine code at run time, which that option forbids.
-
-## Retries
-
-A request that fails for a passing reason is retried.
-Examples are a timeout, a dropped connection or a rate limit.
-A block gets a fixed number of attempts, listed in the [reference](../reference/commands.md#follow).
-For a slow node, raise `--rpc-timeout`.
-Pruned state, an invalid block, a failed root check or a crash in the replay stop that block for good.
-The log then says `stopped retrying block <hash> after <N> attempt(s)`.
+`TimeoutStopSec=45` leaves time for the replay and export waits at stop.
+`Restart=on-failure` restarts `follow` after exit code 1, for example after the [replay deadline](../reference/commands.md#follow) or when it can no longer write its log.
+A stop by signal exits 0, so the service stays stopped.
+`CacheDirectoryMode=0700` and `UMask=0077` keep the [disk cache](../reference/commands.md#disk-cache) private.
+`MemoryDenyWriteExecute=yes` is left out on purpose, because the runtime is compiled to machine code at run time.
