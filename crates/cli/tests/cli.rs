@@ -995,42 +995,6 @@ fn follow_mock_node_retries_failed_blocks_observes_new_heads_and_cancels() {
     );
 }
 
-#[test]
-fn follow_ctrl_c_interrupts_a_stalled_websocket_handshake() {
-    use std::{
-        process::Stdio,
-        thread,
-        time::{Duration, Instant},
-    };
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let url = format!("ws://{}", listener.local_addr().unwrap());
-    let mut child = Command::new(BIN)
-        .args(["follow", "--rpc", &url])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .unwrap();
-    let (mut stream, _) = listener.accept().unwrap();
-    stream.set_nonblocking(false).unwrap();
-    let node = thread::spawn(move || {
-        let _ = stream.read_to_end(&mut Vec::new());
-    });
-    let start = Instant::now();
-    Command::new("kill")
-        .args(["-INT", &child.id().to_string()])
-        .status()
-        .unwrap();
-    while child.try_wait().unwrap().is_none() && start.elapsed() < Duration::from_secs(10) {
-        thread::sleep(Duration::from_millis(10));
-    }
-    if child.try_wait().unwrap().is_none() {
-        child.kill().unwrap();
-    }
-    assert!(child.wait().unwrap().success());
-    assert!(start.elapsed() < Duration::from_secs(10));
-    node.join().unwrap();
-}
-
 /// Sends `signal` to `child` and waits up to ten seconds for it to exit.
 fn stop_child(child: &mut std::process::Child, signal: &str) -> std::process::ExitStatus {
     use std::{
@@ -1063,37 +1027,6 @@ fn wait_for_log(log: &std::path::Path, text: &str, secs: u64) -> String {
         }
         std::thread::sleep(std::time::Duration::from_millis(50));
     }
-}
-
-#[test]
-fn follow_sigterm_stops_gracefully_with_a_summary() {
-    use std::process::Stdio;
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let url = format!("ws://{}", listener.local_addr().unwrap());
-    let log = std::env::temp_dir().join(format!(
-        "polkadot-frame-trace-sigterm-{}.log",
-        std::process::id()
-    ));
-    let mut child = Command::new(BIN)
-        .args(["follow", "--rpc", &url])
-        .stdout(Stdio::null())
-        .stderr(std::fs::File::create(&log).unwrap())
-        .spawn()
-        .unwrap();
-    // A stalled handshake keeps the first poll waiting, as on an unresponsive node.
-    let (mut stream, _) = listener.accept().unwrap();
-    stream.set_nonblocking(false).unwrap();
-    let node = std::thread::spawn(move || {
-        let _ = stream.read_to_end(&mut Vec::new());
-    });
-    let status = stop_child(&mut child, "-TERM");
-    let text = std::fs::read_to_string(&log).unwrap();
-    std::fs::remove_file(log).unwrap();
-    assert!(status.success(), "{status:?}: {text}");
-    assert!(text.contains("follow: stopping"), "{text}");
-    assert!(text.contains("follow stopped after "), "{text}");
-    assert!(text.contains(" traced=0 "), "{text}");
-    node.join().unwrap();
 }
 
 /// Kills the child on drop, so a failed assertion cannot leave `follow` running.
@@ -1239,47 +1172,57 @@ fn full_pipe() -> (std::io::PipeReader, std::io::PipeWriter) {
 }
 
 #[test]
-fn follow_stops_on_signals_while_nobody_reads_its_stderr() {
-    use std::{
-        process::Stdio,
-        time::{Duration, Instant},
-    };
-    for (signals, code) in [(vec!["-TERM"], 0), (vec!["-TERM", "-INT"], 130)] {
+fn follow_stops_on_signals_with_a_summary_even_when_nobody_reads_its_stderr() {
+    use std::process::Stdio;
+    // The signals sent, whether stderr is a full pipe, and the exit code.
+    for (signals, full, code) in [
+        (&["-INT"][..], false, 0),
+        (&["-TERM"], false, 0),
+        (&["-TERM"], true, 0),
+        (&["-TERM", "-INT"], true, 130),
+    ] {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let url = format!("ws://{}", listener.local_addr().unwrap());
-        let (_reader, writer) = full_pipe();
+        let log = std::env::temp_dir().join(format!(
+            "polkadot-frame-trace-signal-{}.log",
+            std::process::id()
+        ));
+        let (_reader, stderr) = if full {
+            let (reader, writer) = full_pipe();
+            (Some(reader), Stdio::from(writer))
+        } else {
+            (None, Stdio::from(std::fs::File::create(&log).unwrap()))
+        };
         let mut child = Child(
             Command::new(BIN)
                 .args(["follow", "--rpc", &url])
                 .stdout(Stdio::null())
-                .stderr(Stdio::from(writer))
+                .stderr(stderr)
                 .spawn()
                 .unwrap(),
         );
         // The first check for new blocks waits on this stalled handshake.
         let (_stream, _) = listener.accept().unwrap();
-        let start = Instant::now();
-        for signal in &signals {
+        for signal in signals {
             Command::new("kill")
                 .args([*signal, &child.0.id().to_string()])
                 .status()
                 .unwrap();
         }
-        let status = loop {
-            if let Some(status) = child.0.try_wait().unwrap() {
-                break Some(status);
-            }
-            if start.elapsed() > Duration::from_secs(15) {
-                break None;
-            }
-            std::thread::sleep(Duration::from_millis(20));
+        let exit = exit_code_within(&mut child, 15);
+        let text = if full {
+            String::new()
+        } else {
+            let text = std::fs::read_to_string(&log).unwrap();
+            std::fs::remove_file(&log).unwrap();
+            text
         };
-        assert_eq!(
-            status.and_then(|s| s.code()),
-            Some(code),
-            "{signals:?} after {:?}",
-            start.elapsed()
-        );
+        assert_eq!(exit, Some(code), "{signals:?}: {text}");
+        if !full {
+            for line in ["follow: stopping", "follow stopped after ", " traced=0 "] {
+                assert!(text.contains(line), "{signals:?}: {text}");
+            }
+        }
     }
 }
 
