@@ -52,6 +52,13 @@ Flags that do not apply to the chosen source are refused, with exit code 2: `--b
 
 Without `--cache-dir`, compiled runtimes are still kept in `$XDG_CACHE_HOME/polkadot-frame-trace/wasm` (or `~/.cache/polkadot-frame-trace/wasm`, or `polkadot-frame-trace-<uid>/wasm` in the temporary directory when `HOME` is not set), and downloaded state stays in memory only. See [Disk cache](#disk-cache) for the limits.
 
+These limits protect against a node that sends too much. They apply to every command that uses `--rpc`.
+
+| Limit | Value | Meaning |
+| --- | --- | --- |
+| One RPC response | 64 MiB | A larger response fails the request at once, without another try. The largest real one, the proof of the runtime, is about 5.5 MB. |
+| State the node sends for one block | 1,000,000 pieces or 256 MiB | More fails the block. Recent blocks of Polkadot, Kusama, Westend and their Asset Hubs, and a Westend Asset Hub runtime upgrade, needed at most 3,656 pieces and 5.6 MB. |
+
 ## summary
 
 ```sh

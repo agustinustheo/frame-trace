@@ -17,6 +17,12 @@ use std::{
     },
 };
 
+/// Distinct proof nodes, and their bytes, one replay may hold. Real blocks of Westend, Polkadot,
+/// Kusama and their Asset Hubs held at most 3,656 nodes (a Polkadot relay block) and 5.6 MB
+/// (a Westend Asset Hub runtime upgrade, with both runtimes).
+pub const MAX_REPLAY_NODES: usize = 1_000_000;
+pub const MAX_REPLAY_NODE_BYTES: usize = 256 * 1024 * 1024;
+
 thread_local! {
     static KEY_HINT: std::cell::RefCell<Option<Vec<u8>>> = const { std::cell::RefCell::new(None) };
     static CHILD: std::cell::RefCell<Option<ChildInfo>> = const { std::cell::RefCell::new(None) };
@@ -64,6 +70,9 @@ pub struct ProofDb {
     rpc_failure: Arc<Mutex<Option<Error>>>,
     pub failure: Arc<Mutex<Option<String>>>,
     pub round_trips: Arc<AtomicUsize>,
+    /// Distinct nodes this replay holds, and their bytes, bounded by [`MAX_REPLAY_NODES`] and
+    /// [`MAX_REPLAY_NODE_BYTES`] for what the node sends.
+    held: Arc<(AtomicUsize, AtomicUsize)>,
 }
 impl ProofDb {
     #[cfg(test)]
@@ -94,6 +103,7 @@ impl ProofDb {
             rpc_failure: Default::default(),
             failure: Default::default(),
             round_trips: Default::default(),
+            held: Default::default(),
         }
     }
     pub fn rpc(&self) -> Option<&Rpc> {
@@ -190,6 +200,16 @@ impl ProofDb {
                 })
                 .collect::<Result<Vec<_>>>()?,
         );
+        let (nodes, bytes) = (
+            self.held.0.load(Ordering::Relaxed),
+            self.held.1.load(Ordering::Relaxed),
+        );
+        if nodes > MAX_REPLAY_NODES || bytes > MAX_REPLAY_NODE_BYTES {
+            return Err(Error::Invalid(format!(
+                "the node sent {nodes} proof nodes ({bytes} bytes) for this block, more than \
+                 the limit of {MAX_REPLAY_NODES} nodes or {MAX_REPLAY_NODE_BYTES} bytes per replay"
+            )));
+        }
         Ok(())
     }
     pub fn insert_nodes(&self, fetched: impl IntoIterator<Item = Vec<u8>>) {
@@ -202,7 +222,11 @@ impl ProofDb {
         for (hash, bytes) in fetched {
             // Keep one immutable allocation per content hash across active replays.
             let bytes = shared.intern(hash, bytes);
-            nodes.entry(hash).or_insert(bytes);
+            if let std::collections::btree_map::Entry::Vacant(entry) = nodes.entry(hash) {
+                self.held.0.fetch_add(1, Ordering::Relaxed);
+                self.held.1.fetch_add(bytes.len(), Ordering::Relaxed);
+                entry.insert(bytes);
+            }
         }
     }
     fn cached(&self, hash: &H256) -> std::result::Result<Option<Vec<u8>>, String> {
