@@ -8,11 +8,15 @@ A node that keeps the state of every past block. Ordinary nodes keep only recent
 
 ## Cache
 
-In frame-trace, a read answered from the block's own earlier writes, held in memory. It never touches the trie. See [Cache or trie](../concepts/cache-or-trie.md).
+In polkadot-frame-trace, a read answered from the block's own earlier writes, held in memory. It never touches the trie. See [Cache or trie](../concepts/cache-or-trie.md).
+
+## Disk cache
+
+The directory given with `--cache-dir`. It keeps chain state polkadot-frame-trace downloaded from the node, with its proofs, and compiled runtimes, so later blocks and runs ask the node less. It is not the [cache](#cache) of a read. See [Disk cache](commands.md#disk-cache).
 
 ## Extrinsic
 
-One item in a block's body: a transaction or an inherent. frame-trace names each one `extrinsic N: Pallet.call`.
+One item in a block's body: a transaction or an inherent. polkadot-frame-trace names each one `extrinsic N: Pallet.call`.
 
 ## Inherent
 
@@ -20,7 +24,7 @@ An unsigned extrinsic the block producer must add, such as `Timestamp.set` or a 
 
 ## Metadata
 
-A description the runtime gives of its own pallets, storage items, calls and types. frame-trace uses it to turn raw keys into names such as `System::Account`.
+A description the runtime gives of its own pallets, storage items, calls and types. polkadot-frame-trace uses it to turn raw keys into names such as `System::Account`.
 
 ## OTLP
 
@@ -40,7 +44,7 @@ One part of a block's execution: initialization, an extrinsic, post inherents or
 
 ## PoV
 
-Proof of validity: what a parachain collator sends to relay chain validators. It holds the block and a compacted storage proof. frame-trace's proof bytes estimate the storage proof part only. See [Proof bytes](../concepts/proof-bytes.md).
+Proof of validity: what a parachain collator sends to relay chain validators. It holds the block and a compacted storage proof. polkadot-frame-trace's proof bytes estimate the storage proof part only. See [Proof bytes](../concepts/proof-bytes.md).
 
 ## Proof bytes
 
@@ -48,11 +52,11 @@ How many bytes a storage operation added to the block's storage proof. See [Proo
 
 ## Root check
 
-frame-trace's check that the replay produced the same state root as the block header. A pass means the trace shows what the block really did. See [What a replay proves](../concepts/what-a-replay-proves.md).
+polkadot-frame-trace's check that the replay produced the same state root as the block header. A pass means the trace shows what the block really did. See [What a replay proves](../concepts/what-a-replay-proves.md).
 
 ## Runtime
 
-The chain's logic, compiled to Wasm and stored on chain under the key `:code`. frame-trace runs it on your machine to replay a block.
+The chain's logic, compiled to Wasm and stored on chain under the key `:code`. polkadot-frame-trace runs it on your machine to replay a block.
 
 ## SCALE
 
@@ -68,7 +72,7 @@ A span is one timed operation with attributes, such as one storage read. A trace
 
 ## State root
 
-A 32-byte hash that commits to the whole chain state after a block. Each block header contains one.
+A 32-byte hash of the whole chain state after a block. Each block header contains one.
 
 ## Storage item and key
 

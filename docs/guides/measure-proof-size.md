@@ -1,9 +1,9 @@
 # Measure proof size
 
-A parachain block's proof of validity carries the trie nodes the block touched.
-frame-trace estimates the size of that storage proof and shows which phases, items and extrinsics made it grow.
-The number is an estimate of the recorded proof, not the exact PoV: the PoV also holds the block, and the proof is compacted and compressed.
-Use it to compare blocks and find what dominates.
+The proof of validity (PoV) of a parachain block holds the trie nodes the block used.
+polkadot-frame-trace estimates the size of that storage proof, and shows which phases, items and extrinsics made it larger.
+The number is not the exact PoV. The PoV also holds the block, and the proof in it is compacted and compressed.
+Use the number to compare blocks and find the largest parts.
 [Proof bytes](../concepts/proof-bytes.md) explains how the bytes are counted.
 
 ## 1. The whole block
@@ -11,7 +11,7 @@ Use it to compare blocks and find what dominates.
 Every replay prints the estimated size of the block's storage proof:
 
 ```sh
-frame-trace block --offline fixtures/replay/people-traced
+polkadot-frame-trace block --offline fixtures/replay/people-traced
 ```
 
 ```text
@@ -26,7 +26,7 @@ A live Westend Asset Hub block in [Your first trace](../getting-started/first-tr
 ## 2. Per phase
 
 ```sh
-frame-trace summary --offline fixtures/replay/people-traced --top 5
+polkadot-frame-trace summary --offline fixtures/replay/people-traced --top 5
 ```
 
 ```text
@@ -58,7 +58,7 @@ Phase shares
 - The `proof bytes` column adds up to the execution proof: 6,586 bytes.
 - `proof %` is each group's share of it.
 - Initialization added 53% of the proof in this block, more than the three-transfer batch.
-  The first block hooks touch many items for the first time, so they pay for those trie nodes.
+  The first hooks of the block read many items for the first time, so they get the bytes of those trie nodes.
 
 ## 3. Per extrinsic
 
@@ -77,8 +77,8 @@ Runtime spans need a runtime built with tracing, see [See runtime calls inside e
 
 ## Reading the numbers
 
-- An item pays for a trie node only if it is the first to touch it.
-  Change the order of extrinsics and the split between them changes.
+- An item gets the bytes of a trie node only if it is the first to use it.
+  If you change the order of extrinsics, the split between them changes.
 - Proof bytes are not weight, and they do not include the runtime code.
 - For many blocks, use `report`. **Phase shares** then sums all blocks, and **Extrinsic distributions** shows the median and 95th percentile per extrinsic.
   See [Analyse many blocks](analyse-many-blocks.md).

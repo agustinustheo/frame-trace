@@ -1,28 +1,36 @@
 [package]
-name = "frame-trace-otel"
-description = "Turns frame-trace block traces into OpenTelemetry spans and exports them over OTLP"
+name = "polkadot-frame-trace-otel"
+description = "Turns polkadot-frame-trace block traces into OpenTelemetry spans and exports them over OTLP"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
+readme = false
+keywords = ["polkadot", "substrate", "opentelemetry", "otlp", "tracing"]
+categories = ["cryptography::cryptocurrencies", "development-tools::debugging"]
+include = ["/src/**/*.rs", "/LICENSE"]
+publish = true
 
 [dependencies]
-frame-trace-decode.workspace = true
-frame-trace-model.workspace = true
+polkadot-frame-trace-decode.workspace = true
+polkadot-frame-trace-model.workspace = true
 opentelemetry.workspace = true
 opentelemetry_sdk.workspace = true
 opentelemetry-otlp.workspace = true
 opentelemetry-http = { version = "0.33.1", default-features = false, features = ["reqwest-blocking"] }
 opentelemetry-proto = { version = "0.33.1", default-features = false, features = ["gen-tonic-messages", "trace"] }
 async-trait = "0.1"
+futures-executor = "0.3"
 prost = "0.14"
-reqwest = { version = "0.13", default-features = false, features = ["blocking"] }
+reqwest = { version = "0.13", default-features = false }
+tokio = { version = "1", features = ["rt", "time", "sync"] }
 serde_json.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-frame-trace-replay.workspace = true
+polkadot-frame-trace-replay.workspace = true
 opentelemetry_sdk = { workspace = true, features = ["testing"] }
 
 [lints]

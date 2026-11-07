@@ -17,6 +17,12 @@ use std::{
     },
 };
 
+/// Distinct proof nodes, and their bytes, one replay may hold. Real blocks of Westend, Polkadot,
+/// Kusama and their Asset Hubs held at most 3,656 nodes (a Polkadot relay block) and 5.6 MB
+/// (a Westend Asset Hub runtime upgrade, with both runtimes).
+pub const MAX_REPLAY_NODES: usize = 1_000_000;
+pub const MAX_REPLAY_NODE_BYTES: usize = 256 * 1024 * 1024;
+
 thread_local! {
     static KEY_HINT: std::cell::RefCell<Option<Vec<u8>>> = const { std::cell::RefCell::new(None) };
     static CHILD: std::cell::RefCell<Option<ChildInfo>> = const { std::cell::RefCell::new(None) };
@@ -64,6 +70,8 @@ pub struct ProofDb {
     rpc_failure: Arc<Mutex<Option<Error>>>,
     pub failure: Arc<Mutex<Option<String>>>,
     pub round_trips: Arc<AtomicUsize>,
+    /// Bytes of the distinct nodes in `nodes`, changed only under its lock, in [`Self::admit`].
+    held_bytes: Arc<AtomicUsize>,
 }
 impl ProofDb {
     #[cfg(test)]
@@ -94,6 +102,7 @@ impl ProofDb {
             rpc_failure: Default::default(),
             failure: Default::default(),
             round_trips: Default::default(),
+            held_bytes: Default::default(),
         }
     }
     pub fn rpc(&self) -> Option<&Rpc> {
@@ -180,7 +189,7 @@ impl ProofDb {
         let nodes = proof["proof"]
             .as_array()
             .ok_or_else(|| Error::Invalid("proof nodes are not an array".into()))?;
-        self.insert_nodes(
+        self.admit_nodes(
             nodes
                 .iter()
                 .map(|v| {
@@ -189,10 +198,15 @@ impl ProofDb {
                         .and_then(unhex)
                 })
                 .collect::<Result<Vec<_>>>()?,
-        );
-        Ok(())
+        )
     }
+    #[cfg(test)]
     pub fn insert_nodes(&self, fetched: impl IntoIterator<Item = Vec<u8>>) {
+        self.admit_nodes(fetched).expect("within the replay limits");
+    }
+    /// Adds nodes from the node, the disk cache or a saved replay, and shares them with the
+    /// session's memory cache. Fails at the first node past the replay limits.
+    pub fn admit_nodes(&self, fetched: impl IntoIterator<Item = Vec<u8>>) -> Result<()> {
         let fetched: Vec<_> = fetched
             .into_iter()
             .map(|bytes| (H256::from(sp_io::hashing::blake2_256(&bytes)), bytes))
@@ -200,15 +214,42 @@ impl ProofDb {
         let mut nodes = self.nodes.lock();
         let mut shared = self.session.nodes.lock();
         for (hash, bytes) in fetched {
+            let len = bytes.len();
             // Keep one immutable allocation per content hash across active replays.
-            let bytes = shared
-                .nodes
-                .get(&hash)
-                .cloned()
-                .unwrap_or_else(|| bytes.into());
-            shared.insert(hash, bytes.clone());
-            nodes.entry(hash).or_insert(bytes);
+            self.admit(&mut nodes, hash, len, || shared.intern(hash, bytes))?;
         }
+        Ok(())
+    }
+    /// The one way a distinct node enters this replay, from any source. The limits are checked
+    /// before it is added, under the lock of `nodes`, which also guards `held_bytes`.
+    fn admit(
+        &self,
+        nodes: &mut BTreeMap<H256, Arc<[u8]>>,
+        hash: H256,
+        len: usize,
+        node: impl FnOnce() -> Arc<[u8]>,
+    ) -> Result<()> {
+        let count = nodes.len() + 1;
+        let std::collections::btree_map::Entry::Vacant(entry) = nodes.entry(hash) else {
+            node();
+            return Ok(());
+        };
+        let bytes = self.held_bytes.load(Ordering::Relaxed) + len;
+        if count > MAX_REPLAY_NODES || bytes > MAX_REPLAY_NODE_BYTES {
+            return Err(Error::Invalid(format!(
+                "this block needs more than {MAX_REPLAY_NODES} proof nodes or \
+                 {MAX_REPLAY_NODE_BYTES} bytes of them, the limit per replay"
+            )));
+        }
+        entry.insert(node());
+        self.held_bytes.store(bytes, Ordering::Relaxed);
+        Ok(())
+    }
+    /// Keeps `error` as the replay's error, and returns its text for the trie.
+    fn fail_with(&self, error: Error) -> String {
+        let text = error.to_string();
+        *self.rpc_failure.lock() = Some(error);
+        text
     }
     fn cached(&self, hash: &H256) -> std::result::Result<Option<Vec<u8>>, String> {
         if let Some(node) = self.nodes.lock().get(hash).cloned() {
@@ -218,37 +259,16 @@ impl ProofDb {
         if self.rpc.is_none() {
             return Ok(None);
         }
-        let cached = self.session.nodes.lock().nodes.get(hash).cloned();
+        let cached = self.session.nodes.lock().get(hash);
         if let Some(node) = cached {
-            self.nodes.lock().insert(*hash, node.clone());
+            self.admit(&mut self.nodes.lock(), *hash, node.len(), || node.clone())
+                .map_err(|e| self.fail_with(e))?;
             return Ok(Some(node.to_vec()));
         }
-        if let Some(dir) = &self.session.node_dir {
-            let path = dir.join(format!("{hash:x}"));
-            match std::fs::File::open(&path) {
-                Ok(file) => {
-                    use std::io::Read;
-                    let mut node = Vec::new();
-                    file.take(16 * 1024 * 1024 + 1)
-                        .read_to_end(&mut node)
-                        .map_err(|e| format!("{}: {e}", path.display()))?;
-                    if node.len() > 16 * 1024 * 1024
-                        || H256::from(sp_io::hashing::blake2_256(&node)) != *hash
-                    {
-                        // Content-addressed disk caches are disposable. Heal corrupt files.
-                        match std::fs::remove_file(&path) {
-                            Ok(()) => {}
-                            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-                            Err(e) => return Err(format!("{}: {e}", path.display())),
-                        }
-                        return Ok(None);
-                    }
-                    self.insert_nodes([node.clone()]);
-                    return Ok(Some(node));
-                }
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-                Err(e) => return Err(format!("{}: {e}", path.display())),
-            }
+        if let Some(node) = self.session.disk.as_ref().and_then(|disk| disk.get(hash)) {
+            self.admit_nodes([node.clone()])
+                .map_err(|e| self.fail_with(e))?;
+            return Ok(Some(node));
         }
         Ok(None)
     }
@@ -260,25 +280,23 @@ impl ProofDb {
             }
         }
     }
-    /// Predictable full keys/storage prefixes are acquired in batches, across a bounded pool.
+    /// Predictable full keys/storage prefixes are acquired in batches, on the shared request
+    /// threads. Each group of batches is one round.
     pub fn prefetch(&self, keys: &[Vec<u8>]) -> Result<()> {
-        let concurrency = self.rpc.as_ref().map_or(1, Rpc::parallelism);
+        let Some(rpc) = &self.rpc else {
+            return keys
+                .chunks(32)
+                .try_for_each(|keys| self.fetch_inner(None, keys, false));
+        };
         let batches: Vec<_> = keys.chunks(32).collect();
-        for group in batches.chunks(concurrency) {
-            let before = self.rpc.as_ref().map_or(0, Rpc::count);
-            std::thread::scope(|scope| {
-                let handles: Vec<_> = group
+        for group in batches.chunks(rpc.parallelism()) {
+            let before = rpc.count();
+            rpc.run_all(
+                group
                     .iter()
-                    .map(|keys| scope.spawn(|| self.fetch_inner(None, keys, false)))
-                    .collect();
-                for handle in handles {
-                    handle.join().map_err(|_| {
-                        Error::Invalid("proof acquisition worker panicked".into())
-                    })??;
-                }
-                Ok::<_, Error>(())
-            })?;
-            if self.rpc.as_ref().map_or(0, Rpc::count) > before {
+                    .map(|keys| || self.fetch_inner(None, keys, false)),
+            )?;
+            if rpc.count() > before {
                 self.round_trips.fetch_add(1, Ordering::Relaxed);
             }
         }
@@ -315,38 +333,30 @@ impl ProofDb {
         if self.rpc.is_some() {
             self.session.remember_paths(self.observed.lock().clone());
         }
-        if let Some(dir) = &self.session.node_dir {
-            for (hash, node) in self.nodes.lock().iter() {
-                let path = dir.join(format!("{hash:x}"));
-                if std::fs::metadata(&path).is_ok_and(|meta| meta.len() == node.len() as u64)
-                    && let Ok(bytes) = std::fs::read(&path)
-                    && H256::from(sp_io::hashing::blake2_256(&bytes)) == *hash
-                {
-                    continue;
-                }
-                static NEXT: std::sync::atomic::AtomicUsize =
-                    std::sync::atomic::AtomicUsize::new(0);
-                let temporary = dir.join(format!(
-                    ".{hash:x}.{}.{}.tmp",
-                    std::process::id(),
-                    NEXT.fetch_add(1, Ordering::Relaxed)
-                ));
-                std::fs::write(&temporary, node.as_ref())
-                    .map_err(|e| Error::Invalid(format!("{}: {e}", temporary.display())))?;
-                std::fs::rename(&temporary, &path)
-                    .map_err(|e| Error::Invalid(format!("{}: {e}", path.display())))?;
-                self.session.index_write(path, node.len() as u64);
+        if let Some(disk) = &self.session.disk {
+            let nodes: Vec<_> = self
+                .nodes
+                .lock()
+                .iter()
+                .map(|(h, n)| (*h, n.clone()))
+                .collect();
+            // The cache is disposable: a failed write costs a later fetch, never this block.
+            if let Err(e) = disk.append(nodes.iter().map(|(h, n)| (h, n.as_ref())))
+                && !self.session.warned_write.swap(true, Ordering::Relaxed)
+            {
+                note!("warning: disk cache: cannot write: {e}");
             }
         }
         Ok(())
     }
-    pub fn retain_nodes(&self, nodes: &[Vec<u8>]) {
-        self.insert_nodes(nodes.iter().cloned());
+    pub fn retain_nodes(&self, nodes: &[Vec<u8>]) -> Result<()> {
+        self.admit_nodes(nodes.iter().cloned())?;
         self.used.lock().extend(
             nodes
                 .iter()
                 .map(|n| H256::from(sp_io::hashing::blake2_256(n))),
         );
+        Ok(())
     }
     pub fn export(&self) -> Vec<String> {
         let used = self.used.lock();
@@ -391,7 +401,7 @@ impl TrieBackendStorage<Blake2Hasher> for ProofDb {
                 if let Some(key) = &*h.borrow()
                     // On warm blocks fetch only the missing branch of :code. Requesting the
                     // full key would download the unchanged multi-megabyte Wasm again.
-                    && (key != b":code" || bytes == key.as_slice() || self.session.nodes.lock().nodes.is_empty())
+                    && (key != b":code" || bytes == key.as_slice() || self.session.nodes.lock().is_empty())
                     && key.starts_with(bytes)
                     && prefix
                         .1
@@ -552,15 +562,24 @@ mod prediction_tests {
         let bytes = vec![7; 1024];
         let hash = H256::from(sp_io::hashing::blake2_256(&bytes));
         first.insert_nodes([bytes.clone()]);
+        // A memory cache hit counts towards this replay's limits, and is refused past them.
+        second
+            .held_bytes
+            .store(MAX_REPLAY_NODE_BYTES, Ordering::Relaxed);
+        assert!(second.cached(&hash).is_err());
+        assert!(second.nodes.lock().is_empty());
+        second.held_bytes.store(0, Ordering::Relaxed);
         assert_eq!(second.cached(&hash).expect("cached"), Some(bytes.clone()));
+        assert_eq!(second.held_bytes.load(Ordering::Relaxed), bytes.len());
         second.insert_nodes([bytes]);
+        assert_eq!(second.held_bytes.load(Ordering::Relaxed), 1024);
         assert!(Arc::ptr_eq(
             &first.nodes.lock()[&hash],
             &second.nodes.lock()[&hash]
         ));
         assert!(Arc::ptr_eq(
             &first.nodes.lock()[&hash],
-            &session.nodes.lock().nodes[&hash]
+            session.nodes.lock().peek(&hash).expect("shared")
         ));
         let offline = ProofDb::with_session(None, H256::repeat_byte(1), session);
         assert!(offline.cached(&hash).expect("offline").is_none());

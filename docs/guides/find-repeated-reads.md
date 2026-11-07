@@ -3,18 +3,18 @@
 A repeated read is a read of a key the same phase already read.
 It is not an error.
 Many repeats are cheap [cache](../concepts/cache-or-trie.md) reads.
-Repeats that go to the [trie](../concepts/cache-or-trie.md) cost more, and they are worth a look.
+Repeats that go to the [trie](../concepts/cache-or-trie.md) cost more. Check those first.
 
 This guide uses block #4 of the People fixture.
 Its extrinsic 2 is a `Utility.batch` of three `transfer_keep_alive` calls from Alice.
 
 ## 1. Print the tables
 
-Run this from the `frame-trace` directory.
+Run this from the `polkadot-frame-trace` directory.
 `--top 5` keeps five rows per phase.
 
 ```sh
-frame-trace summary --offline fixtures/replay/people-traced --top 5
+polkadot-frame-trace summary --offline fixtures/replay/people-traced --top 5
 ```
 
 Against a live chain, use `--rpc <url> --block <block>` instead of `--offline`.
@@ -66,9 +66,8 @@ With the first read, that is 48 reads of the same key in one extrinsic:
 Only the first read added proof bytes: 166 of them.
 The other 47 were repeats: 5 extra trie walks and 42 memory reads.
 
-Bob's row tells a different story: 15 repeats, 8 from cache and 7 from the trie.
-Bob is only read until the first transfer writes his balance.
-Until then, every read of his account walks the trie again.
+Bob's row is different: 15 repeats, 8 from cache and 7 from the trie.
+Until the first transfer writes his balance, every read of his account walks the trie again.
 Reading a key does not put it in the cache. Only a write does.
 
 ## 4. See the reads in order
@@ -77,7 +76,7 @@ The table counts. Jaeger shows the order.
 Send the block to Jaeger and open `extrinsic 2: Utility.batch`:
 
 ```sh
-frame-trace block --offline fixtures/replay/people-traced --otlp
+polkadot-frame-trace block --offline fixtures/replay/people-traced --otlp
 ```
 
 Click each `get System::Account(…)` row and check `frame.storage.origin` and `frame.storage.duplicate_read`.

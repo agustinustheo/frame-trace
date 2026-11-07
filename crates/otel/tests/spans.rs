@@ -4,19 +4,17 @@
 
 use std::time::{Duration, SystemTime};
 
-use frame_trace_decode::{AnnotatedBlock, AnnotatedOp, AnnotatedPhase, Metadata, annotate};
-use frame_trace_model::{Stats, TracedBlock, rpc::parse_trace_block};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use polkadot_frame_trace_decode::{
+    AnnotatedBlock, AnnotatedOp, AnnotatedPhase, Metadata, annotate,
+};
+use polkadot_frame_trace_model::{Stats, TracedBlock, rpc::parse_trace_block};
 
-use frame_trace_otel::{Timing, export_block, provider, record_block, span_count};
 use opentelemetry::{
     Value,
     trace::{SpanId, TracerProvider},
 };
-use opentelemetry_sdk::{
-    error::{OTelSdkError, OTelSdkResult},
-    trace::{InMemorySpanExporter, SpanData, SpanExporter},
-};
+use opentelemetry_sdk::trace::{InMemorySpanExporter, SdkTracerProvider, SpanData};
+use polkadot_frame_trace_otel::{Timing, record_block};
 
 fn fixture(path: &str) -> Vec<u8> {
     std::fs::read(format!(
@@ -28,9 +26,11 @@ fn fixture(path: &str) -> Vec<u8> {
 
 fn export(block: &AnnotatedBlock, timing: Timing) -> Vec<SpanData> {
     let exporter = InMemorySpanExporter::default();
-    let provider = provider(exporter.clone(), span_count(block));
+    let provider = SdkTracerProvider::builder()
+        .with_max_attributes_per_span(256)
+        .with_simple_exporter(exporter.clone())
+        .build();
     let created = record_block(&provider.tracer("test"), block, timing);
-    provider.force_flush().unwrap();
     let spans = exporter.get_finished_spans().unwrap();
     assert_eq!(spans.len(), created);
     spans
@@ -102,6 +102,9 @@ fn builds_block_phase_op_tree() {
     let ext1 = by_name(&spans, "extrinsic 1: Balances.transfer_keep_alive");
     assert_eq!(attr(ext1, "frame.phase"), Some("extrinsic".into()));
     assert_eq!(attr(ext1, "frame.extrinsic.index"), Some(Value::I64(1)));
+    // The transaction hash a submitter knows, so load-test spans can be joined to this one.
+    let hash = attr(ext1, "frame.extrinsic.hash").expect("extrinsic hash attribute");
+    assert!(hash.as_str().starts_with("0x") && hash.as_str().len() == 66);
     assert_eq!(
         attr(ext1, "frame.storage.duplicate_reads"),
         Some(Value::I64(2))
@@ -223,6 +226,7 @@ fn synthetic_block(ops: usize) -> AnnotatedBlock {
             wall_time: None,
             signed: None,
             extrinsic_index: None,
+            extrinsic_hash: None,
             call: None,
             call_error: None,
             label: "unsegmented".into(),
@@ -238,15 +242,245 @@ fn exports_thousands_of_ops_without_drops() {
     let spans = export(&synthetic_block(5000), Timing::default());
     assert_eq!(spans.len(), 5002);
     assert!(spans.iter().any(|s| s.name == "block #7 (0x01)"));
+    let trace = polkadot_frame_trace_otel::prepare(&synthetic_block(5000), Timing::default());
+    assert_eq!((trace.total(), trace.unsent()), (5002, 5002));
+}
 
-    // `export_block` counts what the exporter accepted (the in-memory exporter clears its
-    // spans on shutdown, so the count is the check).
-    let exported = export_block(
-        InMemorySpanExporter::default(),
-        &synthetic_block(5000),
-        Timing::default(),
+/// An OTLP/HTTP receiver that answers each request with the next `(status, delay)` and
+/// records the status and span IDs of every request it answered.
+type Seen = std::sync::Arc<std::sync::Mutex<Vec<(u16, Vec<Vec<u8>>)>>>;
+fn scripted_receiver(script: Vec<(u16, Duration)>) -> (String, Seen) {
+    use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
+    use prost::Message;
+    use std::io::{BufRead, BufReader, Read, Write};
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let log = seen.clone();
+    std::thread::spawn(move || {
+        for (index, stream) in listener.incoming().enumerate() {
+            let Ok(mut stream) = stream else { return };
+            let (status, delay) = script.get(index).copied().unwrap_or((200, Duration::ZERO));
+            let log = log.clone();
+            std::thread::spawn(move || {
+                let mut reader = BufReader::new(stream.try_clone().unwrap());
+                let mut length = 0;
+                loop {
+                    let mut line = String::new();
+                    if reader.read_line(&mut line).unwrap_or(0) == 0 || line == "\r\n" {
+                        break;
+                    }
+                    if let Some(v) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+                        length = v.trim().parse().unwrap_or(0);
+                    }
+                }
+                let mut body = vec![0; length];
+                if reader.read_exact(&mut body).is_err() {
+                    return;
+                }
+                let request = ExportTraceServiceRequest::decode(body.as_slice()).unwrap();
+                // Dashboards filter on the service name, so every request must carry it.
+                // A request without it gets status 599, which breaks the test's status checks.
+                let named = request.resource_spans.iter().all(|r| {
+                    r.resource.as_ref().is_some_and(|resource| {
+                        resource.attributes.iter().any(|kv| {
+                            kv.key == "service.name"
+                                && format!("{:?}", kv.value).contains("polkadot-frame-trace")
+                        })
+                    })
+                });
+                let status = if named { status } else { 599 };
+                let ids = request
+                    .resource_spans
+                    .iter()
+                    .flat_map(|r| &r.scope_spans)
+                    .flat_map(|s| &s.spans)
+                    .map(|span| span.span_id.clone())
+                    .collect();
+                std::thread::sleep(delay);
+                let _ = write!(
+                    stream,
+                    "HTTP/1.1 {status} Test\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"
+                );
+                log.lock().unwrap().push((status, ids));
+            });
+        }
+    });
+    (url, seen)
+}
+
+#[test]
+fn a_retry_sends_only_the_batches_not_yet_accepted_with_the_same_span_ids() {
+    // 1002 spans: batch 1 is accepted, batch 2 fails, then the retry sends only batch 2.
+    let (url, seen) = scripted_receiver(vec![
+        (200, Duration::ZERO),
+        // Not one the exporter retries by itself, so the failure reaches the caller.
+        (400, Duration::ZERO),
+        (200, Duration::ZERO),
+    ]);
+    let sender = polkadot_frame_trace_otel::OtlpSender::new(&url).unwrap();
+    let mut trace = polkadot_frame_trace_otel::prepare(&synthetic_block(1000), Timing::default());
+    let error = sender.send(&mut trace).unwrap_err().to_string();
+    assert!(
+        error.starts_with("490 of 1002 spans were not exported"),
+        "{error}"
     );
-    assert_eq!(exported.unwrap(), 5002);
+    assert_eq!(trace.unsent(), 490);
+    assert_eq!(sender.send(&mut trace).unwrap(), 1002);
+    // The receiver records a request just after answering it.
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while seen.lock().unwrap().len() < 3 && std::time::Instant::now() < deadline {
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    let seen = seen.lock().unwrap();
+    assert_eq!(seen.len(), 3);
+    assert_eq!(
+        seen[1].1, seen[2].1,
+        "the retry resends the failed batch unchanged"
+    );
+    let accepted: Vec<_> = seen
+        .iter()
+        .filter(|(status, _)| *status == 200)
+        .flat_map(|(_, ids)| ids.clone())
+        .collect();
+    let unique: std::collections::BTreeSet<_> = accepted.iter().collect();
+    assert_eq!(accepted.len(), 1002);
+    assert_eq!(unique.len(), 1002, "no span was accepted twice");
+}
+
+#[test]
+fn a_timed_out_request_is_not_sent_again_after_the_retry() {
+    let (url, seen) = scripted_receiver(vec![(200, Duration::from_secs(2))]);
+    let sender =
+        polkadot_frame_trace_otel::OtlpSender::with_timeout(&url, Duration::from_millis(300))
+            .unwrap();
+    let mut trace = polkadot_frame_trace_otel::prepare(&synthetic_block(10), Timing::default());
+    assert!(
+        sender.send(&mut trace).is_err(),
+        "the first request times out"
+    );
+    assert_eq!(sender.send(&mut trace).unwrap(), 12);
+    // Give a stray background export time to land, as the old batch exporter's did.
+    std::thread::sleep(Duration::from_secs(3));
+    let seen = seen.lock().unwrap();
+    assert_eq!(seen.len(), 2, "exactly the timed-out request and the retry");
+    assert_eq!(seen[0].1, seen[1].1, "the retry carries the same span IDs");
+}
+
+/// Serves each connection with `respond(index, stream)` after reading the request.
+fn raw_receiver(
+    respond: impl Fn(usize, &mut std::net::TcpStream) + Send + Sync + 'static,
+) -> String {
+    use std::io::{BufRead, BufReader, Read};
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    let respond = std::sync::Arc::new(respond);
+    std::thread::spawn(move || {
+        for (index, stream) in listener.incoming().enumerate() {
+            let Ok(mut stream) = stream else { return };
+            let respond = respond.clone();
+            std::thread::spawn(move || {
+                let mut reader = BufReader::new(stream.try_clone().unwrap());
+                let mut length = 0;
+                loop {
+                    let mut line = String::new();
+                    if reader.read_line(&mut line).unwrap_or(0) == 0 || line == "\r\n" {
+                        break;
+                    }
+                    if let Some(v) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+                        length = v.trim().parse().unwrap_or(0);
+                    }
+                }
+                if reader.read_exact(&mut vec![0; length]).is_ok() {
+                    respond(index, &mut stream);
+                }
+            });
+        }
+    });
+    url
+}
+
+#[test]
+fn a_slowly_sent_response_body_cannot_outlast_the_timeout() {
+    use std::io::Write;
+    // Headers at once, then one body byte every 150 ms: each read is quick, the whole is not.
+    let url = raw_receiver(|_, stream| {
+        let _ = stream.write_all(b"HTTP/1.1 200 OK\r\ncontent-type: application/x-protobuf\r\ncontent-length: 40\r\n\r\n");
+        for _ in 0..40 {
+            if stream.write_all(&[0]).is_err() {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(150));
+        }
+    });
+    let sender =
+        polkadot_frame_trace_otel::OtlpSender::with_timeout(&url, Duration::from_millis(400))
+            .unwrap();
+    let mut trace = polkadot_frame_trace_otel::prepare(&synthetic_block(10), Timing::default());
+    let start = std::time::Instant::now();
+    assert!(sender.send(&mut trace).is_err());
+    let took = start.elapsed();
+    assert!(took < Duration::from_millis(700), "{took:?}");
+}
+
+#[test]
+fn the_exporters_own_retries_stay_within_the_timeout() {
+    use std::io::Write;
+    // A slow 503 makes the exporter retry by itself; the retry then gets no answer at all.
+    let url = raw_receiver(|index, stream| {
+        if index == 0 {
+            std::thread::sleep(Duration::from_millis(500));
+            let _ = stream.write_all(
+                b"HTTP/1.1 503 Service Unavailable\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
+            );
+        } else {
+            std::thread::sleep(Duration::from_secs(10));
+        }
+    });
+    let sender =
+        polkadot_frame_trace_otel::OtlpSender::with_timeout(&url, Duration::from_millis(800))
+            .unwrap();
+    let mut trace = polkadot_frame_trace_otel::prepare(&synthetic_block(10), Timing::default());
+    let start = std::time::Instant::now();
+    assert!(sender.send(&mut trace).is_err());
+    let took = start.elapsed();
+    assert!(took < Duration::from_millis(1000), "{took:?}");
+}
+
+/// Answers request `index` with one span rejected: "quota" first, "invalid label" after.
+fn partially_rejecting(index: usize, stream: &mut std::net::TcpStream) {
+    use opentelemetry_proto::tonic::collector::trace::v1::{
+        ExportTracePartialSuccess, ExportTraceServiceResponse,
+    };
+    use prost::Message;
+    use std::io::Write;
+    let body = ExportTraceServiceResponse {
+        partial_success: Some(ExportTracePartialSuccess {
+            rejected_spans: 1,
+            error_message: if index == 0 { "quota" } else { "invalid label" }.into(),
+        }),
+    }
+    .encode_to_vec();
+    let _ = write!(
+        stream,
+        "HTTP/1.1 200 OK\r\ncontent-type: application/x-protobuf\r\ncontent-length: {}\r\nconnection: close\r\n\r\n",
+        body.len()
+    );
+    let _ = stream.write_all(&body);
+}
+
+#[test]
+fn a_rejection_message_belongs_to_the_trace_it_came_with() {
+    let sender =
+        polkadot_frame_trace_otel::OtlpSender::new(&raw_receiver(partially_rejecting)).unwrap();
+    for message in ["quota", "invalid label"] {
+        let mut trace = polkadot_frame_trace_otel::prepare(&synthetic_block(10), Timing::default());
+        let error = sender.send(&mut trace).unwrap_err().to_string();
+        assert_eq!(
+            error,
+            format!("1 of 12 spans rejected by the receiver: {message}")
+        );
+    }
 }
 
 #[test]
@@ -322,8 +556,11 @@ fn otlp_partial_rejections_are_totalled_across_batches_without_retries() {
             }
             batches
         });
-        let result =
-            frame_trace_otel::export_otlp(&synthetic_block(1000), &endpoint, Timing::default());
+        let result = polkadot_frame_trace_otel::export_otlp(
+            &synthetic_block(1000),
+            &endpoint,
+            Timing::default(),
+        );
         let batches = server.join().unwrap();
         assert_eq!(batches.iter().sum::<usize>(), 1002);
         assert!(batches.len() >= 2, "{batches:?}");
@@ -332,7 +569,7 @@ fn otlp_partial_rejections_are_totalled_across_batches_without_retries() {
             assert_eq!(result.unwrap(), 1002);
         } else {
             assert!(
-                matches!(result, Err(frame_trace_otel::Error::Rejected { rejected, total: 1002, .. }) if rejected == expected as u64)
+                matches!(result, Err(polkadot_frame_trace_otel::Error::Rejected { rejected, total: 1002, .. }) if rejected == expected as u64)
             );
             assert_eq!(
                 result.unwrap_err().to_string(),
@@ -345,7 +582,7 @@ fn otlp_partial_rejections_are_totalled_across_batches_without_retries() {
 #[test]
 fn runtime_override_is_labelled_on_the_root_span() {
     let mut block = synthetic_block(1);
-    block.runtime_override = Some(frame_trace_decode::RuntimeOverrideInfo {
+    block.runtime_override = Some(polkadot_frame_trace_decode::RuntimeOverrideInfo {
         path: "traced.wasm".into(),
         code_hash: "0xaa".into(),
         chain_code_hash: "0xbb".into(),
@@ -371,53 +608,9 @@ fn runtime_override_is_labelled_on_the_root_span() {
     );
 }
 
-/// Rejects the first batch, accepts the rest (like a backend answering HTTP 400 once).
-#[derive(Debug, Default)]
-struct RejectFirstBatch {
-    calls: AtomicUsize,
-}
-
-impl SpanExporter for RejectFirstBatch {
-    async fn export(&self, _batch: Vec<SpanData>) -> OTelSdkResult {
-        match self.calls.fetch_add(1, Ordering::SeqCst) {
-            0 => Err(OTelSdkError::InternalFailure("HTTP 400".into())),
-            _ => Ok(()),
-        }
-    }
-}
-
-#[test]
-fn reports_spans_lost_to_export_errors() {
-    let err = export_block(
-        RejectFirstBatch::default(),
-        &synthetic_block(2000),
-        Timing::default(),
-    )
-    .unwrap_err();
-    let frame_trace_otel::Error::Incomplete {
-        lost,
-        total,
-        first_error,
-    } = &err
-    else {
-        panic!("expected Incomplete, got {err}");
-    };
-    // The batch processor exports in batches of 512.
-    assert_eq!((*lost, *total), (512, 2002));
-    assert!(
-        first_error
-            .as_deref()
-            .is_some_and(|e| e.contains("HTTP 400"))
-    );
-    assert!(
-        err.to_string()
-            .starts_with("512 of 2002 spans were not exported")
-    );
-}
-
 #[test]
 fn measured_intervals_and_runtime_parent_tree() {
-    use frame_trace_model::{MeasuredTiming, ReplayCapture, ReplayEvent, RuntimeSpan};
+    use polkadot_frame_trace_model::{MeasuredTiming, ReplayCapture, ReplayEvent, RuntimeSpan};
     let span = |id, parent_id, name: &str, wasm, start_ns, end_ns| RuntimeSpan {
         id,
         parent_id,
@@ -503,14 +696,14 @@ fn measured_intervals_and_runtime_parent_tree() {
 
 #[test]
 fn traced_batch_keeps_named_extrinsic_runtime_and_ops_in_one_tree() {
-    let replay = frame_trace_replay::replay_with_session(
-        frame_trace_replay::Artifact::load(
+    let replay = polkadot_frame_trace_replay::replay_with_session(
+        polkadot_frame_trace_replay::Artifact::load(
             &std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .join("../../fixtures/replay/people-traced"),
         )
         .unwrap(),
         None,
-        &frame_trace_replay::ReplaySession::new(None)
+        &polkadot_frame_trace_replay::ReplaySession::new(None)
             .unwrap()
             .with_rpc_metadata_fallback(true),
     )
@@ -576,7 +769,7 @@ fn traced_batch_keeps_named_extrinsic_runtime_and_ops_in_one_tree() {
 
 #[test]
 fn measured_hooks_descend_from_the_corresponding_phase() {
-    use frame_trace_model::{MeasuredTiming, RuntimeSpan};
+    use polkadot_frame_trace_model::{MeasuredTiming, RuntimeSpan};
     let mut block = synthetic_block(1);
     block.timing = Some(MeasuredTiming {
         start_ns: 0,
@@ -637,7 +830,7 @@ fn measured_hooks_descend_from_the_corresponding_phase() {
 
 #[test]
 fn measured_phases_without_ops_use_only_real_runtime_bounds() {
-    use frame_trace_model::{MeasuredTiming, RuntimeSpan};
+    use polkadot_frame_trace_model::{MeasuredTiming, RuntimeSpan};
     let mut block = synthetic_block(0);
     block.timing = Some(MeasuredTiming {
         start_ns: 0,
@@ -717,7 +910,7 @@ fn measured_phases_without_ops_use_only_real_runtime_bounds() {
 
 #[test]
 fn hook_names_resolve_pallet_metadata_and_fall_back_to_crates() {
-    use frame_trace_model::{MeasuredTiming, RuntimeSpan};
+    use polkadot_frame_trace_model::{MeasuredTiming, RuntimeSpan};
     let json = String::from_utf8(fixture("model/two-extrinsics.json")).unwrap();
     let mut traced = TracedBlock::from_trace(&parse_trace_block(&json).unwrap()).unwrap();
     traced.timing = Some(MeasuredTiming {
@@ -767,7 +960,7 @@ fn hook_names_resolve_pallet_metadata_and_fall_back_to_crates() {
     }
     let fallback = annotate(&traced, None);
     assert_eq!(fallback.runtime_spans[0].name, "on_initialize: Balances");
-    let artifact = frame_trace_replay::Artifact::load(
+    let artifact = polkadot_frame_trace_replay::Artifact::load(
         &std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures/replay/call-westend-nonce"),
     )
@@ -791,7 +984,7 @@ fn hook_names_resolve_pallet_metadata_and_fall_back_to_crates() {
             "on_initialize: PoolAssets"
         ]
     );
-    let people = frame_trace_replay::Artifact::load(
+    let people = polkadot_frame_trace_replay::Artifact::load(
         &std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures/replay/people-traced"),
     )
@@ -810,7 +1003,7 @@ fn hook_names_resolve_pallet_metadata_and_fall_back_to_crates() {
 
 #[test]
 fn every_storage_op_has_a_collection_including_well_known_roots_and_iteration() {
-    use frame_trace_model::{ReplayCapture, ReplayEvent};
+    use polkadot_frame_trace_model::{ReplayCapture, ReplayEvent};
     let system = "26aa394eea5630e07c48ae0c9558cef7";
     let capture = ReplayCapture {
         duration_ns: 100,
@@ -819,19 +1012,19 @@ fn every_storage_op_has_a_collection_including_well_known_roots_and_iteration() 
                 "state",
                 "Get",
                 "key",
-                frame_trace_replay::rpc::hex0(b":code"),
+                polkadot_frame_trace_replay::rpc::hex0(b":code"),
             ),
             (
                 "state",
                 "Get",
                 "key",
-                frame_trace_replay::rpc::hex0(b":extrinsic_index"),
+                polkadot_frame_trace_replay::rpc::hex0(b":extrinsic_index"),
             ),
             (
                 "state",
                 "Get",
                 "key",
-                frame_trace_replay::rpc::hex0(b":transaction_level:"),
+                polkadot_frame_trace_replay::rpc::hex0(b":transaction_level:"),
             ),
             ("state", "StorageRoot", "storage_root", "00".into()),
             (
@@ -888,11 +1081,11 @@ fn every_storage_op_has_a_collection_including_well_known_roots_and_iteration() 
 fn runtime_call_root_and_empty_calls_export_one_trace_with_explicit_semantics() {
     for (ops, measured) in [(0, false), (2, false), (0, true), (2, true)] {
         let mut trace = synthetic_block(ops);
-        trace.timing = measured.then_some(frame_trace_model::MeasuredTiming {
+        trace.timing = measured.then_some(polkadot_frame_trace_model::MeasuredTiming {
             start_ns: 0,
             duration_ns: 1_000_000,
         });
-        trace.call = Some(frame_trace_decode::AnnotatedCall {
+        trace.call = Some(polkadot_frame_trace_decode::AnnotatedCall {
             method: "AccountNonceApi_account_nonce".into(),
             data: "0x00".into(),
             result: "0x00000000".into(),
@@ -929,7 +1122,10 @@ fn runtime_call_root_and_empty_calls_export_one_trace_with_explicit_semantics() 
                 .iter()
                 .all(|s| s.span_context.trace_id() == root.span_context.trace_id())
         );
-        assert_eq!(spans.len(), span_count(&trace));
+        assert_eq!(
+            spans.len(),
+            polkadot_frame_trace_otel::prepare(&trace, Timing::default()).total()
+        );
     }
 }
 
@@ -984,7 +1180,7 @@ fn absent_and_unrecognized_origins_export_unknown_and_preserve_raw_values() {
     block.phases[0].ops[1].origin = Some("unknown".into());
     block.phases[0].ops[2].origin = Some("legacy_origin".into());
     for measured in [false, true] {
-        block.timing = measured.then_some(frame_trace_model::MeasuredTiming {
+        block.timing = measured.then_some(polkadot_frame_trace_model::MeasuredTiming {
             start_ns: 0,
             duration_ns: 100,
         });
@@ -1020,7 +1216,7 @@ fn phase_attributes_use_readable_labels_without_changing_json() {
     ];
     for measured in [false, true] {
         let mut block = synthetic_block(1);
-        block.timing = measured.then_some(frame_trace_model::MeasuredTiming {
+        block.timing = measured.then_some(polkadot_frame_trace_model::MeasuredTiming {
             start_ns: 0,
             duration_ns: 100,
         });

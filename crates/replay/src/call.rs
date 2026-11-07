@@ -152,7 +152,7 @@ fn replay_inner(
             capture,
         )
     };
-    eprintln!(
+    note!(
         "call {} at #{}: loading runtime and preparing state",
         call.method,
         state.number()

@@ -6,10 +6,10 @@
 
 ## Rank by proof bytes
 
-Run this from the `frame-trace` directory:
+Run this from the `polkadot-frame-trace` directory:
 
 ```sh
-frame-trace summary --offline fixtures/replay/people-traced --top 5
+polkadot-frame-trace summary --offline fixtures/replay/people-traced --top 5
 ```
 
 ```text
@@ -36,7 +36,7 @@ Top items by proof bytes
 | --- | --- |
 | `item` | The storage item, as `Pallet::Item`. `<unknown>` holds operations with no named key, such as computing the state root. Keys starting with `:` are well-known keys, such as `:code`. |
 | `reads: cache` | Reads answered from the block's own changes. See [Cache or trie](../concepts/cache-or-trie.md). |
-| `trie (already in proof)` | Reads that went to the chain state and added no new trie nodes. |
+| `trie (already in proof)` | Reads that went to the chain state and used only trie nodes seen earlier in this replay. A rollback may have removed them from the current proof. |
 | `trie (new)` | Reads that added new trie nodes to the proof. |
 | `unknown` | Reads with no origin recorded. |
 | `writes` | Writes, including deletes and appends. |
@@ -48,7 +48,7 @@ Top items by proof bytes
 ## What the example shows
 
 - `System::EventTopics` added the most proof bytes, 1,120, with no reads at all.
-  Initialization deletes this prefix, and walking the keys to delete them pulls trie nodes into the proof.
+  Initialization deletes this prefix. To delete the keys, the runtime walks them, and that adds trie nodes to the proof.
 - `System::Account` was read 74 times: 52 from cache, 20 from the trie already in proof, 2 new.
   Only the two new reads added proof bytes, 166 each. The other reads found their trie path already in the proof.
 
@@ -57,8 +57,8 @@ Top items by proof bytes
 `report` takes saved JSON from `block --json` and has `--sort-by`:
 
 ```sh
-frame-trace block --offline fixtures/replay/people-traced --json block.json
-frame-trace report block.json --sort-by ops --top 5
+polkadot-frame-trace block --offline fixtures/replay/people-traced --json block.json
+polkadot-frame-trace report block.json --sort-by ops --top 5
 ```
 
 ```text

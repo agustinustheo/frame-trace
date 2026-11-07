@@ -1,18 +1,18 @@
 # Timings
 
-Every time in frame-trace comes from your machine, during the timed replay.
+Every time in polkadot-frame-trace comes from your machine, during the timed replay.
 The timed replay makes no network calls, so no time is spent waiting for the node.
 
 ## What the times include
 
 - The runtime running the block in Wasm on your CPU.
-- The storage calls, answered from the proofs frame-trace already checked.
+- The storage calls, answered from the proofs polkadot-frame-trace already checked.
 - The cost of recording the trace itself.
 
 ## What the times do not mean
 
 - They are not how long the node took to import the block.
-- They are not the node's database speed. frame-trace reads from memory, not from a database.
+- They are not the node's database speed. polkadot-frame-trace reads from memory, not from a database.
 - They are not the block's weight. Weights come from benchmarks on reference hardware.
 
 Use timings to compare parts of the same block, or the same call across blocks on the same machine.
@@ -38,6 +38,6 @@ Each span's bar length is its duration in the timed replay.
 ## Recorded traces have no times
 
 `--from-file` reads a saved `state_traceBlock` response, which has no timing.
-frame-trace spaces those operations evenly, one millisecond apart, so the tree stays readable.
+polkadot-frame-trace spaces those operations evenly, one millisecond apart, so the tree stays readable.
 Those spans carry `frame.timing = no timing`.
 Ignore their durations.

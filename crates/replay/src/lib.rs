@@ -1,7 +1,13 @@
 //! Faithful block replay using safe RPC and SDK authenticated trie execution.
+#[macro_use]
+mod log;
+pub use log::set_log_hook;
 mod artifact;
 pub mod call;
+mod disk;
 mod metadata;
+mod nodes;
+pub use nodes::MemoryCacheStats;
 mod session;
 pub use session::ReplaySession;
 mod backend;
@@ -13,7 +19,7 @@ pub mod rpc;
 use backend::TracedBackend;
 use capture::Capture;
 use codec::{Decode, Encode};
-use frame_trace_model::ReplayCapture;
+use polkadot_frame_trace_model::ReplayCapture;
 use proof::ProofDb;
 use rpc::{Rpc, unhex};
 use sc_executor::{RuntimeVersion, WasmExecutor};
@@ -66,10 +72,55 @@ pub enum Error {
     Execution(String),
     #[error("runtime rejected the call input: {0}")]
     CallExecution(String),
+    /// The runtime imports host functions that this build's `HostFunctions` lacks.
+    #[error(
+        "the runtime needs host functions polkadot-frame-trace does not have: {functions}{hint}. \
+         polkadot-frame-trace's host functions are fixed when it is built, so this chain needs a \
+         polkadot-frame-trace build that adds them. See {MISSING_HOST_FUNCTIONS_DOCS}"
+    )]
+    MissingHostFunctions {
+        /// The missing imports as the executor names them, for example `env:ext_foo_version_1`.
+        functions: String,
+        /// Empty, or `; ` and a note that a runtime override was executed.
+        hint: String,
+    },
     #[error("artifact I/O: {0}")]
     Io(#[from] std::io::Error),
     #[error("artifact JSON: {0}")]
     Json(#[from] serde_json::Error),
+}
+
+const MISSING_HOST_FUNCTIONS_DOCS: &str = "https://agustinustheodorus.com/polkadot-frame-trace/troubleshooting.html#the-runtime-needs-host-functions-polkadot-frame-trace-does-not-have";
+
+/// The executor's message when the runtime imports a function the host does not provide.
+const MISSING_IMPORTS: &str =
+    "runtime requires function imports which are not present on the host: ";
+
+/// The missing imports named by the executor's error text, if that is what it reports.
+/// sc-executor-wasmtime lists them as `'module:name', 'module:name'`; the list ends at the
+/// first token that does not continue it, so trailing context is never part of a name.
+fn missing_host_functions(text: &str) -> Option<String> {
+    let (_, mut rest) = text.split_once(MISSING_IMPORTS)?;
+    let mut functions = Vec::new();
+    while let Some((name, after)) = rest
+        .strip_prefix('\'')
+        .and_then(|quoted| quoted.split_once('\''))
+    {
+        functions.push(name.trim());
+        match after.strip_prefix(", ") {
+            Some(next) => rest = next,
+            None => break,
+        }
+    }
+    if functions.is_empty() {
+        // Unquoted: the list ends at the first `;`, `.` or line end.
+        let end = rest.find([';', '.', '\n', '\r']).unwrap_or(rest.len());
+        functions = rest[..end].split(',').map(str::trim).collect();
+    }
+    functions.retain(|name| !name.is_empty());
+    // The executor lists them in hash-map order; sort for stable output.
+    functions.sort_unstable();
+    (!functions.is_empty()).then(|| functions.join(", "))
 }
 
 impl Error {
@@ -257,19 +308,24 @@ fn select_runtime(session: &ReplaySession, chain: Vec<u8>) -> (Vec<u8>, Option<R
         version_differences,
     };
     let mut announced = session.announced_override.lock();
-    if announced.as_ref() != Some(&info) {
-        eprintln!(
+    let announce = announced.as_ref() != Some(&info);
+    if announce {
+        *announced = Some(info.clone());
+    }
+    // Logged after the lock is released: a blocked log must not stall other replays.
+    drop(announced);
+    if announce {
+        note!(
             "RUNTIME OVERRIDE: executing {override_code_hash:?} INSTEAD OF the authenticated \
              :code {chain_code_hash:?}; code-hash check BYPASSED (state proofs and any root \
              check still apply)"
         );
         if info.version_differences.is_empty() {
-            eprintln!("runtime override: RuntimeVersion matches the chain's :code");
+            note!("runtime override: RuntimeVersion matches the chain's :code");
         }
         for difference in &info.version_differences {
-            eprintln!("warning: runtime override RuntimeVersion: {difference}");
+            note!("warning: runtime override RuntimeVersion: {difference}");
         }
-        *announced = Some(info.clone());
     }
     (wasm.to_vec(), Some(info))
 }
@@ -285,6 +341,10 @@ pub(crate) fn override_hint(session: &ReplaySession, error: Error) -> Error {
         Error::Execution(text) => Error::Execution(format!("{text}; {HINT}")),
         Error::CallExecution(text) => Error::CallExecution(format!("{text}; {HINT}")),
         Error::Invalid(text) => Error::Invalid(format!("{text}; {HINT}")),
+        Error::MissingHostFunctions { functions, hint } => Error::MissingHostFunctions {
+            functions,
+            hint: format!("{hint}; {HINT}"),
+        },
         other => other,
     }
 }
@@ -302,6 +362,12 @@ pub struct Replay {
     /// Sequential proof acquisition waves, excluding context RPC and retries.
     pub proof_round_trips: usize,
     pub proof_bytes: usize,
+    /// Blake2-256 of the runtime code that executed the block. Without an override this is
+    /// the hash of the raw `:code` value stored in the parent state, in its stored form (usually
+    /// SDK-compressed), not of the decompressed Wasm. With an override it is the hash of the
+    /// override file's bytes, equal to [`RuntimeOverride::override_code_hash`].
+    /// Library only: the CLI's `--json` output does not include it.
+    pub runtime_code_hash: H256,
     pub artifact: Artifact,
     /// Set only when the session executed a substitute runtime.
     pub runtime_override: Option<RuntimeOverride>,
@@ -380,17 +446,20 @@ pub fn online_with_session(rpc: &Rpc, selector: &str, session: &ReplaySession) -
     Ok(replay)
 }
 
-// Both calls are pinned to the block's parent and independent of each other. Join before
-// returning even on failure, so no context request can leak into timed replay accounting.
+// Both calls are pinned to the block's parent and independent of each other. Both finish
+// before this returns, even on failure, so no context request can leak into timed replay
+// accounting.
 fn parent_context(rpc: &Rpc, parent: H256) -> Result<(Value, Value)> {
-    std::thread::scope(|scope| {
-        let version = scope.spawn(|| rpc.call("state_getRuntimeVersion", json!([parent])));
-        let header = rpc.call("chain_getHeader", json!([parent]));
-        let version = version
-            .join()
-            .map_err(|_| Error::Invalid("context RPC worker panicked".into()))?;
-        Ok((header?, version?))
-    })
+    let mut results = rpc
+        .run_all(
+            ["chain_getHeader", "state_getRuntimeVersion"]
+                .map(|method| move || rpc.call(method, json!([parent]))),
+        )?
+        .into_iter();
+    match (results.next(), results.next()) {
+        (Some(header), Some(version)) => Ok((header, version)),
+        _ => Err(Error::Invalid("context requests returned no result".into())),
+    }
 }
 
 pub fn offline(dir: &Path) -> Result<Replay> {
@@ -413,19 +482,11 @@ pub fn replay_with_session(
 
 fn with_maintenance<T>(session: &ReplaySession, run: impl FnOnce() -> Result<T>) -> Result<T> {
     let result = run();
-    let maintenance = session.prune_disk_cache();
-    match result {
-        Ok(value) => {
-            maintenance?;
-            Ok(value)
-        }
-        Err(error) => {
-            if let Err(cache_error) = maintenance {
-                eprintln!("warning: cache cleanup: {cache_error}");
-            }
-            Err(error)
-        }
+    // The cache is disposable: a cleanup error never fails the replay it follows.
+    if let Err(cache_error) = session.prune_disk_cache() {
+        note!("warning: cache cleanup: {cache_error}");
     }
+    result
 }
 
 fn replay_inner(
@@ -446,14 +507,14 @@ fn replay_inner(
         .retain(|d| !matches!(d, generic::DigestItem::Seal(_, _)));
     let db = open_db(&artifact, rpc.clone(), session, &parent)?;
     if rpc.is_some() {
-        eprintln!(
+        note!(
             "replay #{number}: fetching state (shared limit: {} concurrent RPC requests)",
             rpc.as_ref().map_or(1, Rpc::parallelism)
         );
         let mut hints = session.predicted_keys();
         hints.extend(storage_hints(&artifact.metadata));
         // Fetch missing full paths before even loading :code: its ancestor nodes change each block.
-        if session.nodes.lock().nodes.is_empty() {
+        if session.nodes.lock().is_empty() {
             hints.extend([b":code".to_vec(), b":heappages".to_vec()]);
         }
         db.prefetch(&hints.into_iter().take(4096).collect::<Vec<_>>())?;
@@ -463,7 +524,7 @@ fn replay_inner(
     metadata::load(&mut artifact, &db, &wasm, heap_pages, session, &parent)?;
     let executor = session.executor_for(&wasm);
     db.mark_bootstrap();
-    eprintln!("replay #{number}: loading runtime and preparing state");
+    note!("replay #{number}: loading runtime and preparing state");
     if rpc.is_some() && session.speculative_discovery {
         db.speculative.store(true, Ordering::SeqCst);
         for _ in 0..8 {
@@ -499,6 +560,8 @@ fn replay_inner(
         })?;
     let rpc_count = rpc.as_ref().map_or(0, Rpc::count);
     let capture = captured(&capture, artifact.block_hash, parent.hash());
+    // `execute` fails on a state root mismatch, so only verified blocks reach the disk cache
+    // and the hints for the next replay.
     persist_export(&db, &mut artifact)?;
     Ok(Replay {
         capture,
@@ -510,6 +573,7 @@ fn replay_inner(
         measured_rpc_count,
         proof_round_trips: db.round_trips.load(Ordering::Relaxed),
         proof_bytes,
+        runtime_code_hash: H256::from(sp_io::hashing::blake2_256(&wasm)),
         artifact,
         runtime_override,
     })
@@ -617,7 +681,12 @@ fn execute_method(
         return Err(db.take_error(failure));
     }
     let execution_error = |text: String| {
-        if method == "Core_execute_block" {
+        if let Some(functions) = missing_host_functions(&text) {
+            Error::MissingHostFunctions {
+                functions,
+                hint: String::new(),
+            }
+        } else if method == "Core_execute_block" {
             Error::Execution(text)
         } else {
             Error::CallExecution(
@@ -663,13 +732,13 @@ fn open_db(
 ) -> Result<ProofDb> {
     let db = ProofDb::with_session(rpc, state.hash(), session.clone());
     db.set_root(*state.state_root());
-    db.insert_nodes(
+    db.admit_nodes(
         artifact
             .proof_nodes
             .iter()
             .map(|s| unhex(s))
             .collect::<Result<Vec<_>>>()?,
-    );
+    )?;
     Ok(db)
 }
 

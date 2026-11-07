@@ -1,7 +1,7 @@
 //! A traced block with names: the form the exporters and the CLI consume.
 
-use frame_trace_model::{Phase, PrintedBytes, Stats, StorageOp, TracedBlock};
 use parity_scale_codec::Decode;
+use polkadot_frame_trace_model::{Phase, PrintedBytes, Stats, StorageOp, TracedBlock};
 use serde::{Deserialize, Serialize};
 
 use crate::{KeyName, Metadata, key::well_known};
@@ -21,9 +21,9 @@ pub struct AnnotatedBlock {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub runtime_override: Option<RuntimeOverrideInfo>,
     /// Observed span tree, empty for legacy JSON.
-    pub runtime_spans: Vec<frame_trace_model::RuntimeSpan>,
+    pub runtime_spans: Vec<polkadot_frame_trace_model::RuntimeSpan>,
     /// Replay duration, absent for synthetic input.
-    pub timing: Option<frame_trace_model::MeasuredTiming>,
+    pub timing: Option<polkadot_frame_trace_model::MeasuredTiming>,
     /// Block number. `state_traceBlock` does not report it, so it is `None` unless the caller
     /// knows it (for example from the RPC source).
     pub block_number: Option<u64>,
@@ -65,6 +65,10 @@ pub struct AnnotatedPhase {
     pub kind: String,
     /// Extrinsic index for `apply_extrinsic`.
     pub extrinsic_index: Option<u32>,
+    /// `0x`-prefixed blake2-256 of the encoded extrinsic: the transaction hash a submitter
+    /// (for example a load generator) sees. Absent when the bytes were not in the trace.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extrinsic_hash: Option<String>,
     /// `Pallet.call` of the extrinsic, when its bytes were in the trace and decoded.
     pub call: Option<String>,
     /// Why the extrinsic bytes did not decode. Usually the metadata is not the block's runtime.
@@ -111,7 +115,7 @@ pub struct AnnotatedOp {
     #[serde(default)]
     pub proof_bytes_added: Option<usize>,
     /// Measured local replay interval.
-    pub timing: Option<frame_trace_model::MeasuredTiming>,
+    pub timing: Option<polkadot_frame_trace_model::MeasuredTiming>,
     /// Parent capture span ID.
     pub parent_span: Option<u64>,
     /// Position in the block.
@@ -247,6 +251,10 @@ fn annotate_phase(
         }),
         kind: phase.kind.name().into(),
         extrinsic_index: phase.kind.extrinsic_index(),
+        extrinsic_hash: phase
+            .extrinsic
+            .as_deref()
+            .map(|bytes| format!("0x{}", hex::encode(sp_crypto_hashing::blake2_256(bytes)))),
         call,
         call_error,
         label,
@@ -420,18 +428,18 @@ mod phase_timing_tests {
     use super::*;
     #[test]
     fn phase_json_has_explicit_bounds_and_marks_storage_only_envelopes() {
-        let raw = frame_trace_model::rpc::parse_trace_block(include_str!(
+        let raw = polkadot_frame_trace_model::rpc::parse_trace_block(include_str!(
             "../../../fixtures/model/two-extrinsics.json"
         ))
         .unwrap();
         let mut block = TracedBlock::from_trace(&raw).unwrap();
         for op in &mut block.ops {
-            op.timing = Some(frame_trace_model::MeasuredTiming {
+            op.timing = Some(polkadot_frame_trace_model::MeasuredTiming {
                 start_ns: 10 + op.seq as u64 * 10,
                 duration_ns: 5,
             });
         }
-        block.runtime_spans = vec![frame_trace_model::RuntimeSpan {
+        block.runtime_spans = vec![polkadot_frame_trace_model::RuntimeSpan {
             id: 1,
             parent_id: None,
             name: "init_block".into(),

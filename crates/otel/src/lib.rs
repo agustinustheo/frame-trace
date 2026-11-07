@@ -1,4 +1,4 @@
-//! OpenTelemetry export for frame-trace.
+//! OpenTelemetry export for polkadot-frame-trace.
 //!
 //! One trace per block, following the trace model in `dev/SPEC.md`:
 //!
@@ -17,29 +17,30 @@
 //! and every span carries `frame.timing = "no timing"`. Spans are built with the OpenTelemetry
 //! SDK directly (not through `tracing-opentelemetry`).
 
-use std::time::{Duration, SystemTime};
+use std::{
+    sync::{Arc, Mutex, PoisonError},
+    time::{Duration, SystemTime},
+};
 
-mod delivery;
 mod http;
 
-pub use delivery::{Delivery, DeliveryHandle, Tracked};
-use frame_trace_decode::{AnnotatedBlock, AnnotatedOp, AnnotatedPhase};
-use frame_trace_model::Stats;
-pub use http::HttpExporter;
+use http::HttpExporter;
 use opentelemetry::{
     Array, Context, KeyValue, StringValue, Value,
     trace::{SpanKind, TraceContextExt, Tracer, TracerProvider as _},
 };
 use opentelemetry_sdk::{
     Resource,
-    trace::{BatchConfigBuilder, BatchSpanProcessor, SdkTracer, SdkTracerProvider, SpanExporter},
+    trace::{SdkTracer, SdkTracerProvider, SpanData, SpanExporter},
 };
+use polkadot_frame_trace_decode::{AnnotatedBlock, AnnotatedOp, AnnotatedPhase};
+use polkadot_frame_trace_model::Stats;
 
 /// `db.system.name` for every storage op.
 pub const DB_SYSTEM: &str = "substrate";
 
 /// Instrumentation scope name.
-const SCOPE: &str = "frame-trace";
+const SCOPE: &str = "polkadot-frame-trace";
 
 /// Longest span name; longer labels are cut.
 const MAX_NAME_CHARS: usize = 160;
@@ -50,9 +51,6 @@ pub enum Error {
     /// The OTLP exporter could not be built.
     #[error("cannot build OTLP exporter: {0}")]
     Build(#[from] opentelemetry_otlp::ExporterBuildError),
-    /// Export or shutdown failed.
-    #[error("export failed: {0}")]
-    Export(#[from] opentelemetry_sdk::error::OTelSdkError),
     /// The receiver accepted the HTTP request but rejected some of its spans.
     #[error("{rejected} of {total} spans rejected by the receiver: {message}")]
     Rejected {
@@ -63,7 +61,7 @@ pub enum Error {
         /// The first rejection message from the receiver.
         message: String,
     },
-    /// Some spans never reached the backend: rejected by the exporter or dropped by the SDK.
+    /// Some spans never reached the backend.
     #[error(
         "{lost} of {total} spans were not exported{}",
         first_error.as_ref().map(|e| format!(" (first error: {e})")).unwrap_or_default()
@@ -98,7 +96,7 @@ impl Default for Timing {
 }
 
 /// Spans [`record_block`] creates for `block`: root, phases and ops.
-pub fn span_count(block: &AnnotatedBlock) -> usize {
+fn span_count(block: &AnnotatedBlock) -> usize {
     1 + block.all_phases().map(|p| 1 + p.ops.len()).sum::<usize>()
         + block
             .runtime_spans
@@ -109,85 +107,153 @@ pub fn span_count(block: &AnnotatedBlock) -> usize {
 
 // The runtime's whole-block wrapper is represented by the OTel block itself. Keeping it
 // below initialization would incorrectly stretch that phase across the entire block.
-fn runtime_span(span: &frame_trace_model::RuntimeSpan) -> bool {
+fn runtime_span(span: &polkadot_frame_trace_model::RuntimeSpan) -> bool {
     span.wasm && span.name != "execute_block" && span.name != "Core_execute_block"
 }
 
-/// A tracer provider exporting through `exporter` with a batch processor whose queue holds
-/// `max_spans` spans, so a whole block is exported without drops (the SDK default queue of 2048
-/// would drop most of a busy block).
-pub fn provider<E: SpanExporter + 'static>(exporter: E, max_spans: usize) -> SdkTracerProvider {
-    let batch = BatchConfigBuilder::default()
-        .with_max_queue_size(max_spans.max(2048))
-        .with_max_export_batch_size(512)
-        .build();
+/// Spans per OTLP request.
+const BATCH_SPANS: usize = 512;
+
+fn builder() -> opentelemetry_sdk::trace::TracerProviderBuilder {
     SdkTracerProvider::builder()
-        .with_span_processor(
-            BatchSpanProcessor::builder(exporter)
-                .with_batch_config(batch)
-                .build(),
-        )
         .with_max_attributes_per_span(256)
-        .with_resource(Resource::builder().with_service_name(SCOPE).build())
-        .build()
+        .with_resource(resource())
 }
 
-/// An OTLP/HTTP (protobuf) span exporter. `/v1/traces` is appended to `endpoint` unless present,
-/// so `http://127.0.0.1:4318` works.
-pub fn otlp_http_exporter(endpoint: &str) -> Result<HttpExporter, Error> {
+fn resource() -> Resource {
+    Resource::builder().with_service_name(SCOPE).build()
+}
+
+fn traces_url(endpoint: &str) -> String {
     let base = endpoint.trim_end_matches('/');
-    let url = if base.ends_with("/v1/traces") {
+    if base.ends_with("/v1/traces") {
         base.to_owned()
     } else {
         format!("{base}/v1/traces")
-    };
-    HttpExporter::new(url)
+    }
 }
 
-/// Exports `block` to an OTLP/HTTP endpoint. See [`export_block`].
+/// Exports `block` to an OTLP/HTTP endpoint once. See [`OtlpSender::send`].
 pub fn export_otlp(block: &AnnotatedBlock, endpoint: &str, timing: Timing) -> Result<usize, Error> {
-    let exporter = otlp_http_exporter(endpoint)?;
-    let rejections = exporter.rejections.clone();
-    let result = export_block(exporter, block, timing);
-    let rejections = rejections
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner);
-    if rejections.rejected > 0 {
-        return Err(Error::Rejected {
-            rejected: rejections.rejected,
-            total: span_count(block),
-            message: rejections.message.clone(),
-        });
-    }
-    result
+    OtlpSender::new(endpoint)?.send(&mut prepare(block, timing))
 }
 
-/// Exports `block` through `exporter` and waits until every span was handed over. Returns the
-/// number of spans, or [`Error::Incomplete`] if any span was rejected or dropped.
-pub fn export_block<E: SpanExporter + 'static>(
-    exporter: E,
-    block: &AnnotatedBlock,
-    timing: Timing,
-) -> Result<usize, Error> {
-    let (exporter, delivery) = Tracked::new(exporter);
-    let provider = provider(exporter, span_count(block));
-    let total = record_block(&provider.tracer(SCOPE), block, timing);
-    let flushed = provider.force_flush();
-    let shutdown = provider.shutdown();
+/// One block's spans, built once so that every export attempt sends the same span IDs.
+#[derive(Debug)]
+pub struct PreparedTrace {
+    // Batches the receiver has not accepted yet, in order.
+    batches: std::collections::VecDeque<Vec<SpanData>>,
+    total: usize,
+    rejected: u64,
+    message: String,
+}
 
-    let delivery = delivery.get();
-    if delivery.exported < total {
-        return Err(Error::Incomplete {
-            lost: total - delivery.exported,
-            total,
-            first_error: delivery
-                .first_error
-                .or_else(|| flushed.err().map(|e| e.to_string())),
-        });
+impl PreparedTrace {
+    /// Spans in the trace.
+    pub fn total(&self) -> usize {
+        self.total
     }
-    flushed?;
-    shutdown?;
-    Ok(total)
+    /// Spans not yet accepted by the receiver.
+    pub fn unsent(&self) -> usize {
+        self.batches.iter().map(Vec::len).sum()
+    }
+}
+
+/// Builds the spans of `block` without sending them.
+pub fn prepare(block: &AnnotatedBlock, timing: Timing) -> PreparedTrace {
+    let spans = Arc::new(Mutex::new(Vec::new()));
+    let provider = builder()
+        .with_simple_exporter(Collect(spans.clone()))
+        .build();
+    record_block(&provider.tracer(SCOPE), block, timing);
+    let _ = provider.shutdown();
+    let spans = std::mem::take(&mut *spans.lock().unwrap_or_else(PoisonError::into_inner));
+    let total = spans.len();
+    let mut batches = std::collections::VecDeque::new();
+    let mut spans = spans.into_iter().peekable();
+    while spans.peek().is_some() {
+        batches.push_back(spans.by_ref().take(BATCH_SPANS).collect());
+    }
+    PreparedTrace {
+        batches,
+        total,
+        rejected: 0,
+        message: String::new(),
+    }
+}
+
+/// Keeps finished spans in memory.
+#[derive(Debug)]
+struct Collect(Arc<Mutex<Vec<SpanData>>>);
+
+impl SpanExporter for Collect {
+    async fn export(&self, batch: Vec<SpanData>) -> opentelemetry_sdk::error::OTelSdkResult {
+        self.0
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .extend(batch);
+        Ok(())
+    }
+}
+
+/// Sends [`PreparedTrace`]s over OTLP/HTTP, one request at a time, on the calling thread.
+#[derive(Debug)]
+pub struct OtlpSender {
+    exporter: HttpExporter,
+}
+
+impl OtlpSender {
+    /// A sender for `endpoint`, with the timeout from the standard OpenTelemetry variables.
+    pub fn new(endpoint: &str) -> Result<Self, Error> {
+        Self::build(endpoint, None)
+    }
+
+    /// A sender that waits at most `timeout` for each request.
+    pub fn with_timeout(endpoint: &str, timeout: Duration) -> Result<Self, Error> {
+        Self::build(endpoint, Some(timeout))
+    }
+
+    fn build(endpoint: &str, timeout: Option<Duration>) -> Result<Self, Error> {
+        let mut exporter = HttpExporter::new(traces_url(endpoint), timeout)?;
+        exporter.set_resource(&resource());
+        Ok(Self { exporter })
+    }
+
+    /// Sends the batches of `trace` that the receiver has not accepted yet, and stops at the
+    /// first failure. An accepted batch is never sent again, so calling this again after
+    /// [`Error::Incomplete`] retries only the rest. No request is still running when it
+    /// returns.
+    ///
+    /// Returns the number of spans once every batch was accepted, or [`Error::Rejected`] if
+    /// the receiver refused some spans of an accepted batch. Those are not sent again.
+    pub fn send(&self, trace: &mut PreparedTrace) -> Result<usize, Error> {
+        while let Some(batch) = trace.batches.front() {
+            match self.exporter.send(batch.clone()) {
+                Ok((rejected, message)) => {
+                    trace.batches.pop_front();
+                    if rejected > 0 && trace.rejected == 0 {
+                        trace.message = message;
+                    }
+                    trace.rejected += rejected;
+                }
+                Err(error) => {
+                    return Err(Error::Incomplete {
+                        lost: trace.unsent(),
+                        total: trace.total,
+                        first_error: Some(error.to_string()),
+                    });
+                }
+            }
+        }
+        if trace.rejected > 0 {
+            return Err(Error::Rejected {
+                rejected: trace.rejected,
+                total: trace.total,
+                message: trace.message.clone(),
+            });
+        }
+        Ok(trace.total)
+    }
 }
 
 /// Records `block` as one trace on `tracer`. Returns the number of spans created.
@@ -433,6 +499,9 @@ fn record_measured(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) -
         if let Some(call) = &phase.call {
             attrs.push(KeyValue::new("frame.extrinsic.call", call.clone()));
         }
+        if let Some(hash) = &phase.extrinsic_hash {
+            attrs.push(KeyValue::new("frame.extrinsic.hash", hash.clone()));
+        }
         let span = tracer
             .span_builder(phase.label.clone())
             .with_start_time(at(bounds[i].0))
@@ -488,10 +557,12 @@ fn record_measured(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) -
                 .filter(|id| owners.get(id) == Some(&i))
                 .and_then(|id| contexts.get(&id))
                 .unwrap_or(cx);
-            let t = op.timing.unwrap_or(frame_trace_model::MeasuredTiming {
-                start_ns: bounds[i].0,
-                duration_ns: 0,
-            });
+            let t = op
+                .timing
+                .unwrap_or(polkadot_frame_trace_model::MeasuredTiming {
+                    start_ns: bounds[i].0,
+                    duration_ns: 0,
+                });
             let mut span = tracer
                 .span_builder(truncate(&op.label))
                 .with_start_time(at(t.start_ns))
@@ -533,6 +604,9 @@ fn record_phase(
     if let Some(call) = &phase.call {
         attrs.push(KeyValue::new("frame.extrinsic.call", call.clone()));
     }
+    if let Some(hash) = &phase.extrinsic_hash {
+        attrs.push(KeyValue::new("frame.extrinsic.hash", hash.clone()));
+    }
     attrs.extend(stats_attributes(&phase.stats));
     let span = tracer
         .span_builder(phase.label.clone())
@@ -565,7 +639,7 @@ fn phase_label(kind: &str) -> &str {
     match kind {
         "apply_extrinsic" => "extrinsic",
         "unsegmented" => "no phase markers",
-        other => frame_trace_model::PhaseKind::label(other),
+        other => polkadot_frame_trace_model::PhaseKind::label(other),
     }
 }
 

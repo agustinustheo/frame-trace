@@ -1,10 +1,10 @@
 use codec::Encode;
-use frame_trace_model::TracedBlock;
-use frame_trace_replay::{
+use hash_db::{EMPTY_PREFIX, HashDB};
+use polkadot_frame_trace_model::TracedBlock;
+use polkadot_frame_trace_replay::{
     Artifact, ArtifactKind, ReplaySession, call,
     rpc::{hex0, unhex},
 };
-use hash_db::{EMPTY_PREFIX, HashDB};
 use serde_json::json;
 use sp_core::Blake2Hasher;
 use sp_runtime::{generic::Header, traits::BlakeTwo256};

@@ -1,10 +1,10 @@
-//! Terminal tables for `frame-trace summary`.
+//! Terminal tables for `polkadot-frame-trace summary`.
 
 use std::collections::BTreeMap;
 
 use comfy_table::{CellAlignment, Table};
-use frame_trace_decode::{AnnotatedBlock, AnnotatedOp};
-use frame_trace_model::Stats;
+use polkadot_frame_trace_decode::{AnnotatedBlock, AnnotatedOp};
+use polkadot_frame_trace_model::Stats;
 
 /// Renders the phase table, the top storage items, and the duplicate reads of each phase.
 pub fn render(block: &AnnotatedBlock, top: usize) -> String {
@@ -67,7 +67,7 @@ fn phases(block: &AnnotatedBlock) -> Table {
 }
 
 /// Derive terminal labels from stable identifiers, including when reading older saved JSON.
-fn phase_label(phase: &frame_trace_decode::AnnotatedPhase) -> String {
+fn phase_label(phase: &polkadot_frame_trace_decode::AnnotatedPhase) -> String {
     if phase.kind == "apply_extrinsic" {
         if let Some(index) = phase.extrinsic_index {
             let mut label = format!("extrinsic {index}");
@@ -77,12 +77,12 @@ fn phase_label(phase: &frame_trace_decode::AnnotatedPhase) -> String {
             return label;
         }
     } else if phase.kind != "call" {
-        return frame_trace_model::PhaseKind::label(&phase.kind).into();
+        return polkadot_frame_trace_model::PhaseKind::label(&phase.kind).into();
     }
     phase.label.clone()
 }
 
-fn phase_row(phase: &frame_trace_decode::AnnotatedPhase, label: String) -> Vec<String> {
+fn phase_row(phase: &polkadot_frame_trace_decode::AnnotatedPhase, label: String) -> Vec<String> {
     let mut row = stats_row(label, &phase.stats);
     let t = crate::report::Tally::of(&phase.ops);
     row.extend([

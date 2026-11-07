@@ -3,10 +3,10 @@ use std::{path::PathBuf, time::Duration};
 
 use anyhow::{Context, Result};
 use clap::{ArgGroup, Args};
-use frame_trace_decode::{AnnotatedCall, Metadata, annotate};
-use frame_trace_replay::{
+use polkadot_frame_trace_decode::{AnnotatedCall, Metadata, annotate};
+use polkadot_frame_trace_replay::{
     Artifact, ReplaySession, call,
-    rpc::{Rpc, hex0, unhex},
+    rpc::{hex0, unhex},
 };
 
 #[derive(Args)]
@@ -58,9 +58,12 @@ pub struct CallArgs {
     /// OTLP/HTTP endpoint (bare --otlp uses http://127.0.0.1:4318).
     #[arg(long, num_args = 0..=1, default_missing_value = "http://127.0.0.1:4318")]
     otlp: Option<String>,
-    /// Maximum concurrent proof requests (1–64; up to 32 keys per request).
+    /// Maximum concurrent RPC requests (1–64; up to 32 proof keys per request).
     #[arg(long, default_value_t = 8, requires = "rpc", conflicts_with = "offline", value_parser = clap::value_parser!(u8).range(1..=64))]
     proof_concurrency: u8,
+    /// Longest wait in seconds for one RPC response; each request gets four tries.
+    #[arg(long, value_name = "SECONDS", default_value = "30", value_parser = super::source::rpc_timeout, requires = "rpc", conflicts_with = "offline")]
+    rpc_timeout: Duration,
     /// Persistent authenticated proof-node and compiled Wasm cache directory.
     #[arg(long, value_name = "DIR")]
     cache_dir: Option<PathBuf>,
@@ -98,10 +101,10 @@ pub fn run(args: CallArgs) -> Result<()> {
     let (artifact, rpc) = if let Some(dir) = &args.offline {
         (Artifact::load(dir)?, None)
     } else {
-        let rpc = Rpc::with_options(
+        let rpc = super::source::rpc(
             args.rpc.as_deref().context("--rpc required")?,
-            args.proof_concurrency as usize,
-            Duration::from_secs(30),
+            args.proof_concurrency,
+            args.rpc_timeout,
             Default::default(),
         )?;
         let mut artifact = call::prepare(
@@ -133,7 +136,10 @@ pub fn run(args: CallArgs) -> Result<()> {
         artifact.call.as_mut().context("missing call context")?.data = hex0(&data);
         (artifact, Some(rpc))
     };
-    let replay = call::replay(artifact, rpc, &session, args.oracle)?;
+    let replay = {
+        let _slow = super::source::warn_if_slow("the call".into());
+        call::replay(artifact, rpc, &session, args.oracle)?
+    };
     if let Some(dir) = &args.save {
         replay.artifact.save(dir)?;
     }
@@ -162,7 +168,7 @@ pub fn run(args: CallArgs) -> Result<()> {
             .ok()
     });
     let mut trace = annotate(
-        &frame_trace_model::TracedBlock::from_call(&replay.capture)?,
+        &polkadot_frame_trace_model::TracedBlock::from_call(&replay.capture)?,
         metadata.as_ref(),
     );
     trace.block_number = Some(replay.block_number);

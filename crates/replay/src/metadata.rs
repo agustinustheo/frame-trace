@@ -1,6 +1,6 @@
 //! Metadata used for names and JSON arguments must come from authenticated code/state.
 use crate::*;
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
 
 fn negotiate(mut run: impl FnMut(&str, &[u8]) -> Result<Vec<u8>>) -> Result<String> {
     for version in [16u32, 15] {
@@ -61,9 +61,9 @@ pub(crate) fn load(
         db.failure.lock().take();
         if valid {
             if entry.iteration_root.is_some() {
-                db.retain_nodes(&entry.proof_nodes);
+                db.retain_nodes(&entry.proof_nodes)?;
             }
-            artifact.metadata = entry.metadata;
+            artifact.metadata = entry.metadata.clone();
             return Ok(());
         }
     }
@@ -141,7 +141,7 @@ pub(crate) fn load(
             }
             cache.insert(
                 hash,
-                session::MetadataEntry {
+                Arc::new(session::MetadataEntry {
                     metadata: metadata.clone(),
                     reads: reads
                         .into_iter()
@@ -153,15 +153,19 @@ pub(crate) fn load(
                     } else {
                         Vec::new()
                     },
-                },
+                }),
             );
             artifact.metadata = metadata;
         }
-        Err(error) if error.is_transient() || matches!(error, Error::Cancelled) => {
+        // The block cannot run either; say why now instead of after a metadata notice.
+        Err(error)
+            if error.is_transient()
+                || matches!(error, Error::Cancelled | Error::MissingHostFunctions { .. }) =>
+        {
             return Err(error);
         }
         Err(error) if session.rpc_metadata_fallback => {
-            eprintln!(
+            note!(
                 "warning: local metadata unavailable ({}); UNAUTHENTICATED METADATA (unverified names from the node or saved replay)",
                 unavailable_reason(&error)
             );
@@ -171,7 +175,7 @@ pub(crate) fn load(
             };
         }
         Err(error) => {
-            eprintln!(
+            note!(
                 "notice: local metadata unavailable ({}); using unnamed storage and hex results",
                 unavailable_reason(&error)
             );

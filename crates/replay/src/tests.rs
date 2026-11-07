@@ -353,6 +353,59 @@ fn online_acquisition_pins_context_and_measures_with_zero_rpc() {
 }
 
 #[test]
+fn a_failed_root_check_records_no_hints_and_writes_no_disk_cache() {
+    let path = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/replay/people-transfer");
+    let artifact = Artifact::load(&path).unwrap();
+    let mut memory = sp_trie::MemoryDB::<Blake2Hasher>::default();
+    for node in &artifact.proof_nodes {
+        HashDB::insert(&mut memory, EMPTY_PREFIX, &unhex(node).unwrap());
+    }
+    let parent_header: Header = serde_json::from_value(artifact.parent_header.clone()).unwrap();
+    let trie =
+        sp_state_machine::TrieBackendBuilder::new(memory, *parent_header.state_root()).build();
+    let parent = artifact.block["header"]["parentHash"].clone();
+    // Same block with a wrong state root in its header: replay must fail the root check.
+    let mut block = artifact.block.clone();
+    block["header"]["stateRoot"] = json!(format!("0x{}", "ee".repeat(32)));
+    let hash = header_hash(&block["header"]).unwrap();
+    let (rpc, _, halt, worker) = server(move |request| match request["method"].as_str().unwrap() {
+        "chain_getBlock" => json!({ "block": block }),
+        "chain_getHeader" => artifact.parent_header.clone(),
+        "state_getRuntimeVersion" => artifact.runtime_version.clone(),
+        "state_getMetadata" => json!(""),
+        "state_getReadProof" => {
+            let keys: Vec<_> = request["params"][0]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|v| unhex(v.as_str().unwrap()).unwrap())
+                .collect();
+            match sp_state_machine::prove_read_on_trie_backend(&trie, &keys) {
+                Ok(proof) => {
+                    json!({"at":parent,"proof":proof.into_iter_nodes().map(|n| rpc::hex0(&n)).collect::<Vec<_>>()})
+                }
+                Err(_) => json!({"at":parent,"proof":[]}),
+            }
+        }
+        method => panic!("unexpected RPC {method}"),
+    });
+    let dir = std::env::temp_dir().join(format!(
+        "polkadot-frame-trace-root-fail-{}",
+        std::process::id()
+    ));
+    let session = ReplaySession::new(Some(&dir))
+        .unwrap()
+        .with_speculative_discovery(false);
+    let error = online_with_session(&rpc, &hash, &session).unwrap_err();
+    assert!(matches!(error, Error::Execution(_)), "{error}");
+    assert!(session.predicted_keys().is_empty(), "hints recorded");
+    let written = session.disk.as_ref().unwrap().node_count();
+    assert_eq!(written, 0, "proof nodes written to the disk cache");
+    stop(halt, worker);
+    std::fs::remove_dir_all(dir).unwrap();
+}
+
+#[test]
 fn measured_run_rpc_guard_detects_network_activity() {
     let (rpc, requests, halt, worker) = server(|_| json!(null));
     assert_eq!(without_rpc(Some(&rpc), || Ok(())).unwrap(), ((), 0));
@@ -445,12 +498,58 @@ fn unknown_host_import_error_names_the_import() {
         &block,
         &Capture::new(),
     )
-    .unwrap_err()
-    .to_string();
+    .unwrap_err();
     assert!(
-        error.contains("ext_frame_trace_unknown_version_1"),
+        matches!(&error, Error::MissingHostFunctions { functions, hint }
+            if functions == "env:ext_frame_trace_unknown_version_1" && hint.is_empty()),
         "{error}"
     );
+    // Without an override the message has no override note and ends with the docs link.
+    let text = error.to_string();
+    assert!(!text.contains("override"), "{text}");
+    assert!(
+        text.starts_with(
+            "the runtime needs host functions polkadot-frame-trace does not have: \
+             env:ext_frame_trace_unknown_version_1. polkadot-frame-trace's host functions are fixed"
+        ),
+        "{text}"
+    );
+    assert!(text.ends_with(MISSING_HOST_FUNCTIONS_DOCS), "{text}");
+}
+
+#[test]
+fn missing_host_function_names_stop_at_the_end_of_the_list() {
+    // sc-executor-wasmtime 0.47.0 imports.rs: names.push(format!("'{}:{}'", module, name)),
+    // joined with ", ", wrapped by sc-executor-common's WasmError::Other and then by ours.
+    let upstream = "Other error happened while constructing the runtime: runtime requires \
+                    function imports which are not present on the host: \
+                    'env:ext_beta_version_2', 'env:ext_alpha_version_1'";
+    let expected = Some("env:ext_alpha_version_1, env:ext_beta_version_2".to_owned());
+    assert_eq!(missing_host_functions(upstream), expected);
+    for trailing in [
+        "; a runtime override was executed instead of the authenticated :code",
+        ". WASM backtrace:\n    0: 0x1234 - <unknown>",
+        "\nsecond line, 'env:not_a_name'",
+        " and more text",
+    ] {
+        assert_eq!(
+            missing_host_functions(&format!("{upstream}{trailing}")),
+            expected,
+            "{trailing:?}"
+        );
+    }
+    // A future unquoted form still stops at `;`, `.` or the line end.
+    assert_eq!(
+        missing_host_functions(&format!(
+            "{MISSING_IMPORTS}env:ext_a_version_1, env:ext_b_version_1; trailing, text"
+        )),
+        Some("env:ext_a_version_1, env:ext_b_version_1".to_owned())
+    );
+    assert_eq!(
+        missing_host_functions("Exported method Core_version is not found"),
+        None
+    );
+    assert_eq!(missing_host_functions(MISSING_IMPORTS), None);
 }
 
 #[test]
@@ -488,48 +587,127 @@ fn stalled_websocket_handshake_has_deadline_and_can_be_cancelled() {
     }
 }
 
+/// Writes fail part-way when files may not grow past 20 or 40 KiB (`ulimit -f 40`), so this
+/// runs itself again in a shell with that limit and `SIGXFSZ` ignored.
+#[test]
+fn disk_cache_write_failures_are_cut_back_counted_and_warned_once() {
+    use std::os::unix::fs::MetadataExt;
+    const CHILD: &str = "FRAME_TRACE_WRITE_FAILURE_CHILD";
+    if let Some(dir) = std::env::var_os(CHILD) {
+        let dir = std::path::PathBuf::from(dir);
+        let session = ReplaySession::with_cache_max_bytes(Some(&dir), 1 << 20).unwrap();
+        let disk = session.disk.clone().unwrap();
+        disk.wait_loaded();
+        for block in 0u32..40 {
+            let db = ProofDb::with_session(None, H256::zero(), session.clone());
+            db.insert_nodes(
+                (block * 20..block * 20 + 20)
+                    .map(|i| [i.to_le_bytes().as_slice(), &[7; 1000]].concat()),
+            );
+            db.persist().unwrap();
+        }
+        let (mut real, mut files) = (0, 0);
+        for entry in std::fs::read_dir(dir.join("proof-nodes")).unwrap() {
+            real += entry.unwrap().metadata().unwrap().blocks() * 512 + 4096;
+            files += 1;
+        }
+        println!(
+            "child: total {} real {real} files {files} segments {}",
+            disk.total(),
+            disk.segment_count()
+        );
+        assert!(
+            real <= disk.total(),
+            "{real} on disk, {} counted",
+            disk.total()
+        );
+        assert_eq!(files, disk.segment_count());
+        return;
+    }
+    let dir = std::env::temp_dir().join(format!(
+        "polkadot-frame-trace-write-failure-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    let out = std::process::Command::new("/bin/sh")
+        .args(["-c", "trap '' XFSZ; ulimit -f 40; exec \"$0\" \"$@\""])
+        .arg(std::env::current_exe().unwrap())
+        .args([
+            "--exact",
+            "tests::disk_cache_write_failures_are_cut_back_counted_and_warned_once",
+            "--nocapture",
+            "--test-threads=1",
+        ])
+        .env(CHILD, &dir)
+        .output()
+        .unwrap();
+    let (stdout, stderr) = (
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr),
+    );
+    std::fs::remove_dir_all(&dir).unwrap();
+    assert!(
+        out.status.success() && stdout.contains("child: total"),
+        "{stdout}{stderr}"
+    );
+    assert_eq!(
+        stderr.matches("warning: disk cache: cannot write:").count(),
+        1,
+        "{stderr}"
+    );
+}
+
 #[test]
 fn persistent_node_cache_reuses_and_heals_corrupt_nodes() {
     use sp_state_machine::TrieBackendStorage;
-    let dir = std::env::temp_dir().join(format!("frame-trace-node-cache-{}", std::process::id()));
-    let session = ReplaySession::new(Some(&dir)).unwrap();
+    use std::os::unix::fs::FileExt;
+    let dir = std::env::temp_dir().join(format!(
+        "polkadot-frame-trace-node-cache-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    let session = |dir: &Path| {
+        let session = ReplaySession::new(Some(dir)).unwrap();
+        session.disk.as_ref().unwrap().wait_loaded();
+        session
+    };
     let bytes = vec![1, 2, 3, 4];
     let hash = H256::from(sp_io::hashing::blake2_256(&bytes));
     let rpc = Rpc::new("http://127.0.0.1:1").unwrap();
-    let first = ProofDb::with_session(Some(rpc.clone()), H256::repeat_byte(1), session);
+    let first = ProofDb::with_session(Some(rpc.clone()), H256::repeat_byte(1), session(&dir));
     first.insert_nodes([bytes.clone()]);
     first.persist().unwrap();
-    let second = ProofDb::with_session(
-        Some(rpc.clone()),
-        H256::repeat_byte(2),
-        ReplaySession::new(Some(&dir)).unwrap(),
-    );
+    let second = ProofDb::with_session(Some(rpc.clone()), H256::repeat_byte(2), session(&dir));
     assert_eq!(
         TrieBackendStorage::get(&second, &hash, EMPTY_PREFIX).unwrap(),
-        Some(bytes)
+        Some(bytes.clone())
     );
     assert_eq!(rpc.count(), 0);
-    let path = dir.join("nodes").join(format!("{hash:x}"));
-    std::fs::write(&path, b"corrupt").unwrap();
+    // Damage the node's bytes in the first segment, after the 8-byte magic and 36-byte header.
+    let segment = dir.join("proof-nodes").join("0000000000.seg");
+    std::fs::File::options()
+        .write(true)
+        .open(&segment)
+        .unwrap()
+        .write_all_at(&[9], 8 + 36 + 2)
+        .unwrap();
     let parent = H256::repeat_byte(3);
     let (healing_rpc, _, halt, worker) =
         server(move |_| json!({"at":parent,"proof":[rpc::hex0(&[1,2,3,4])]}));
-    let third = ProofDb::with_session(
-        Some(healing_rpc.clone()),
-        parent,
-        ReplaySession::new(Some(&dir)).unwrap(),
-    );
+    let third = ProofDb::with_session(Some(healing_rpc.clone()), parent, session(&dir));
     assert_eq!(
         TrieBackendStorage::get(&third, &hash, EMPTY_PREFIX).unwrap(),
-        Some(vec![1, 2, 3, 4])
+        Some(bytes.clone())
     );
     third.persist().unwrap();
-    assert_eq!(std::fs::read(&path).unwrap(), vec![1, 2, 3, 4]);
     assert_eq!(healing_rpc.count(), 1);
-    // Persist also replaces corruption which has not yet been read by this block.
-    std::fs::write(&path, b"bad again").unwrap();
-    third.persist().unwrap();
-    assert_eq!(std::fs::read(&path).unwrap(), vec![1, 2, 3, 4]);
+    // The fetched copy went to a new segment, and the next session reads it from disk.
+    let fourth = ProofDb::with_session(Some(rpc.clone()), H256::repeat_byte(4), session(&dir));
+    assert_eq!(
+        TrieBackendStorage::get(&fourth, &hash, EMPTY_PREFIX).unwrap(),
+        Some(bytes)
+    );
+    assert_eq!(rpc.count(), 0);
     stop(halt, worker);
     std::fs::remove_dir_all(dir).unwrap();
 }
@@ -669,30 +847,25 @@ fn speculative_pending_preserves_top_and_both_child_namespaces() {
 }
 
 #[test]
-fn disk_cache_limit_evicts_oldest_nodes_and_wasm_together() {
-    let dir = std::env::temp_dir().join(format!("frame-trace-eviction-{}", std::process::id()));
-    let session = ReplaySession::with_cache_max_bytes(Some(&dir), 10).unwrap();
-    let old = dir.join("nodes/old");
-    let newer = dir.join("wasm/new");
-    std::fs::write(&old, [0; 8]).unwrap();
-    std::fs::File::options()
-        .write(true)
-        .open(&old)
-        .unwrap()
-        .set_times(std::fs::FileTimes::new().set_modified(std::time::SystemTime::UNIX_EPOCH))
-        .unwrap();
-    std::fs::write(&newer, [0; 8]).unwrap();
-    session.prune_disk_cache().unwrap();
-    assert!(!old.exists());
-    assert!(newer.exists());
-    let abandoned = dir.join("nodes/abandoned.tmp");
-    std::fs::write(&abandoned, [0; 20]).unwrap();
-    std::fs::File::options()
-        .write(true)
-        .open(&abandoned)
-        .unwrap()
-        .set_times(std::fs::FileTimes::new().set_modified(std::time::SystemTime::UNIX_EPOCH))
-        .unwrap();
+fn disk_cache_limit_bounds_nodes_and_unused_runtimes_together() {
+    let dir = std::env::temp_dir().join(format!(
+        "polkadot-frame-trace-eviction-{}",
+        std::process::id()
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+    let cap = 256 * 1024;
+    let session = ReplaySession::with_cache_max_bytes(Some(&dir), cap).unwrap();
+    let _active = session.executor_for(b"runtime");
+    let unused = dir.join("wasm/unused");
+    std::fs::write(&unused, vec![0; 200 * 1024]).unwrap();
+    for block in 0u32..20 {
+        let db = ProofDb::with_session(None, H256::zero(), session.clone());
+        db.insert_nodes(
+            (block * 100..block * 100 + 100)
+                .map(|i| [i.to_le_bytes().as_slice(), &[7; 200]].concat()),
+        );
+        db.persist().unwrap();
+    }
     // Even a failed replay runs maintenance and preserves the original execution error.
     let mut artifact = Artifact::load(
         &Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/replay/people-transfer"),
@@ -705,10 +878,18 @@ fn disk_cache_limit_evicts_oldest_nodes_and_wasm_together() {
             .to_string()
             .contains("unsupported artifact version")
     );
-    assert!(!abandoned.exists());
+    assert!(!unused.exists(), "an unused runtime outlived the cap");
+    let used: u64 = std::fs::read_dir(dir.join("proof-nodes"))
+        .unwrap()
+        .map(|e| crate::disk::file_charge(&e.unwrap().metadata().unwrap()))
+        .sum();
+    assert!(used > 0 && used <= cap, "{used} bytes of proof nodes");
     let zero = ReplaySession::with_cache_max_bytes(Some(&dir), 0).unwrap();
-    zero.prune_disk_cache().unwrap();
-    assert!(!newer.exists());
+    assert_eq!(
+        std::fs::read_dir(dir.join("proof-nodes")).unwrap().count(),
+        0
+    );
+    drop(zero);
     std::fs::remove_dir_all(dir).unwrap();
 }
 
@@ -1015,6 +1196,8 @@ mod runtime_override {
         let substitute = H256::from(sp_io::hashing::blake2_256(&wasm));
         assert_eq!(info.override_code_hash, substitute);
         assert_ne!(info.chain_code_hash, substitute);
+        assert_eq!(result.runtime_code_hash, substitute);
+        assert_ne!(result.runtime_code_hash, info.chain_code_hash);
         // Metadata was generated by executing the substitute, never the chain's code.
         let cached = session.metadata.lock();
         assert!(cached.contains_key(&substitute), "{:?}", cached.keys());
@@ -1169,4 +1352,304 @@ fn parent_context_overlaps_requests_and_forks_isolate_counters() {
     assert_eq!(fork.count(), 2);
     assert_eq!(rpc.count(), 0);
     server.join().unwrap();
+}
+
+/// A real contract call fetched through the loopback node: child trie nodes arrive only through
+/// `state_getChildReadProof`, pinned to the parent, and a missing or corrupted child proof fails.
+#[test]
+fn real_contract_call_fetches_pinned_child_proofs_and_rejects_bad_ones() {
+    #[derive(Clone, Copy, Debug, PartialEq)]
+    enum Child {
+        Honest,
+        Empty,
+        Corrupt,
+    }
+    let path = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../fixtures/replay/paseo-asset-hub-contract");
+    let artifact = Artifact::load(&path).unwrap();
+    let trie_id =
+        unhex("0xefdd7b91c3f1506385cbe9ee6e0255a6e4d12d4d2dd1f45975d5160872c45a2d").unwrap();
+    let child = ChildInfo::new_default(&trie_id);
+    let prefixed = rpc::hex0(child.prefixed_storage_key().as_slice());
+    // The child keys the block reads and writes, from the offline replay.
+    let offline = replay(artifact.clone(), None).unwrap();
+    let block_keys: std::collections::BTreeSet<String> =
+        polkadot_frame_trace_model::TracedBlock::from_replay(&offline.capture)
+            .unwrap()
+            .ops
+            .iter()
+            .filter(|o| o.child_trie.is_some())
+            .map(|o| o.key.to_hex())
+            .collect();
+    assert_eq!(block_keys.len(), 6);
+    let parent_header: Header = serde_json::from_value(artifact.parent_header.clone()).unwrap();
+    let parent = parent_header.hash();
+    // Nodes of the contract's child trie: its full proof minus the top trie path to its root.
+    let backend = || {
+        let mut memory = sp_trie::MemoryDB::<Blake2Hasher>::default();
+        for node in &artifact.proof_nodes {
+            HashDB::insert(&mut memory, EMPTY_PREFIX, &unhex(node).unwrap());
+        }
+        sp_state_machine::TrieBackendBuilder::new(memory, *parent_header.state_root()).build()
+    };
+    let child_keys: Vec<_> = block_keys.iter().map(|k| unhex(k).unwrap()).collect();
+    let child_proof =
+        sp_state_machine::prove_child_read_on_trie_backend(&backend(), &child, &child_keys)
+            .unwrap();
+    let top_path = sp_state_machine::prove_read_on_trie_backend(
+        &backend(),
+        [child.prefixed_storage_key().into_inner()],
+    )
+    .unwrap();
+    let top_path: std::collections::BTreeSet<_> = top_path.into_iter_nodes().collect();
+    let child_nodes: std::collections::BTreeSet<_> = child_proof
+        .into_iter_nodes()
+        .filter(|n| !top_path.contains(n))
+        .collect();
+    assert!(!child_nodes.is_empty());
+    // Top trie requests get every other fixture node: the test is about child proofs.
+    let top_nodes: Vec<String> = artifact
+        .proof_nodes
+        .iter()
+        .filter(|n| !child_nodes.contains(&unhex(n).unwrap()))
+        .cloned()
+        .collect();
+
+    for mode in [Child::Honest, Child::Empty, Child::Corrupt] {
+        let trie = backend();
+        let served = artifact.clone();
+        let top_nodes = top_nodes.clone();
+        let child = child.clone();
+        let (rpc, requests, halt, worker) = server(move |request| {
+            let keys = |at: usize| -> Vec<Vec<u8>> {
+                request["params"][at]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|v| unhex(v.as_str().unwrap()).unwrap())
+                    .collect()
+            };
+            // The fixture holds only the nodes the block used. Prove each requested key on its
+            // own and merge, so one key outside the fixture does not empty the whole response.
+            let nodes = |proofs: Vec<sp_trie::StorageProof>| -> Value {
+                let nodes: std::collections::BTreeSet<_> = proofs
+                    .into_iter()
+                    .flat_map(|p| p.into_iter_nodes())
+                    .map(|n| rpc::hex0(&n))
+                    .collect();
+                json!({"at": parent, "proof": nodes})
+            };
+            match request["method"].as_str().unwrap() {
+                "chain_getBlock" => json!({"block": served.block}),
+                "chain_getHeader" => served.parent_header.clone(),
+                "state_getRuntimeVersion" => served.runtime_version.clone(),
+                "state_getReadProof" => {
+                    assert_eq!(request["params"][1], json!(parent));
+                    json!({"at": parent, "proof": top_nodes})
+                }
+                "state_getChildReadProof" => {
+                    let proofs = keys(1)
+                        .into_iter()
+                        .filter_map(|key| {
+                            sp_state_machine::prove_child_read_on_trie_backend(&trie, &child, [key])
+                                .ok()
+                        })
+                        .collect();
+                    match mode {
+                        Child::Honest => nodes(proofs),
+                        Child::Empty => nodes(Vec::new()),
+                        Child::Corrupt => {
+                            let mut response = nodes(proofs);
+                            for node in response["proof"].as_array_mut().unwrap() {
+                                let mut bytes = unhex(node.as_str().unwrap()).unwrap();
+                                let last = bytes.len() - 1;
+                                bytes[last] ^= 0x01;
+                                *node = json!(rpc::hex0(&bytes));
+                            }
+                            response
+                        }
+                    }
+                }
+                method => panic!("unexpected RPC {method}"),
+            }
+        });
+        let session = ReplaySession::new(None)
+            .unwrap()
+            .with_speculative_discovery(false);
+        let result = online_with_session(&rpc, &format!("{:?}", artifact.block_hash), &session);
+        let requests = requests.lock().unwrap().clone();
+        stop(halt, worker);
+
+        let child_requests: Vec<_> = requests
+            .iter()
+            .filter(|r| r["method"] == "state_getChildReadProof")
+            .collect();
+        assert!(!child_requests.is_empty(), "{mode:?}");
+        for request in &child_requests {
+            // Pinned to the parent block, the contract's prefixed child storage key and
+            // child-local keys the block uses.
+            assert_eq!(request["params"][0], json!(prefixed), "{mode:?}");
+            assert_eq!(request["params"][2], json!(parent), "{mode:?}");
+            for key in request["params"][1].as_array().unwrap() {
+                assert!(
+                    block_keys.contains(key.as_str().unwrap()),
+                    "{mode:?}: {key}"
+                );
+            }
+        }
+        match mode {
+            Child::Honest => {
+                let result = result.unwrap();
+                assert!(result.root_check);
+                assert_eq!(result.measured_rpc_count, 0);
+                assert_eq!(result.computed_state_root, offline.computed_state_root);
+                let requested: std::collections::BTreeSet<String> = child_requests
+                    .iter()
+                    .flat_map(|r| r["params"][1].as_array().unwrap())
+                    .map(|k| k.as_str().unwrap().to_owned())
+                    .collect();
+                assert_eq!(requested, block_keys);
+                // Every child op in the online trace is on the contract's trie, as offline.
+                let traced =
+                    polkadot_frame_trace_model::TracedBlock::from_replay(&result.capture).unwrap();
+                assert!(
+                    traced
+                        .ops
+                        .iter()
+                        .filter_map(|o| o.child_trie.as_ref())
+                        .all(|c| c.complete() == Some(&trie_id[..]))
+                );
+            }
+            Child::Empty | Child::Corrupt => {
+                // Rejected at the first child read: the node the trie needs is not in the
+                // response (empty) or its hash no longer matches (corrupted).
+                let error = result.unwrap_err().to_string();
+                assert!(
+                    error.contains("proof did not contain")
+                        && error.contains("missing/invalid proof node"),
+                    "{mode:?}: {error}"
+                );
+                assert!(
+                    child_nodes.iter().any(|node| error.contains(&format!(
+                        "{:?}",
+                        H256::from(sp_io::hashing::blake2_256(node))
+                    ))),
+                    "{mode:?}: names a child trie node: {error}"
+                );
+                assert!(
+                    block_keys
+                        .iter()
+                        .any(|key| error.contains(&format!("at {key}"))),
+                    "{mode:?}: at a child key: {error}"
+                );
+            }
+        }
+    }
+}
+
+/// Threads of this process, from the operating system.
+fn os_threads() -> usize {
+    if let Ok(tasks) = std::fs::read_dir("/proc/self/task") {
+        return tasks.count();
+    }
+    let out = std::process::Command::new("ps")
+        .args(["-M", "-p", &std::process::id().to_string()])
+        .output()
+        .unwrap();
+    String::from_utf8_lossy(&out.stdout).lines().count() - 1
+}
+
+#[test]
+fn prefetch_reuses_a_fixed_set_of_request_threads() {
+    const CHILD: &str = "FRAME_TRACE_PREFETCH_THREADS_TEST";
+    // Run alone in a child process, so other tests' threads do not change the count.
+    if std::env::var_os(CHILD).is_none() {
+        let output = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "tests::prefetch_reuses_a_fixed_set_of_request_threads",
+                "--nocapture",
+                "--test-threads=1",
+            ])
+            .env(CHILD, "1")
+            .output()
+            .unwrap();
+        let text = String::from_utf8_lossy(&output.stdout).into_owned()
+            + &String::from_utf8_lossy(&output.stderr);
+        assert!(output.status.success(), "{text}");
+        assert!(text.contains("1 passed"), "{text}");
+        return;
+    }
+    let parent = H256::repeat_byte(3);
+    // One thread answers every request in turn: the server adds no threads while counting.
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    let served = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let count = served.clone();
+    thread::spawn(move || {
+        for stream in listener.incoming() {
+            let mut stream = stream.unwrap();
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut len = 0;
+            loop {
+                let mut line = String::new();
+                if reader.read_line(&mut line).unwrap() == 0 || line == "\r\n" {
+                    break;
+                }
+                if let Some(value) = line.to_lowercase().strip_prefix("content-length:") {
+                    len = value.trim().parse().unwrap();
+                }
+            }
+            let mut bytes = vec![0; len];
+            reader.read_exact(&mut bytes).unwrap();
+            let request: Value = serde_json::from_slice(&bytes).unwrap();
+            let body =
+                json!({"jsonrpc":"2.0","id":request["id"],"result":{"at":parent,"proof":[]}})
+                    .to_string();
+            count.fetch_add(1, Ordering::SeqCst);
+            write!(
+                stream,
+                "HTTP/1.1 200 OK\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                body.len()
+            )
+            .unwrap();
+        }
+    });
+    let rpc = Rpc::new(&url).unwrap();
+    let session = ReplaySession::new(None).unwrap();
+    // 10 batches of 32 keys: two rounds of 8 and 2 requests.
+    let keys: Vec<_> = (0..320u32).map(|i| i.to_be_bytes().to_vec()).collect();
+    let replay = || {
+        ProofDb::with_session(Some(rpc.fork()), parent, session.clone())
+            .prefetch(&keys)
+            .unwrap()
+    };
+    // The first replay starts the request threads and the network runtime.
+    replay();
+    let before = os_threads();
+    let peak = Arc::new(std::sync::atomic::AtomicUsize::new(before));
+    let done = Arc::new(AtomicBool::new(false));
+    let sampler = {
+        let (peak, done) = (peak.clone(), done.clone());
+        thread::spawn(move || {
+            while !done.load(Ordering::SeqCst) {
+                // Less this sampler thread.
+                peak.fetch_max(os_threads() - 1, Ordering::SeqCst);
+            }
+        })
+    };
+    let replays = 50;
+    for _ in 0..replays {
+        replay();
+    }
+    done.store(true, Ordering::SeqCst);
+    sampler.join().unwrap();
+    let after = os_threads();
+    assert_eq!(served.load(Ordering::SeqCst), (replays + 1) * 10);
+    assert_eq!(rpc.pool_threads(), Some(rpc.parallelism()));
+    assert!(
+        after <= before && peak.load(Ordering::SeqCst) <= before,
+        "threads before {before}, at most {} during and {after} after {replays} replays",
+        peak.load(Ordering::SeqCst)
+    );
 }

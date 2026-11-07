@@ -1,11 +1,9 @@
 # Phases of a block
 
-A **phase** is one part of a block's execution.
-frame-trace puts every storage operation in exactly one phase.
-In Jaeger every phase is a child of the block span, except `post inherents (on_poll)`.
-That phase sits inside the first extrinsic that is not an inherent, when the block has one.
-When the block has only inherents, it is a top-level phase of its own, just before finalization.
-In the tables each phase is a row.
+A **phase** is one part of the block execution.
+polkadot-frame-trace puts each storage operation in one phase only.
+In the tables, each phase is a row.
+In Jaeger, phases are children of the block span. The post-inherent hooks may instead be nested inside an extrinsic, see [below](#why-post-inherents-sit-inside-an-extrinsic).
 
 ## The phases, in order
 
@@ -13,8 +11,8 @@ In the tables each phase is a row.
 | --- | --- |
 | `initialization` | Block setup and every pallet's `on_initialize` hook. |
 | `extrinsic N: Pallet.call` | One extrinsic, numbered from 0 in block order, for example `extrinsic 2: Utility.batch`. |
-| `post inherents (on_poll)` | Hooks such as `on_poll` that run once the inherents are done. They sit inside the first non-inherent extrinsic, or stand alone before finalization when there is none. See below. |
-| `finalization` | `on_idle` hooks, when weight remains and no multi-block migration is running, then every pallet's `on_finalize` hook, then the final checks. |
+| `post inherents (on_poll)` | Hooks such as `on_poll`, after the inherents. They run inside the first non-inherent extrinsic. Without one, they form a separate phase before finalization. |
+| `finalization` | `on_idle` hooks run if weight remains and no multi-block migration is active. Every pallet's `on_finalize` hook follows. Final checks run last. |
 
 Here is block #4 of the People fixture as `summary` prints it:
 
@@ -34,18 +32,19 @@ Here is block #4 of the People fixture as `summary` prints it:
 
 ## Why post inherents sit inside an extrinsic
 
-The runtime runs the post-inherent hooks lazily.
-They start when the first extrinsic that is not an inherent is applied, inside that extrinsic.
-That extrinsic is usually signed, but it can be an unsigned one.
-frame-trace shows the hooks nested under it, with `└`, and counts them separately.
-The extrinsic's own row does not include them.
-If a block has only inherents, post inherents is a phase of its own, as in most Westend Asset Hub blocks.
+The runtime does not run the post-inherent hooks immediately after the inherents.
+It runs them when it applies the first extrinsic that is not an inherent, inside that extrinsic.
+That extrinsic is usually signed, but it may be unsigned.
+polkadot-frame-trace shows the hooks in a separate row under that extrinsic, marked with `└`.
+The extrinsic's row does not include those operations.
+If a block has only inherents, post inherents is a phase of its own, before finalization.
+Most Westend Asset Hub blocks are like this.
 
 ## Phase groups
 
-When frame-trace adds up many blocks, it groups the extrinsic phases.
-It sorts them by whether the extrinsic is signed, read from the extrinsic's bytes.
-That is an approximation of inherents and user transactions: an unsigned extrinsic that is not an inherent lands in the inherents group.
+polkadot-frame-trace groups extrinsic phases when it combines blocks.
+It reads from each extrinsic's bytes whether it is signed. Unsigned extrinsics go in the inherents group, signed ones in the signed group.
+So an unsigned extrinsic that is not an inherent also lands in the inherents group.
 The group names appear in the **Phase shares** table:
 
 | Group | Contains |

@@ -10,7 +10,7 @@ use std::{
 
 static REPLAY_TEST_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
-const BIN: &str = env!("CARGO_BIN_EXE_frame-trace");
+const BIN: &str = env!("CARGO_BIN_EXE_polkadot-frame-trace");
 
 fn fixture(path: &str) -> String {
     format!("{}/../../fixtures/{path}", env!("CARGO_MANIFEST_DIR"))
@@ -144,31 +144,60 @@ fn ignored_source_options_are_rejected_before_loading_or_connecting() {
 
 #[test]
 fn command_help_has_plain_descriptions_examples_and_hidden_compatible_aliases() {
-    for (command, description) in [
+    for (command, description, words) in [
         (
             "block",
             "Trace storage use in one block and export it to JSON or a trace viewer",
+            &[
+                "best",
+                "--proof-concurrency",
+                "--cache-dir",
+                "--cache-max-bytes",
+                "http://127.0.0.1:4318",
+            ][..],
         ),
         (
             "summary",
             "Show storage use by block phase and storage item",
+            &[],
         ),
         (
             "call",
             "Trace storage use and the result of a runtime API call",
+            &[
+                "--check-state-call",
+                "stdout",
+                "--json",
+                "OTLP/HTTP",
+                "32 proof keys",
+                "compiled Wasm",
+                "cache limit",
+                "--unauthenticated-metadata",
+            ],
         ),
         (
             "report",
             "Compare storage use across saved blocks or a range of finalized blocks",
+            &[],
         ),
-        ("follow", "Trace new finalized blocks as they arrive"),
+        (
+            "follow",
+            "Trace new finalized blocks as they arrive",
+            &[
+                "http://127.0.0.1:4318",
+                "--best",
+                "finalized",
+                "--rpc-timeout <SECONDS>",
+            ],
+        ),
     ] {
         let out = run(&[command, "--help"]);
         assert!(out.status.success());
         let help = String::from_utf8(out.stdout).unwrap();
         assert!(help.starts_with(description), "{help}");
         assert_eq!(
-            help.matches(&format!("  frame-trace {command} ")).count(),
+            help.matches(&format!("  polkadot-frame-trace {command} "))
+                .count(),
             2,
             "{help}"
         );
@@ -176,8 +205,8 @@ fn command_help_has_plain_descriptions_examples_and_hidden_compatible_aliases() 
             !help.contains("--oracle") && !help.contains("--rpc-metadata-fallback"),
             "{help}"
         );
-        if command == "call" {
-            assert!(help.contains("--check-state-call"), "{help}");
+        for word in words {
+            assert!(help.contains(word), "{command}: {word}: {help}");
         }
         if matches!(command, "block" | "summary" | "call") {
             let flag = if command == "call" { "--at" } else { "--block" };
@@ -264,8 +293,10 @@ fn summary_prints_phase_and_item_tables() {
 
 #[test]
 fn block_writes_json() {
-    let path =
-        std::env::temp_dir().join(format!("frame-trace-cli-test-{}.json", std::process::id()));
+    let path = std::env::temp_dir().join(format!(
+        "polkadot-frame-trace-cli-test-{}.json",
+        std::process::id()
+    ));
     let out = run(&[
         "block",
         "--from-file",
@@ -338,7 +369,10 @@ fn duplicate_reads_are_grouped_by_key_not_by_name() {
         get("bb"),
         get("bb"),
     );
-    let path = std::env::temp_dir().join(format!("frame-trace-dups-{}.json", std::process::id()));
+    let path = std::env::temp_dir().join(format!(
+        "polkadot-frame-trace-dups-{}.json",
+        std::process::id()
+    ));
     std::fs::write(&path, json).unwrap();
     let out = run(&["summary", "--from-file", path.to_str().unwrap()]);
     std::fs::remove_file(&path).ok();
@@ -587,7 +621,10 @@ fn child_trie_keys_are_named_and_grouped_by_key() {
         get("bb"),
         get("bb"),
     );
-    let path = std::env::temp_dir().join(format!("frame-trace-child-{}.json", std::process::id()));
+    let path = std::env::temp_dir().join(format!(
+        "polkadot-frame-trace-child-{}.json",
+        std::process::id()
+    ));
     std::fs::write(&path, json).unwrap();
     let out = run(&["summary", "--from-file", path.to_str().unwrap()]);
     std::fs::remove_file(&path).ok();
@@ -614,7 +651,7 @@ fn child_trie_keys_are_named_and_grouped_by_key() {
 fn offline_block_reports_root_and_writes_measured_named_json() {
     let _serial = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
     let path = std::env::temp_dir().join(format!(
-        "frame-trace-offline-cli-{}.json",
+        "polkadot-frame-trace-offline-cli-{}.json",
         std::process::id()
     ));
     let out = run(&[
@@ -724,7 +761,7 @@ impl Drop for MockNode {
     }
 }
 fn artifact_rpc(
-    artifact: &frame_trace_replay::Artifact,
+    artifact: &polkadot_frame_trace_replay::Artifact,
     request: &serde_json::Value,
 ) -> serde_json::Value {
     use serde_json::json;
@@ -750,7 +787,7 @@ fn block_and_summary_pin_the_finalized_head_before_replay() {
     };
     let _guard = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
     for command in ["block", "summary"] {
-        let artifact = frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
+        let artifact = polkadot_frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
             "replay/people-transfer",
         )))
         .unwrap();
@@ -784,7 +821,7 @@ fn call_pins_finalized_state_for_replay_and_state_call_check() {
         atomic::{AtomicUsize, Ordering},
     };
     let _guard = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
-    let artifact = frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
+    let artifact = polkadot_frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
         "replay/call-westend-nonce",
     )))
     .unwrap();
@@ -846,12 +883,15 @@ fn call_pins_finalized_state_for_replay_and_state_call_check() {
 #[test]
 fn cli_save_then_offline_ignores_unauthenticated_rpc_metadata() {
     let _serial = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
-    let artifact = frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
+    let artifact = polkadot_frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
         "replay/people-transfer",
     )))
     .unwrap();
     let node = MockNode::new(move |request| artifact_rpc(&artifact, request));
-    let dir = std::env::temp_dir().join(format!("frame-trace-cli-save-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!(
+        "polkadot-frame-trace-cli-save-{}",
+        std::process::id()
+    ));
     let output = run(&[
         "block",
         "--rpc",
@@ -868,7 +908,7 @@ fn cli_save_then_offline_ignores_unauthenticated_rpc_metadata() {
         "{stderr}"
     );
     drop(node); // The round trip must work after the mock node has stopped.
-    let saved = frame_trace_replay::Artifact::load(&dir).unwrap();
+    let saved = polkadot_frame_trace_replay::Artifact::load(&dir).unwrap();
     assert!(saved.proof_nodes.iter().all(|node| node.starts_with("0x")));
     for command in ["block", "summary"] {
         let output = run(&[command, "--offline", dir.to_str().unwrap()]);
@@ -895,7 +935,7 @@ fn follow_mock_node_retries_failed_blocks_observes_new_heads_and_cancels() {
         thread,
         time::{Duration, Instant},
     };
-    let artifact = frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
+    let artifact = polkadot_frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
         "replay/people-transfer",
     )))
     .unwrap();
@@ -906,7 +946,7 @@ fn follow_mock_node_retries_failed_blocks_observes_new_heads_and_cancels() {
     let mut new_header = artifact.block["header"].clone();
     new_header["parentHash"] = serde_json::json!(artifact.block_hash);
     new_header["number"] = "0x3".into();
-    let new_hash = frame_trace_replay::header_hash(&new_header).unwrap();
+    let new_hash = polkadot_frame_trace_replay::header_hash(&new_header).unwrap();
     let expected_new = new_hash.clone();
     let node = MockNode::new(move |request| {
         if request["method"] == "chain_getBlock" && request["params"][0] == new_hash {
@@ -929,7 +969,7 @@ fn follow_mock_node_retries_failed_blocks_observes_new_heads_and_cancels() {
         artifact_rpc(&artifact, request)
     });
     let log = std::env::temp_dir().join(format!(
-        "frame-trace-follow-test-{}.log",
+        "polkadot-frame-trace-follow-test-{}.log",
         std::process::id()
     ));
     let file = std::fs::File::create(&log).unwrap();
@@ -978,87 +1018,459 @@ fn follow_mock_node_retries_failed_blocks_observes_new_heads_and_cancels() {
     assert!(
         text.contains("in-flight=")
             && text.contains("stopped=")
-            && text.contains("follow stopped")
+            && text.contains("follow stopped after ")
             && !text.contains("panicked at")
     );
 }
 
-#[test]
-fn follow_ctrl_c_interrupts_a_stalled_websocket_handshake() {
+/// Sends `signal` to `child` and waits up to ten seconds for it to exit.
+fn stop_child(child: &mut std::process::Child, signal: &str) -> std::process::ExitStatus {
     use std::{
-        process::Stdio,
         thread,
         time::{Duration, Instant},
     };
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let url = format!("ws://{}", listener.local_addr().unwrap());
-    let mut child = Command::new(BIN)
-        .args(["follow", "--rpc", &url])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .unwrap();
-    let (mut stream, _) = listener.accept().unwrap();
-    stream.set_nonblocking(false).unwrap();
-    let node = thread::spawn(move || {
-        let _ = stream.read_to_end(&mut Vec::new());
-    });
     let start = Instant::now();
     Command::new("kill")
-        .args(["-INT", &child.id().to_string()])
+        .args([signal, &child.id().to_string()])
         .status()
         .unwrap();
     while child.try_wait().unwrap().is_none() && start.elapsed() < Duration::from_secs(10) {
-        thread::sleep(Duration::from_millis(10));
+        thread::sleep(Duration::from_millis(20));
     }
     if child.try_wait().unwrap().is_none() {
         child.kill().unwrap();
     }
-    assert!(child.wait().unwrap().success());
-    assert!(start.elapsed() < Duration::from_secs(10));
-    node.join().unwrap();
+    let status = child.wait().unwrap();
+    assert!(start.elapsed() < Duration::from_secs(10), "{status:?}");
+    status
+}
+
+/// Waits up to `secs` seconds for the log to contain `text`.
+fn wait_for_log(log: &std::path::Path, text: &str, secs: u64) -> String {
+    let start = std::time::Instant::now();
+    loop {
+        let current = std::fs::read_to_string(log).unwrap();
+        if current.contains(text) || start.elapsed() > std::time::Duration::from_secs(secs) {
+            return current;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+}
+
+/// Kills the child on drop, so a failed assertion cannot leave `follow` running.
+struct Child(std::process::Child);
+impl Drop for Child {
+    fn drop(&mut self) {
+        if self.0.try_wait().ok().flatten().is_none() {
+            let _ = self.0.kill();
+            let _ = self.0.wait();
+        }
+    }
+}
+
+/// An OTLP/HTTP receiver that answers `503` while `down` is set and `200` otherwise, and
+/// counts the requests it accepted.
+fn switchable_receiver(
+    down: std::sync::Arc<std::sync::atomic::AtomicBool>,
+) -> (String, std::sync::Arc<std::sync::atomic::AtomicUsize>) {
+    use std::sync::atomic::Ordering;
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let url = format!("http://{}", listener.local_addr().unwrap());
+    let accepted = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let count = accepted.clone();
+    std::thread::spawn(move || {
+        for stream in listener.incoming() {
+            let Ok(mut stream) = stream else { return };
+            let mut reader = BufReader::new(stream.try_clone().unwrap());
+            let mut len = 0;
+            loop {
+                let mut line = String::new();
+                if reader.read_line(&mut line).unwrap_or(0) == 0 || line == "\r\n" {
+                    break;
+                }
+                if let Some(v) = line.to_ascii_lowercase().strip_prefix("content-length:") {
+                    len = v.trim().parse().unwrap_or(0);
+                }
+            }
+            if reader.read_exact(&mut vec![0; len]).is_err() {
+                continue;
+            }
+            let status = if down.load(Ordering::SeqCst) {
+                "503 Service Unavailable"
+            } else {
+                count.fetch_add(1, Ordering::SeqCst);
+                "200 OK"
+            };
+            let _ = write!(
+                stream,
+                "HTTP/1.1 {status}\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"
+            );
+        }
+    });
+    (url, accepted)
 }
 
 #[test]
-fn help_describes_best_concurrency_cache_and_otlp_default() {
-    let output = run(&["block", "--help"]);
-    let text = String::from_utf8_lossy(&output.stdout);
-    for word in [
-        "best",
-        "--proof-concurrency",
-        "--cache-dir",
-        "--cache-max-bytes",
-        "http://127.0.0.1:4318",
-    ] {
-        assert!(text.contains(word), "{text}");
-    }
-    let output = run(&["call", "--help"]);
-    let text = String::from_utf8_lossy(&output.stdout);
-    for word in [
-        "stdout",
-        "--json",
-        "OTLP/HTTP",
-        "32 keys",
-        "compiled Wasm",
-        "cache limit",
-        "--unauthenticated-metadata",
-    ] {
-        assert!(text.contains(word), "{text}");
-    }
-    let output = run(&["follow", "--help"]);
-    let text = String::from_utf8_lossy(&output.stdout);
-    assert!(
-        text.contains("http://127.0.0.1:4318")
-            && text.contains("--best")
-            && text.contains("finalized")
+fn follow_retries_only_the_export_while_the_collector_is_down() {
+    let _serial = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    use std::{
+        process::Stdio,
+        sync::{
+            Arc,
+            atomic::{AtomicBool, AtomicUsize, Ordering},
+        },
+    };
+    let artifact = polkadot_frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
+        "replay/people-transfer",
+    )))
+    .unwrap();
+    let blocks = Arc::new(AtomicUsize::new(0));
+    let fetched = blocks.clone();
+    let node = MockNode::new(move |request| {
+        if request["method"] == "chain_getBlock" {
+            fetched.fetch_add(1, Ordering::SeqCst);
+        }
+        artifact_rpc(&artifact, request)
+    });
+    let down = Arc::new(AtomicBool::new(true));
+    let (otlp, accepted) = switchable_receiver(down.clone());
+    let log = std::env::temp_dir().join(format!(
+        "polkadot-frame-trace-follow-otlp-{}.log",
+        std::process::id()
+    ));
+    let mut child = Child(
+        Command::new(BIN)
+            .args(["follow", "--rpc", &node.url, "--otlp", &otlp])
+            // Keep each failed try short; the exporter retries 503 within this time.
+            .env("OTEL_EXPORTER_OTLP_TIMEOUT", "500")
+            .stdout(Stdio::null())
+            .stderr(std::fs::File::create(&log).unwrap())
+            .spawn()
+            .unwrap(),
     );
+    let text = wait_for_log(&log, "OTLP export failed", 120);
+    assert!(
+        text.contains("OTLP export failed (1 attempt(s) in a row)"),
+        "{text}"
+    );
+    down.store(false, Ordering::SeqCst);
+    wait_for_log(&log, "OTLP export recovered", 30);
+    let status = stop_child(&mut child.0, "-TERM");
+    let text = std::fs::read_to_string(&log).unwrap();
+    std::fs::remove_file(log).unwrap();
+    assert!(status.success(), "{status:?}: {text}");
+    assert!(text.contains("OTLP export recovered after "), "{text}");
+    assert!(
+        text.contains(
+            "traced=1 exported=1 export-rejected=0 export-failed=0 export-dropped=0 export-unsent=0"
+        ),
+        "{text}"
+    );
+    // The block was replayed once and its one batch accepted once.
+    assert_eq!(blocks.load(Ordering::SeqCst), 1, "{text}");
+    assert_eq!(accepted.load(Ordering::SeqCst), 1, "{text}");
+}
+
+/// A pipe already full, so that every write to it blocks until the test ends.
+fn full_pipe() -> (std::io::PipeReader, std::io::PipeWriter) {
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+    let (reader, writer) = std::io::pipe().unwrap();
+    let mut filler = writer.try_clone().unwrap();
+    let written = Arc::new(AtomicUsize::new(0));
+    let progress = written.clone();
+    std::thread::spawn(move || {
+        while filler.write_all(&[b'x'; 512]).is_ok() {
+            progress.fetch_add(512, Ordering::SeqCst);
+        }
+    });
+    // Full once the filler stops making progress.
+    let mut last = usize::MAX;
+    loop {
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        let now = written.load(Ordering::SeqCst);
+        if now == last && now > 0 {
+            break;
+        }
+        last = now;
+    }
+    (reader, writer)
+}
+
+#[test]
+fn follow_stops_on_signals_with_a_summary_even_when_nobody_reads_its_stderr() {
+    use std::process::Stdio;
+    // The signals sent, whether stderr is a full pipe, and the exit code.
+    for (signals, full, code) in [
+        (&["-INT"][..], false, 0),
+        (&["-TERM"], false, 0),
+        (&["-TERM"], true, 0),
+        (&["-TERM", "-INT"], true, 130),
+    ] {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("ws://{}", listener.local_addr().unwrap());
+        let log = std::env::temp_dir().join(format!(
+            "polkadot-frame-trace-signal-{}.log",
+            std::process::id()
+        ));
+        let (_reader, stderr) = if full {
+            let (reader, writer) = full_pipe();
+            (Some(reader), Stdio::from(writer))
+        } else {
+            (None, Stdio::from(std::fs::File::create(&log).unwrap()))
+        };
+        let mut child = Child(
+            Command::new(BIN)
+                .args(["follow", "--rpc", &url])
+                .stdout(Stdio::null())
+                .stderr(stderr)
+                .spawn()
+                .unwrap(),
+        );
+        // The first check for new blocks waits on this stalled handshake.
+        let (_stream, _) = listener.accept().unwrap();
+        for signal in signals {
+            Command::new("kill")
+                .args([*signal, &child.0.id().to_string()])
+                .status()
+                .unwrap();
+        }
+        let exit = exit_code_within(&mut child, 15);
+        let text = if full {
+            String::new()
+        } else {
+            let text = std::fs::read_to_string(&log).unwrap();
+            std::fs::remove_file(&log).unwrap();
+            text
+        };
+        assert_eq!(exit, Some(code), "{signals:?}: {text}");
+        if !full {
+            for line in ["follow: stopping", "follow stopped after ", " traced=0 "] {
+                assert!(text.contains(line), "{signals:?}: {text}");
+            }
+        }
+    }
+}
+
+/// Waits up to `secs` seconds for `child` to exit and returns its exit code.
+fn exit_code_within(child: &mut Child, secs: u64) -> Option<i32> {
+    let start = std::time::Instant::now();
+    loop {
+        if let Some(status) = child.0.try_wait().unwrap() {
+            return status.code();
+        }
+        if start.elapsed() > std::time::Duration::from_secs(secs) {
+            return None;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+}
+
+#[test]
+fn follow_startup_errors_and_replays_do_not_wait_for_a_blocked_stderr() {
+    let _serial = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    use std::{
+        process::Stdio,
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
+    };
+    // A startup error is queued like every other line, then `follow` exits 1.
+    let (_reader, writer) = full_pipe();
+    let mut child = Child(
+        Command::new(BIN)
+            .args(["follow", "--rpc", "invalid"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::from(writer))
+            .spawn()
+            .unwrap(),
+    );
+    assert_eq!(exit_code_within(&mut child, 10), Some(1));
+    // Replays write progress lines from worker threads; a stop must not wait for them.
+    let artifact = polkadot_frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
+        "replay/people-transfer",
+    )))
+    .unwrap();
+    let proofs = Arc::new(AtomicUsize::new(0));
+    let seen = proofs.clone();
+    let node = MockNode::new(move |request| {
+        if request["method"] == "state_getReadProof" {
+            seen.fetch_add(1, Ordering::SeqCst);
+        }
+        artifact_rpc(&artifact, request)
+    });
+    let (_reader, writer) = full_pipe();
+    let mut child = Child(
+        Command::new(BIN)
+            .args(["follow", "--rpc", &node.url])
+            .stdout(Stdio::null())
+            .stderr(Stdio::from(writer))
+            .spawn()
+            .unwrap(),
+    );
+    let start = std::time::Instant::now();
+    while proofs.load(Ordering::SeqCst) == 0 && start.elapsed().as_secs() < 60 {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+    assert!(
+        proofs.load(Ordering::SeqCst) > 0,
+        "the replay never started"
+    );
+    Command::new("kill")
+        .args(["-TERM", &child.0.id().to_string()])
+        .status()
+        .unwrap();
+    // The stop waits at most 10 s for replays and 2 s for the log.
+    assert_eq!(exit_code_within(&mut child, 20), Some(0));
+}
+
+#[test]
+fn follow_exits_1_when_its_stderr_is_closed() {
+    use std::process::Stdio;
+    // Nobody will ever read: every write to this pipe fails, as after journald restarted.
+    let (reader, writer) = std::io::pipe().unwrap();
+    drop(reader);
+    let mut child = Child(
+        Command::new(BIN)
+            .args(["follow", "--rpc", "ws://127.0.0.1:9"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::from(writer))
+            .spawn()
+            .unwrap(),
+    );
+    assert_eq!(exit_code_within(&mut child, 15), Some(1));
+}
+
+#[test]
+fn follow_exits_1_with_a_summary_when_its_threads_die() {
+    use std::{process::Stdio, time::Duration};
+    for (fault, reason) in [
+        ("workers", "all replay workers stopped"),
+        ("export-thread", "the OTLP export thread stopped"),
+        (
+            "hung-replay",
+            "the replay of block #0 0xtest ran the runtime for more than 1s without finishing",
+        ),
+    ] {
+        let log = std::env::temp_dir().join(format!(
+            "polkadot-frame-trace-fault-{fault}-{}.log",
+            std::process::id()
+        ));
+        let mut child = Child(
+            Command::new(BIN)
+                .args([
+                    "follow",
+                    "--rpc",
+                    "ws://127.0.0.1:9",
+                    "--otlp",
+                    "http://127.0.0.1:9",
+                ])
+                .env("FRAME_TRACE_TEST_FAULT", fault)
+                .env("RUST_BACKTRACE", "1")
+                .stdout(Stdio::null())
+                .stderr(std::fs::File::create(&log).unwrap())
+                .spawn()
+                .unwrap(),
+        );
+        let start = std::time::Instant::now();
+        let status = loop {
+            if let Some(status) = child.0.try_wait().unwrap() {
+                break Some(status);
+            }
+            if start.elapsed() > Duration::from_secs(30) {
+                break None;
+            }
+            std::thread::sleep(Duration::from_millis(20));
+        };
+        let text = std::fs::read_to_string(&log).unwrap();
+        std::fs::remove_file(log).unwrap();
+        assert_eq!(status.and_then(|s| s.code()), Some(1), "{fault}: {text}");
+        assert!(
+            text.contains(&format!("follow: {reason}; stopping")),
+            "{text}"
+        );
+        assert!(text.contains("follow stopped after "), "{text}");
+        assert!(
+            text.contains(&format!("Error: follow stopped because {reason}")),
+            "{text}"
+        );
+        if fault == "export-thread" {
+            // The injected panic is logged with its backtrace.
+            assert!(
+                text.contains("injected export thread failure\nstack backtrace:"),
+                "{text}"
+            );
+        }
+    }
+}
+
+#[test]
+fn rpc_timeout_lets_a_slow_node_answer() {
+    let _serial = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    let artifact = polkadot_frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
+        "replay/people-transfer",
+    )))
+    .unwrap();
+    // The block takes 1.5 s to arrive, as a large response from a far node does.
+    let node = MockNode::new(move |request| {
+        if request["method"] == "chain_getBlock" {
+            std::thread::sleep(std::time::Duration::from_millis(1500));
+        }
+        artifact_rpc(&artifact, request)
+    });
+    let out = run(&[
+        "block",
+        "--rpc",
+        &node.url,
+        "--block",
+        "2",
+        "--rpc-timeout",
+        "0.5",
+    ]);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert_eq!(out.status.code(), Some(1), "{stderr}");
+    assert!(
+        stderr.contains("chain_getBlock") && stderr.contains("deadline exceeded"),
+        "{stderr}"
+    );
+    let out = run(&[
+        "block",
+        "--rpc",
+        &node.url,
+        "--block",
+        "2",
+        "--rpc-timeout",
+        "3",
+    ]);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "{stderr}");
+    assert!(stderr.contains("root check: PASS"), "{stderr}");
+    for bad in ["0", "-1", "soon", "3601"] {
+        let out = run(&[
+            "block",
+            "--rpc",
+            &node.url,
+            "--block",
+            "2",
+            "--rpc-timeout",
+            bad,
+        ]);
+        assert_eq!(out.status.code(), Some(2), "{bad}");
+    }
+    let out = run(&["block", "--offline", "missing", "--rpc-timeout", "3"]);
+    assert_eq!(out.status.code(), Some(2));
 }
 
 #[test]
 fn call_offline_exports_measured_named_ops_and_self_contained_round_trip() {
     let _guard = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
-    let dir =
-        std::env::temp_dir().join(format!("frame-trace-call-roundtrip-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!(
+        "polkadot-frame-trace-call-roundtrip-{}",
+        std::process::id()
+    ));
     let out = run(&[
         "call",
         "--offline",
@@ -1180,7 +1592,7 @@ fn call_public_offline_decodes_result_and_labels_recorded_oracle() {
 }
 
 fn call_node(mismatch: bool) -> MockNode {
-    let artifact = frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
+    let artifact = polkadot_frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
         "replay/call-westend-nonce",
     )))
     .unwrap();
@@ -1263,7 +1675,7 @@ fn oracle_mismatch_exits_three_after_emitting_parseable_json_and_summary_to_stde
     let _serial = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
     let node = call_node(true);
     let out = run(&["call", "--rpc", &node.url, "--method", "AccountNonceApi_account_nonce", "--args",
-        &serde_json::json!({"account":frame_trace_replay::rpc::unhex("d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d").unwrap()}).to_string(), "--oracle", "--json", "-", "--summary"]);
+        &serde_json::json!({"account":polkadot_frame_trace_replay::rpc::unhex("d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d").unwrap()}).to_string(), "--oracle", "--json", "-", "--summary"]);
     let stderr = String::from_utf8_lossy(&out.stderr);
     assert_eq!(out.status.code(), Some(3), "{stderr}");
     let json: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
@@ -1318,25 +1730,6 @@ fn unknown_block_hash_reports_block_not_found() {
     ]);
     assert!(String::from_utf8_lossy(&out.stderr).contains("block not found"));
     assert_eq!(out.status.code(), Some(1));
-}
-
-#[test]
-fn mock_handler_assertions_are_reported_and_propagated_to_the_test_thread() {
-    let node = MockNode::new(|_| panic!("handler invariant"));
-    let rpc = frame_trace_replay::rpc::Rpc::new(&node.url).unwrap();
-    let error = rpc
-        .call("chain_getHeader", serde_json::json!([]))
-        .unwrap_err();
-    assert!(
-        error
-            .to_string()
-            .contains("mock handler assertion failed: handler invariant")
-    );
-    assert!(matches!(
-        error,
-        frame_trace_replay::Error::RpcResponse { code: -32099, .. }
-    ));
-    assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| drop(node))).is_err());
 }
 
 #[test]
@@ -1399,11 +1792,11 @@ fn saved_block_json_drives_summary_and_multiblock_reports_without_replay() {
 #[test]
 fn report_last_pins_finalized_hash_and_exports_replay_statistics() {
     let _guard = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
-    let artifact = frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
+    let artifact = polkadot_frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
         "replay/people-transfer",
     )))
     .unwrap();
-    let other = frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
+    let other = polkadot_frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
         "replay/people-kill-prefix",
     )))
     .unwrap();
@@ -1469,7 +1862,7 @@ fn report_help_and_write_errors_explain_options_and_paths() {
     for expected in [
         "First block",
         "Last block",
-        "Maximum concurrent proof requests across all blocks",
+        "Maximum concurrent RPC requests across all blocks",
         "compiled Wasm",
         "disk cache",
         "Maximum rows",
@@ -1498,13 +1891,14 @@ fn report_help_and_write_errors_explain_options_and_paths() {
 
 /// The traced People Wasm is the `:code` value node inside the `people-traced` artifact.
 fn traced_people_wasm(tag: &str) -> std::path::PathBuf {
-    let artifact =
-        frame_trace_replay::Artifact::load(std::path::Path::new(&fixture("replay/people-traced")))
-            .unwrap();
+    let artifact = polkadot_frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
+        "replay/people-traced",
+    )))
+    .unwrap();
     let wasm = artifact
         .proof_nodes
         .iter()
-        .map(|node| frame_trace_replay::rpc::unhex(node).unwrap())
+        .map(|node| polkadot_frame_trace_replay::rpc::unhex(node).unwrap())
         .max_by_key(Vec::len)
         .unwrap();
     assert!(
@@ -1512,7 +1906,7 @@ fn traced_people_wasm(tag: &str) -> std::path::PathBuf {
         "the largest node is the runtime code"
     );
     let path = std::env::temp_dir().join(format!(
-        "frame-trace-traced-people-{tag}-{}.wasm",
+        "polkadot-frame-trace-traced-people-{tag}-{}.wasm",
         std::process::id()
     ));
     std::fs::write(&path, wasm).unwrap();
@@ -1665,7 +2059,7 @@ fn runtime_override_replays_untraced_block_with_traced_wasm_and_labels_it() {
     assert!(stderr.contains("RuntimeVersion matches"), "{stderr}");
 
     // Online replay through safe RPC accepts the same override.
-    let artifact = frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
+    let artifact = polkadot_frame_trace_replay::Artifact::load(std::path::Path::new(&fixture(
         "replay/people-transfer",
     )))
     .unwrap();
@@ -1737,4 +2131,44 @@ fn bad_runtime_override_files_are_rejected_by_name_before_replay() {
         std::fs::remove_file(path).unwrap();
     }
     std::fs::remove_file(wasm).unwrap();
+}
+
+#[test]
+fn missing_host_function_fails_with_its_name_and_no_metadata_notice() {
+    let _serial = REPLAY_TEST_LOCK.lock().unwrap_or_else(|p| p.into_inner());
+    let out = run(&[
+        "block",
+        "--offline",
+        &fixture("replay/westend-asset-hub"),
+        "--runtime-override",
+        &fixture("wasm/missing-host-function.wasm"),
+    ]);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(!out.status.success(), "{stderr}");
+    assert!(
+        stderr.contains(
+            "the runtime needs host functions polkadot-frame-trace does not have: \
+             env:ext_frame_trace_missing_version_1; a runtime override was executed"
+        ),
+        "{stderr}"
+    );
+    // Metadata loading runs the same runtime first. It must stop with this error, not print
+    // a notice that sends the reader after metadata.
+    assert!(!stderr.contains("local metadata unavailable"), "{stderr}");
+    assert!(!stderr.contains("runtime execution failed"), "{stderr}");
+    assert!(stderr.contains("root check: NOT VERIFIED"), "{stderr}");
+}
+
+#[test]
+fn version_prints_the_crate_version_or_the_nightly_build_version() {
+    let output = run(&["--version"]);
+    assert!(output.status.success());
+    let expected = match option_env!("FRAME_TRACE_BUILD_VERSION") {
+        Some(version) if !version.is_empty() => version,
+        _ => env!("CARGO_PKG_VERSION"),
+    };
+    assert_eq!(
+        String::from_utf8(output.stdout).unwrap(),
+        format!("polkadot-frame-trace {expected}\n")
+    );
 }

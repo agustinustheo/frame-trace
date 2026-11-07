@@ -1,6 +1,6 @@
 # Span names and attributes
 
-Every trace uses the service name `frame-trace`.
+Every trace uses the service name `polkadot-frame-trace`.
 This page lists the span names and the attributes on each kind of span.
 
 ## Span tree
@@ -20,7 +20,8 @@ block #4 (0x06618995…0637)                  block span
 └─ finalization                             phase span
 ```
 
-Phases are children of the block span, except `post inherents (on_poll)`: it sits inside the first extrinsic that is not an inherent, or is a top-level phase before finalization when the block has only inherents.
+Phases are children of the block span, except `post inherents (on_poll)`.
+That phase is inside the first extrinsic that is not an inherent. If the block has only inherents, it is a top-level phase before finalization.
 See [Phases of a block](../concepts/phases.md).
 
 ## Span names
@@ -45,8 +46,8 @@ See [Phases of a block](../concepts/phases.md).
 | `put` | write | Write a value. |
 | `clear` | write | Delete a key. |
 | `append` | write | Add an item to a value. |
-| `clear_prefix` | write | Delete every key under a prefix. |
-| `kill_child` | write | Delete a whole child trie. |
+| `clear_prefix` | write | Delete keys under a prefix. The runtime may limit the deletion. |
+| `kill_child` | write | Delete child trie entries. The runtime may limit the deletion. |
 | `storage_root` | other | Compute a storage root. |
 | `index_transaction`, `renew_transaction_index` | other | Index a transaction for storage. |
 | `next_key` | other | Find the next key. The result can still change from pending writes. |
@@ -95,6 +96,7 @@ With `--runtime-override`, also:
 | `frame.phase` | string | Phase kind: `initialization`, `extrinsic`, `post inherents (on_poll)`, `finalization`, or `no phase markers` for a recorded trace without them. |
 | `frame.extrinsic.index` | int | Extrinsic number, for extrinsic phases. |
 | `frame.extrinsic.call` | string | `Pallet.call`, for extrinsic phases. |
+| `frame.extrinsic.hash` | string | `0x`-prefixed blake2-256 of the encoded extrinsic: the transaction hash `author_submitExtrinsic` returns. Use it to join a load generator's records or spans to this phase. Absent when the extrinsic bytes were not in the trace. |
 | `frame.phase.timing_available` | bool | `false` if the phase had no timed operations. Its bar then spans the whole block. |
 | `frame.timing` | string | `timed replay`, or `no timing` if the phase had no timed operations. |
 | `frame.storage.*` totals | int | See [Totals](#totals). |

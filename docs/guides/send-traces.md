@@ -1,12 +1,12 @@
 # Choose where to send traces
 
-frame-trace has two outputs: OpenTelemetry traces over OTLP/HTTP, and JSON files.
+polkadot-frame-trace has two outputs: OpenTelemetry traces over OTLP/HTTP, and JSON files.
 `block`, `call` and `follow` send traces with `--otlp`.
 `block` and `call` write JSON with `--json`.
 
 ## Pick a trace viewer
 
-The repository has a ready Docker Compose setup for each of these, in [`examples/`](https://github.com/agustinustheo/frame-trace/tree/main/examples).
+The repository has a ready Docker Compose setup for each of these, in [`examples/`](https://github.com/agustinustheo/polkadot-frame-trace/tree/main/examples).
 
 | Setup | Use it when | Download | Ready in | Guide |
 | --- | --- | --- | --- | --- |
@@ -21,13 +21,13 @@ Run one at a time.
 
 ## Jaeger
 
-Run this from the `frame-trace` directory:
+Run this from the `polkadot-frame-trace` directory:
 
 ```sh
 cd examples/jaeger
 docker compose up -d
 cd ../..
-frame-trace block --offline fixtures/replay/people-traced --otlp
+polkadot-frame-trace block --offline fixtures/replay/people-traced --otlp
 ```
 
 ```text
@@ -35,31 +35,32 @@ frame-trace block --offline fixtures/replay/people-traced --otlp
 exported 633 spans to http://127.0.0.1:4318
 ```
 
-Open <http://127.0.0.1:16686> and pick the service `frame-trace`.
+Open <http://127.0.0.1:16686> and pick the service `polkadot-frame-trace`.
 [Your first trace](../getting-started/first-trace.md) shows what you will see.
 Stop it with `docker compose down` from `examples/jaeger`.
 
 ## Any other OTLP receiver
 
 `--otlp` takes the base URL of an OTLP/HTTP receiver.
-frame-trace adds `/v1/traces` unless the URL already ends with it.
+polkadot-frame-trace adds `/v1/traces` unless the URL already ends with it.
+Output shows only the scheme, host and port of the URL.
 Both of these send to the same place:
 
 ```sh
-frame-trace block --offline fixtures/replay/people-transfer --otlp http://127.0.0.1:4318
-frame-trace block --offline fixtures/replay/people-transfer --otlp http://127.0.0.1:4318/v1/traces
+polkadot-frame-trace block --offline fixtures/replay/people-transfer --otlp http://127.0.0.1:4318
+polkadot-frame-trace block --offline fixtures/replay/people-transfer --otlp http://127.0.0.1:4318/v1/traces
 ```
 
 ```text
 ...
-exported 428 spans to http://127.0.0.1:4318/v1/traces
+exported 428 spans to http://127.0.0.1:4318
 ```
 
 The receiver must accept OTLP over HTTP with protobuf, usually on port 4318.
 Headers, such as an authorization header, come from `OTEL_EXPORTER_OTLP_HEADERS`.
 See [Send traces through Grafana Alloy to Tempo](send-traces-through-alloy.md#send-to-an-alloy-or-collector-you-already-run).
 
-Every trace uses the service name `frame-trace`.
+Every trace uses the service name `polkadot-frame-trace`.
 Search by span name, such as `extrinsic 2: Utility.batch`, or by attribute, such as `frame.block.number`.
 [Span names and attributes](../reference/spans.md) lists them all.
 
@@ -71,7 +72,7 @@ Search by span name, such as `extrinsic 2: Utility.batch`, or by attribute, such
 | `call` | One trace per call, rooted at `call <method> at #<number>`. |
 | `follow` | One trace per block, as each block is traced. |
 
-frame-trace waits for the receiver to answer and fails if it rejects any span.
+`block` and `call` wait for the receiver to answer, and fail if it rejects any span.
 A receiver may still drop data later, for example through sampling or retention.
 
 If the receiver cannot be reached:
@@ -86,14 +87,14 @@ If it answers but rejects some spans:
 Error: exporting to http://127.0.0.1:4319: 5 of 428 spans rejected by the receiver: span attribute limit exceeded
 ```
 
-Both exit with code 1.
+`block` and `call` exit with code 1 in both cases. `follow` retries failed requests and counts rejected traces without stopping.
 
 See [Troubleshooting](../troubleshooting.md#n-of-m-spans-were-not-exported).
 
 ## JSON
 
 ```sh
-frame-trace block --offline fixtures/replay/people-traced --json block.json
+polkadot-frame-trace block --offline fixtures/replay/people-traced --json block.json
 ```
 
 `--json -` writes to stdout.
@@ -113,7 +114,7 @@ Use JSON to:
 `--otlp` and `--json` can be combined in one run, together with `--save`:
 
 ```sh
-frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block finalized \
+polkadot-frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block finalized \
   --otlp --json block.json --save saved-block
 ```
 
@@ -121,4 +122,4 @@ frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block finalize
 
 Traces and JSON hold raw storage keys and decoded names, including account addresses such as `5Grw…`.
 With `--runtime-override`, they also hold the local path of your Wasm file.
-Storage keys are not secrets on a public chain, but review traces before you upload them to a shared or hosted backend.
+Storage keys are not secret on a public chain. Check traces before you send them to a shared or hosted backend.

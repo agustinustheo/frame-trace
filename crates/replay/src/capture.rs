@@ -46,8 +46,8 @@ pub struct Span {
 }
 
 impl Span {
-    pub fn to_model(&self) -> frame_trace_model::RuntimeSpan {
-        frame_trace_model::RuntimeSpan {
+    pub fn to_model(&self) -> polkadot_frame_trace_model::RuntimeSpan {
+        polkadot_frame_trace_model::RuntimeSpan {
             id: self.id,
             parent_id: self.parent_id,
             name: self.name.clone(),
@@ -64,13 +64,13 @@ impl Span {
     }
 }
 
-pub use frame_trace_model::ReplayEvent as Event;
+pub use polkadot_frame_trace_model::ReplayEvent as Event;
 
 pub struct Data {
     pub start: Instant,
     pub spans: Vec<Span>,
     pub events: Vec<Event>,
-    pub transitions: Vec<frame_trace_model::SpanTransition>,
+    pub transitions: Vec<polkadot_frame_trace_model::SpanTransition>,
     stack: Vec<u64>,
     last_proof_bytes: usize,
     pending_read: Option<(Option<u64>, bool)>,
@@ -239,11 +239,12 @@ impl Subscriber for Capture {
     fn enter(&self, id: &Id) {
         let mut d = self.0.lock();
         let at_ns = d.start.elapsed().as_nanos() as u64;
-        d.transitions.push(frame_trace_model::SpanTransition {
-            id: id.into_u64(),
-            at_ns,
-            enter: true,
-        });
+        d.transitions
+            .push(polkadot_frame_trace_model::SpanTransition {
+                id: id.into_u64(),
+                at_ns,
+                enter: true,
+            });
         d.stack.push(id.into_u64());
         let proof_size = d
             .recorder
@@ -269,11 +270,12 @@ impl Subscriber for Capture {
             d.pending_append = None;
         }
         let now = d.start.elapsed().as_nanos() as u64;
-        d.transitions.push(frame_trace_model::SpanTransition {
-            id: id.into_u64(),
-            at_ns: now,
-            enter: false,
-        });
+        d.transitions
+            .push(polkadot_frame_trace_model::SpanTransition {
+                id: id.into_u64(),
+                at_ns: now,
+                enter: false,
+            });
         let proof_size = d
             .recorder
             .as_ref()

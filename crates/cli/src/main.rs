@@ -1,19 +1,32 @@
-//! `frame-trace`: show what a Polkadot SDK block did to storage, as OpenTelemetry traces.
+//! `polkadot-frame-trace`: show what a Polkadot SDK block did to storage, as OpenTelemetry traces.
 
 use std::{fs, io::Write, path::PathBuf};
 
 use anyhow::{Context, Result};
 use clap::{Args, Parser, Subcommand};
-use frame_trace_decode::AnnotatedBlock;
+use polkadot_frame_trace_decode::AnnotatedBlock;
 
+#[macro_use]
+mod log;
 mod call;
 mod follow;
 mod report;
 mod source;
 mod summary;
 
+/// The version `--version` prints. The nightly workflow sets `FRAME_TRACE_BUILD_VERSION`
+/// at build time, for example `0.1.0-nightly.20261106+abc1234`; other builds print the crate version.
+const VERSION: &str = build_version(option_env!("FRAME_TRACE_BUILD_VERSION"));
+
+const fn build_version(set: Option<&'static str>) -> &'static str {
+    match set {
+        Some(version) if !version.is_empty() => version,
+        _ => env!("CARGO_PKG_VERSION"),
+    }
+}
+
 #[derive(Parser)]
-#[command(name = "frame-trace", version, about)]
+#[command(name = "polkadot-frame-trace", version = VERSION, about)]
 struct Cli {
     #[command(subcommand)]
     command: Command,
@@ -23,27 +36,27 @@ struct Cli {
 enum Command {
     /// Compare storage use across saved blocks or a range of finalized blocks.
     #[command(
-        after_help = "Examples:\n  frame-trace report block-1.json block-2.json\n  frame-trace report --rpc URL --last 10"
+        after_help = "Examples:\n  polkadot-frame-trace report block-1.json block-2.json\n  polkadot-frame-trace report --rpc URL --last 10"
     )]
     Report(report::ReportArgs),
     /// Trace storage use and the result of a runtime API call.
     #[command(
-        after_help = "Examples:\n  frame-trace call --rpc URL --at finalized --method Core_version --data 0x --check-state-call\n  frame-trace call --offline fixtures/replay/call-people-nonce --summary"
+        after_help = "Examples:\n  polkadot-frame-trace call --rpc URL --at finalized --method Core_version --data 0x --check-state-call\n  polkadot-frame-trace call --offline fixtures/replay/call-people-nonce --summary"
     )]
     Call(call::CallArgs),
     /// Trace storage use in one block and export it to JSON or a trace viewer.
     #[command(
-        after_help = "Examples:\n  frame-trace block --rpc URL --block finalized --otlp\n  frame-trace block --offline fixtures/replay/people-traced --json block.json"
+        after_help = "Examples:\n  polkadot-frame-trace block --rpc URL --block finalized --otlp\n  polkadot-frame-trace block --offline fixtures/replay/people-traced --json block.json"
     )]
     Block(BlockArgs),
     /// Show storage use by block phase and storage item.
     #[command(
-        after_help = "Examples:\n  frame-trace summary --rpc URL --block finalized\n  frame-trace summary --from-json block.json"
+        after_help = "Examples:\n  polkadot-frame-trace summary --rpc URL --block finalized\n  polkadot-frame-trace summary --from-json block.json"
     )]
     Summary(SummaryArgs),
     /// Trace new finalized blocks as they arrive.
     #[command(
-        after_help = "Examples:\n  frame-trace follow --rpc URL --otlp\n  frame-trace follow --rpc URL --best"
+        after_help = "Examples:\n  polkadot-frame-trace follow --rpc URL --otlp\n  polkadot-frame-trace follow --rpc URL --best"
     )]
     Follow(FollowArgs),
 }
@@ -72,6 +85,9 @@ struct SummaryArgs {
 fn main() -> std::process::ExitCode {
     match run() {
         Ok(()) => std::process::ExitCode::SUCCESS,
+        Err(error) if error.downcast_ref::<follow::Reported>().is_some() => {
+            std::process::ExitCode::FAILURE
+        }
         Err(error) => {
             eprintln!("Error: {error:#}");
             std::process::ExitCode::from(if error.downcast_ref::<OracleMismatch>().is_some() {
@@ -134,9 +150,9 @@ fn load(args: &source::SourceArgs) -> Result<AnnotatedBlock> {
     if loaded.metadata.is_none() {
         eprintln!("notice: metadata unavailable; storage keys and extrinsics will not be named");
     }
-    let mut block = frame_trace_decode::annotate_at_block(
+    let mut block = polkadot_frame_trace_decode::annotate_at_block(
         &traced,
-        loaded.metadata.as_ref(),
+        loaded.metadata.as_deref(),
         loaded.block_number,
     );
     let undecoded = block
@@ -177,9 +193,11 @@ fn emit(
         write_json(trace, path)?;
     }
     if let Some(endpoint) = otlp {
-        let spans = frame_trace_otel::export_otlp(trace, endpoint, Default::default())
-            .with_context(|| format!("exporting to {endpoint}"))?;
-        eprintln!("exported {spans} spans to {endpoint}");
+        source::warn_unencrypted("--otlp", endpoint);
+        let shown = polkadot_frame_trace_model::redact::endpoint(endpoint);
+        let spans = polkadot_frame_trace_otel::export_otlp(trace, endpoint, Default::default())
+            .with_context(|| format!("exporting to {shown}"))?;
+        eprintln!("exported {spans} spans to {shown}");
     }
     if let Some(top) = top {
         let summary = summary::render(trace, top);
@@ -210,6 +228,9 @@ struct FollowArgs {
     /// Maximum concurrent RPC requests across all workers (1–64; up to 32 proof keys per request).
     #[arg(long, default_value_t = 16, value_parser = clap::value_parser!(u8).range(1..=64))]
     proof_concurrency: u8,
+    /// Longest wait in seconds for one RPC response; each request gets four tries.
+    #[arg(long, value_name = "SECONDS", default_value = "30", value_parser = source::rpc_timeout)]
+    rpc_timeout: std::time::Duration,
     /// Persistent proof-node and compiled Wasm cache directory.
     #[arg(long, value_name = "DIR")]
     cache_dir: Option<PathBuf>,
@@ -230,9 +251,27 @@ mod argument_tests {
     use super::*;
 
     #[test]
+    fn version_is_the_crate_version_unless_the_build_sets_one() {
+        assert_eq!(build_version(None), env!("CARGO_PKG_VERSION"));
+        assert_eq!(build_version(Some("")), env!("CARGO_PKG_VERSION"));
+        assert_eq!(
+            build_version(Some("0.1.0-nightly.20261106+abc1234")),
+            "0.1.0-nightly.20261106+abc1234"
+        );
+        let error = Cli::try_parse_from(["polkadot-frame-trace", "--version"])
+            .err()
+            .expect("--version exits early");
+        assert_eq!(error.kind(), clap::error::ErrorKind::DisplayVersion);
+        assert_eq!(
+            error.to_string(),
+            format!("polkadot-frame-trace {VERSION}\n")
+        );
+    }
+
+    #[test]
     fn follow_workers_default_and_limits() {
         let Command::Follow(args) =
-            Cli::try_parse_from(["frame-trace", "follow", "--rpc", "ws://node"])
+            Cli::try_parse_from(["polkadot-frame-trace", "follow", "--rpc", "ws://node"])
                 .expect("default follow arguments")
                 .command
         else {
@@ -240,10 +279,11 @@ mod argument_tests {
         };
         assert_eq!(args.workers, 8);
         assert_eq!(args.proof_concurrency, 16);
+        assert_eq!(args.rpc_timeout, std::time::Duration::from_secs(30));
         for workers in ["1", "4", "16"] {
             assert!(
                 Cli::try_parse_from([
-                    "frame-trace",
+                    "polkadot-frame-trace",
                     "follow",
                     "--rpc",
                     "ws://node",
@@ -256,7 +296,7 @@ mod argument_tests {
         for workers in ["0", "17", "256", "-1", "many"] {
             assert!(
                 Cli::try_parse_from([
-                    "frame-trace",
+                    "polkadot-frame-trace",
                     "follow",
                     "--rpc",
                     "ws://node",

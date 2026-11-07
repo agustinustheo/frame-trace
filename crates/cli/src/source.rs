@@ -1,10 +1,14 @@
 //! Where a block trace and its metadata come from.
 
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use anyhow::{Context, Result, bail};
 use clap::{ArgGroup, Args};
-use frame_trace_decode::Metadata;
+use polkadot_frame_trace_decode::Metadata;
 
 /// Arguments that select the block to trace.
 #[derive(Args)]
@@ -41,9 +45,12 @@ pub struct SourceArgs {
     /// Save the replay context and proofs for offline use.
     #[arg(long, value_name = "DIR", conflicts_with = "from_file")]
     pub save: Option<PathBuf>,
-    /// Maximum concurrent proof requests (1–64; up to 32 keys per request).
+    /// Maximum concurrent RPC requests (1–64; up to 32 proof keys per request).
     #[arg(long, default_value_t = 8, requires = "rpc", conflicts_with_all = ["from_file", "from_json", "offline"], value_parser = clap::value_parser!(u8).range(1..=64))]
     pub proof_concurrency: u8,
+    /// Longest wait in seconds for one RPC response; each request gets four tries.
+    #[arg(long, value_name = "SECONDS", default_value = "30", value_parser = rpc_timeout, requires = "rpc", conflicts_with_all = ["from_file", "from_json", "offline"])]
+    pub rpc_timeout: Duration,
     /// Persistent authenticated proof nodes and compiled Wasm cache directory.
     #[arg(long, value_name = "DIR", conflicts_with_all = ["from_file", "from_json"])]
     pub cache_dir: Option<PathBuf>,
@@ -61,6 +68,84 @@ pub struct SourceArgs {
     pub runtime_override: Option<PathBuf>,
 }
 
+/// Parses `--rpc-timeout`, in seconds.
+pub fn rpc_timeout(text: &str) -> std::result::Result<Duration, String> {
+    let secs: f64 = text
+        .parse()
+        .map_err(|_| format!("{text} is not a number of seconds"))?;
+    if !(secs > 0.0 && secs <= 3600.0) {
+        return Err("must be more than 0 and at most 3600 seconds".into());
+    }
+    Ok(Duration::from_secs_f64(secs))
+}
+
+/// Longest a replay should keep running the runtime. `follow` exits 1 when one does; the
+/// other commands warn once. Real blocks take seconds, and compiling a new runtime a minute.
+pub const REPLAY_DEADLINE: Duration = Duration::from_secs(600);
+
+/// Warns once if still alive after [`REPLAY_DEADLINE`]. The runtime cannot be interrupted, so
+/// the replay goes on until it ends or the user stops it.
+pub struct SlowWarning {
+    _done: std::sync::mpsc::Sender<()>,
+}
+pub fn warn_if_slow(what: String) -> SlowWarning {
+    let (done, wait) = std::sync::mpsc::channel::<()>();
+    let _ = std::thread::Builder::new()
+        .name("replay-deadline".into())
+        .spawn(move || {
+            if wait.recv_timeout(REPLAY_DEADLINE) == Err(std::sync::mpsc::RecvTimeoutError::Timeout) {
+                say!(
+                    "warning: {what} has run for more than 10 minutes; the runtime may never finish. Press Ctrl-C to stop it"
+                );
+            }
+        });
+    SlowWarning { _done: done }
+}
+
+/// Warns once when `url` is plain `ws://` or `http://` to a host other than this machine:
+/// anyone on the way can read, or change, what is sent.
+pub fn warn_unencrypted(flag: &str, url: &str) {
+    let shown = polkadot_frame_trace_model::redact::endpoint(url);
+    let Some(authority) = shown
+        .strip_prefix("ws://")
+        .or_else(|| shown.strip_prefix("http://"))
+    else {
+        return;
+    };
+    let host = match authority.strip_prefix('[') {
+        Some(v6) => v6.split(']').next().unwrap_or_default(),
+        None => authority.split(':').next().unwrap_or_default(),
+    };
+    let local = host.eq_ignore_ascii_case("localhost")
+        || host
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|ip| ip.is_loopback());
+    if !local {
+        let secure = if flag == "--otlp" {
+            "https://"
+        } else {
+            "wss:// or https://"
+        };
+        say!("warning: {flag} {shown} is not encrypted; use {secure} for a remote host");
+    }
+}
+
+/// A node client. `timeout` bounds each try; a request gets four tries within four times it.
+pub fn rpc(
+    url: &str,
+    concurrency: u8,
+    timeout: Duration,
+    cancel: polkadot_frame_trace_replay::rpc::CancellationToken,
+) -> Result<polkadot_frame_trace_replay::rpc::Rpc> {
+    warn_unencrypted("--rpc", url);
+    Ok(polkadot_frame_trace_replay::rpc::Rpc::with_options(
+        url,
+        usize::from(concurrency),
+        timeout * 4,
+        cancel,
+    )?)
+}
+
 /// Read a `--runtime-override` Wasm (plain or SDK-compressed) before any network work.
 pub fn read_runtime_override(path: Option<&Path>) -> Result<Option<Vec<u8>>> {
     let Some(path) = path else {
@@ -73,9 +158,9 @@ pub fn read_runtime_override(path: Option<&Path>) -> Result<Option<Vec<u8>>> {
         "--runtime-override {} is empty",
         path.display()
     );
-    frame_trace_replay::check_runtime_wasm(&wasm)
+    polkadot_frame_trace_replay::check_runtime_wasm(&wasm)
         .with_context(|| format!("--runtime-override {}", path.display()))?;
-    eprintln!(
+    say!(
         "RUNTIME OVERRIDE: {} will execute instead of the chain's authenticated :code",
         path.display()
     );
@@ -84,10 +169,10 @@ pub fn read_runtime_override(path: Option<&Path>) -> Result<Option<Vec<u8>>> {
 
 /// The JSON/OTLP label for a substitute runtime.
 pub fn override_info(
-    o: Option<frame_trace_replay::RuntimeOverride>,
+    o: Option<polkadot_frame_trace_replay::RuntimeOverride>,
     path: Option<&Path>,
-) -> Option<frame_trace_decode::RuntimeOverrideInfo> {
-    o.map(|o| frame_trace_decode::RuntimeOverrideInfo {
+) -> Option<polkadot_frame_trace_decode::RuntimeOverrideInfo> {
+    o.map(|o| polkadot_frame_trace_decode::RuntimeOverrideInfo {
         path: path.map(|p| p.display().to_string()).unwrap_or_default(),
         code_hash: format!("{:?}", o.override_code_hash),
         chain_code_hash: format!("{:?}", o.chain_code_hash),
@@ -97,22 +182,26 @@ pub fn override_info(
 
 /// A block trace and what is needed to decode it.
 pub struct Loaded {
-    pub traced: frame_trace_model::TracedBlock,
-    pub metadata: Option<Metadata>,
+    pub traced: polkadot_frame_trace_model::TracedBlock,
+    pub metadata: Option<Arc<Metadata>>,
     pub block_number: Option<u64>,
-    pub execution: Option<frame_trace_decode::ExecutionInfo>,
-    pub runtime_override: Option<frame_trace_replay::RuntimeOverride>,
+    pub execution: Option<polkadot_frame_trace_decode::ExecutionInfo>,
+    pub runtime_override: Option<polkadot_frame_trace_replay::RuntimeOverride>,
 }
 
 pub fn load(args: &SourceArgs) -> Result<Loaded> {
+    let _slow = warn_if_slow(match &args.block {
+        Some(block) => format!("the replay of block {block}"),
+        None => "the replay".into(),
+    });
     let runtime_override = read_runtime_override(args.runtime_override.as_deref())?;
     if let Some(dir) = &args.offline {
-        let replay = frame_trace_replay::Artifact::load(dir)
+        let replay = polkadot_frame_trace_replay::Artifact::load(dir)
             .and_then(|artifact| {
-                frame_trace_replay::replay_with_session(
+                polkadot_frame_trace_replay::replay_with_session(
                     artifact,
                     None,
-                    &frame_trace_replay::ReplaySession::with_cache_max_bytes(
+                    &polkadot_frame_trace_replay::ReplaySession::with_cache_max_bytes(
                         args.cache_dir.as_deref(),
                         args.cache_max_bytes,
                     )?
@@ -122,26 +211,26 @@ pub fn load(args: &SourceArgs) -> Result<Loaded> {
             })
             .map_err(|e| anyhow::anyhow!("{}: {e}", dir.join("artifact.json.zst").display()))
             .inspect_err(|_| {
-                eprintln!("root check: NOT VERIFIED; RPC calls: 0");
+                say!("root check: NOT VERIFIED; RPC calls: 0");
             })?;
         return replay_loaded(replay, args.save.as_deref());
     }
     match (&args.from_file, &args.rpc) {
         (Some(trace), _) => file::load(trace, args.metadata.as_deref()),
         (None, Some(url)) => {
-            let rpc = frame_trace_replay::rpc::Rpc::with_options(
+            let rpc = rpc(
                 url,
-                args.proof_concurrency as usize,
-                std::time::Duration::from_secs(30),
+                args.proof_concurrency,
+                args.rpc_timeout,
                 Default::default(),
             )
             .inspect_err(|_| {
-                eprintln!("root check: NOT VERIFIED; RPC calls: 0");
+                say!("root check: NOT VERIFIED; RPC calls: 0");
             })?;
-            let replay = frame_trace_replay::online_with_session(
+            let replay = polkadot_frame_trace_replay::online_with_session(
                 &rpc,
                 args.block.as_deref().unwrap_or_default(),
-                &frame_trace_replay::ReplaySession::with_cache_max_bytes(
+                &polkadot_frame_trace_replay::ReplaySession::with_cache_max_bytes(
                     args.cache_dir.as_deref(),
                     args.cache_max_bytes,
                 )?
@@ -149,7 +238,7 @@ pub fn load(args: &SourceArgs) -> Result<Loaded> {
                 .with_runtime_override(runtime_override),
             )
             .inspect_err(|_| {
-                eprintln!("root check: NOT VERIFIED; RPC calls: {}", rpc.count());
+                say!("root check: NOT VERIFIED; RPC calls: {}", rpc.count());
             })?;
             replay_loaded(replay, args.save.as_deref())
         }
@@ -164,11 +253,11 @@ mod file {
         let json = std::fs::read_to_string(trace)
             .with_context(|| format!("reading {}", trace.display()))?;
         let trace_path = trace;
-        let trace = frame_trace_model::rpc::parse_trace_block(&json)
+        let trace = polkadot_frame_trace_model::rpc::parse_trace_block(&json)
             .with_context(|| format!("parsing {}", trace.display()))?;
-        let metadata = metadata.map(load_metadata).transpose()?;
+        let metadata = metadata.map(load_metadata).transpose()?.map(Arc::new);
         Ok(Loaded {
-            traced: frame_trace_model::TracedBlock::from_trace(&trace)
+            traced: polkadot_frame_trace_model::TracedBlock::from_trace(&trace)
                 .with_context(|| format!("converting trace from {}", trace_path.display()))?,
             metadata,
             block_number: None,
@@ -204,8 +293,32 @@ mod file {
 }
 
 /// Both block and summary consume the same faithful measured result.
-pub fn replay_loaded(replay: frame_trace_replay::Replay, save: Option<&Path>) -> Result<Loaded> {
-    eprintln!(
+/// The decoded metadata of the last few runtimes. `follow` and `report` replay many blocks of
+/// one runtime: they decode its metadata once, not once per block.
+fn decoded(hex: &str) -> std::result::Result<Arc<Metadata>, polkadot_frame_trace_decode::Error> {
+    static DECODED: Mutex<Vec<(String, Arc<Metadata>)>> = Mutex::new(Vec::new());
+    let found = DECODED
+        .lock()
+        .ok()
+        .and_then(|d| d.iter().find(|(h, _)| h == hex).map(|(_, m)| m.clone()));
+    if let Some(metadata) = found {
+        return Ok(metadata);
+    }
+    let metadata = Arc::new(Metadata::from_hex(hex)?);
+    if let Ok(mut decoded) = DECODED.lock() {
+        if decoded.len() >= 4 {
+            decoded.remove(0);
+        }
+        decoded.push((hex.to_owned(), metadata.clone()));
+    }
+    Ok(metadata)
+}
+
+pub fn replay_loaded(
+    replay: polkadot_frame_trace_replay::Replay,
+    save: Option<&Path>,
+) -> Result<Loaded> {
+    say!(
         "root check: {}{}; RPC calls: {} (timed replay: {}); execution proof: {} bytes",
         if replay.root_check { "PASS" } else { "FAIL" },
         if replay.runtime_override.is_some() {
@@ -220,21 +333,24 @@ pub fn replay_loaded(replay: frame_trace_replay::Replay, save: Option<&Path>) ->
     if let Some(dir) = save {
         replay.artifact.save(dir)?;
     }
-    eprintln!(
+    say!(
         "fetching state #{}: {} proof request rounds; {} RPC calls",
-        replay.block_number, replay.proof_round_trips, replay.rpc_count
+        replay.block_number,
+        replay.proof_round_trips,
+        replay.rpc_count
     );
-    eprintln!(
+    say!(
         "state root: computed {:?}; header {:?}",
-        replay.computed_state_root, replay.expected_state_root
+        replay.computed_state_root,
+        replay.expected_state_root
     );
     let metadata = if replay.artifact.metadata.is_empty() {
         None
     } else {
-        match Metadata::from_hex(&replay.artifact.metadata) {
+        match decoded(&replay.artifact.metadata) {
             Ok(metadata) => Some(metadata),
             Err(error) => {
-                eprintln!(
+                say!(
                     "warning: metadata decoding failed: {error}; continuing with undecoded names (names require metadata V14+)"
                 );
                 None
@@ -242,10 +358,10 @@ pub fn replay_loaded(replay: frame_trace_replay::Replay, save: Option<&Path>) ->
         }
     };
     Ok(Loaded {
-        traced: frame_trace_model::TracedBlock::from_replay(&replay.capture)?,
+        traced: polkadot_frame_trace_model::TracedBlock::from_replay(&replay.capture)?,
         metadata,
         block_number: Some(replay.block_number),
-        execution: Some(frame_trace_decode::ExecutionInfo {
+        execution: Some(polkadot_frame_trace_decode::ExecutionInfo {
             root_check: replay.root_check,
             proof_bytes: replay.proof_bytes,
             rpc_calls: replay.rpc_count,
@@ -254,4 +370,25 @@ pub fn replay_loaded(replay: frame_trace_replay::Replay, save: Option<&Path>) ->
         }),
         runtime_override: replay.runtime_override,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn metadata_is_decoded_once_per_runtime() {
+        let path =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/metadata/westend-v16.scale");
+        let bytes = std::fs::read(path).expect("fixture");
+        let hex: String = std::iter::once("0x".to_owned())
+            .chain(bytes.iter().map(|b| format!("{b:02x}")))
+            .collect();
+        let first = decoded(&hex).expect("decodes");
+        let second = decoded(&hex).expect("decodes");
+        assert!(Arc::ptr_eq(&first, &second));
+        assert!(decoded("0x00").is_err());
+        // Failures are not kept: the same text fails again, and the good entry stays.
+        assert!(decoded("0x00").is_err());
+        assert!(Arc::ptr_eq(&first, &decoded(&hex).expect("decodes")));
+    }
 }

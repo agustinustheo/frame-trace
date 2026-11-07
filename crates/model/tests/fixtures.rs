@@ -4,7 +4,7 @@
 
 use std::ops::Range;
 
-use frame_trace_model::{OpKind, PhaseKind, Stats, TracedBlock, rpc::parse_trace_block};
+use polkadot_frame_trace_model::{OpKind, PhaseKind, Stats, TracedBlock, rpc::parse_trace_block};
 
 fn load(name: &str) -> TracedBlock {
     let path = format!("{}/../../fixtures/model/{name}", env!("CARGO_MANIFEST_DIR"));
@@ -160,9 +160,9 @@ fn segments_a_real_parachain_block() {
         ]
     );
     let is = |seq: usize, key: &[u8]| block.ops[seq].key.complete() == Some(key);
-    let ewr = frame_trace_model::keys::EXTRINSIC_WEIGHT_RECLAIMED;
+    let ewr = polkadot_frame_trace_model::keys::EXTRINSIC_WEIGHT_RECLAIMED;
     assert!(is(199, &ewr) && is(225, &ewr));
-    assert!(is(249, frame_trace_model::keys::EXTRINSIC_INDEX));
+    assert!(is(249, polkadot_frame_trace_model::keys::EXTRINSIC_INDEX));
     assert!(block.phases[1].extrinsic.is_some() && block.phases[2].extrinsic.is_some());
 }
 
@@ -187,7 +187,7 @@ fn signed_extrinsic_owns_its_check_reads() {
     let own: Vec<usize> = block.phase_ops(transfer).map(|op| op.seq).take(5).collect();
     assert_eq!(own, [230, 231, 232, 233, 248]);
     let block_hash_prefix = [
-        frame_trace_model::keys::SYSTEM_PREFIX.as_slice(),
+        polkadot_frame_trace_model::keys::SYSTEM_PREFIX.as_slice(),
         &[
             0xa4, 0x47, 0x04, 0xb5, 0x68, 0xd2, 0x16, 0x67, 0x35, 0x6a, 0x5a, 0x05, 0x0c, 0x11,
             0x87, 0x46,

@@ -1,7 +1,7 @@
 //! Aggregation of the public JSON format. No replay is needed for saved traces.
 use anyhow::{Context, Result, ensure};
 use clap::{ArgGroup, Args, ValueEnum};
-use frame_trace_decode::{AnnotatedBlock, AnnotatedOp};
+use polkadot_frame_trace_decode::{AnnotatedBlock, AnnotatedOp};
 use serde::Serialize;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -29,12 +29,15 @@ pub struct ReportArgs {
     /// Most recent K blocks anchored to one finalized head.
     #[arg(long, requires="rpc", conflicts_with_all=["from", "to", "files", "from_json"], value_parser=clap::value_parser!(u32).range(1..=10000))]
     last: Option<u32>,
-    /// Concurrent block replays (proof request concurrency is separate).
+    /// Concurrent block replays (--proof-concurrency limits their RPC requests).
     #[arg(long, default_value_t=2, requires = "rpc", conflicts_with_all = ["files", "from_json"], value_parser=clap::value_parser!(u8).range(1..=4))]
     concurrency: u8,
-    /// Maximum concurrent proof requests across all blocks (1–64).
+    /// Maximum concurrent RPC requests across all blocks (1–64; up to 32 proof keys per request).
     #[arg(long, default_value_t=8, requires = "rpc", conflicts_with_all = ["files", "from_json"], value_parser=clap::value_parser!(u8).range(1..=64))]
     proof_concurrency: u8,
+    /// Longest wait in seconds for one RPC response; each request gets four tries.
+    #[arg(long, value_name = "SECONDS", default_value = "30", value_parser = crate::source::rpc_timeout, requires = "rpc", conflicts_with_all = ["files", "from_json"])]
+    rpc_timeout: std::time::Duration,
     /// Persist authenticated proof nodes and compiled Wasm in this directory.
     #[arg(long, requires = "rpc", conflicts_with_all = ["files", "from_json"])]
     cache_dir: Option<PathBuf>,
@@ -108,17 +111,16 @@ pub fn read_trace(path: &Path) -> Result<AnnotatedBlock> {
 pub fn run(args: ReportArgs) -> Result<()> {
     let mut accumulator = Accumulator::default();
     if let Some(url) = &args.rpc {
-        use frame_trace_replay::{ReplaySession, rpc::Rpc};
-        let rpc = Rpc::with_options(
+        use polkadot_frame_trace_replay::ReplaySession;
+        let rpc = crate::source::rpc(
             url,
-            args.proof_concurrency as usize,
-            std::time::Duration::from_secs(30),
+            args.proof_concurrency,
+            args.rpc_timeout,
             Default::default(),
         )?;
         let session =
             ReplaySession::with_cache_max_bytes(args.cache_dir.as_deref(), args.cache_max_bytes)?;
-        let head = rpc.call("chain_getFinalizedHead", serde_json::json!([]))?;
-        let header = rpc.call("chain_getHeader", serde_json::json!([head]))?;
+        let header = rpc.finalized_header()?;
         let finalized = u64::from_str_radix(
             header["number"]
                 .as_str()
@@ -153,12 +155,16 @@ pub fn run(args: ReportArgs) -> Result<()> {
                                 let hash =
                                     rpc.call("chain_getBlockHash", serde_json::json!([number]))?;
                                 let hash = hash.as_str().context("block hash unavailable")?;
-                                let replay =
-                                    frame_trace_replay::online_with_session(&rpc, hash, session)?;
+                                let _slow = crate::source::warn_if_slow(format!(
+                                    "the replay of block {number}"
+                                ));
+                                let replay = polkadot_frame_trace_replay::online_with_session(
+                                    &rpc, hash, session,
+                                )?;
                                 let loaded = crate::source::replay_loaded(replay, None)?;
-                                let mut block = frame_trace_decode::annotate_at_block(
+                                let mut block = polkadot_frame_trace_decode::annotate_at_block(
                                     &loaded.traced,
-                                    loaded.metadata.as_ref(),
+                                    loaded.metadata.as_deref(),
                                     loaded.block_number,
                                 );
                                 block.execution = loaded.execution;
@@ -346,7 +352,7 @@ pub struct ExtrinsicAggregate {
 pub struct OverriddenBlock {
     pub block_hash: String,
     #[serde(flatten)]
-    pub runtime: frame_trace_decode::RuntimeOverrideInfo,
+    pub runtime: polkadot_frame_trace_decode::RuntimeOverrideInfo,
 }
 #[derive(Serialize, Default)]
 pub struct Report {
@@ -684,7 +690,7 @@ pub fn render_body(r: &Report, top: usize, sort: SortKey) -> String {
     for name in &r.phase_order {
         let p = &r.phases[name];
         phases.add_row(vec![
-            frame_trace_model::PhaseKind::label(name).to_owned(),
+            polkadot_frame_trace_model::PhaseKind::label(name).to_owned(),
             format!("{:.1}", p.ops_share * 100.0),
             format!("{:.1}", p.storage_time_share * 100.0),
             p.proof_bytes_share
@@ -888,9 +894,9 @@ mod tests {
     use super::*;
     fn trace() -> AnnotatedBlock {
         let json = include_str!("../../../fixtures/model/two-extrinsics.json");
-        let raw = frame_trace_model::rpc::parse_trace_block(json).expect("fixture");
-        let traced = frame_trace_model::TracedBlock::from_trace(&raw).expect("trace");
-        frame_trace_decode::annotate(&traced, None)
+        let raw = polkadot_frame_trace_model::rpc::parse_trace_block(json).expect("fixture");
+        let traced = polkadot_frame_trace_model::TracedBlock::from_trace(&raw).expect("trace");
+        polkadot_frame_trace_decode::annotate(&traced, None)
     }
     #[test]
     fn nested_intervals_are_unioned_and_percentiles_use_nearest_rank() {
@@ -1079,7 +1085,7 @@ mod round5_tests {
                 phase.ops.resize(100, op);
             }
             for op in &mut phase.ops {
-                op.timing = Some(frame_trace_model::MeasuredTiming {
+                op.timing = Some(polkadot_frame_trace_model::MeasuredTiming {
                     start_ns: 0,
                     duration_ns: if i == 0 { 1 } else { 10000 },
                 });

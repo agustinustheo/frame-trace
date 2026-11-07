@@ -12,7 +12,7 @@ distributor:
         grpc:
           endpoint: "0.0.0.0:4317"
 
-# Make a new trace searchable about two seconds after frame-trace sends it.
+# Make a new trace searchable about two seconds after polkadot-frame-trace sends it.
 # The defaults, which wait about 30 seconds, suit a busy cluster.
 query_frontend:
   query_end_cutoff: 1s

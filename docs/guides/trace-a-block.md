@@ -1,6 +1,6 @@
 # Trace a block from any node
 
-frame-trace needs only the normal RPC methods every Polkadot SDK node serves.
+polkadot-frame-trace needs only the normal RPC methods every Polkadot SDK node serves.
 You do not need your own node, unsafe RPC or a special build.
 
 ## Pick the block
@@ -18,7 +18,7 @@ Run it in a terminal.
 This example traces block 1,000,000 of Westend Asset Hub:
 
 ```sh
-frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block 1000000
+polkadot-frame-trace block --rpc wss://westend-asset-hub-rpc.polkadot.io --block 1000000
 ```
 
 ```text
@@ -30,7 +30,7 @@ state root: computed 0x614e27580d5a379f5a7a57dd7598df672545859d85d387ae5e5ab7ebf
 block 0x849423aff4eae359240b694f1dc46d108522393ffd1cb4cb02401cfb95b5c58b: 4 phases, 143 storage operations (68 reads, 73 writes, 8 duplicate reads). Use --otlp or --json to export it.
 ```
 
-Without an output flag, frame-trace prints this one-line count.
+Without an output flag, polkadot-frame-trace prints this one-line count.
 Add an output to see the trace:
 
 | Flag | Output |
@@ -42,7 +42,7 @@ Add an output to see the trace:
 To see tables in the terminal instead, use `summary` with the same source flags:
 
 ```sh
-frame-trace summary --rpc wss://westend-asset-hub-rpc.polkadot.io --block finalized
+polkadot-frame-trace summary --rpc wss://westend-asset-hub-rpc.polkadot.io --block finalized
 ```
 
 [Find the heaviest storage items](find-heaviest-items.md) explains its tables.
@@ -50,12 +50,12 @@ frame-trace summary --rpc wss://westend-asset-hub-rpc.polkadot.io --block finali
 ## Choose an endpoint
 
 The URL can be `ws://`, `wss://`, `http://` or `https://`.
-The node must serve the standard methods, including `state_getReadProof`, which frame-trace uses for every piece of state.
+The node must serve the standard methods, including `state_getReadProof`. polkadot-frame-trace uses it for every piece of state.
 
-One block takes about 90 requests on Westend Asset Hub, and `report` and `follow` send that for every block.
+One Westend Asset Hub block takes about 90 requests, and `report` and `follow` send that many for every block.
 Before you trace ranges or follow a chain, check the endpoint's:
 
-- request limits: public endpoints can rate-limit you, and frame-trace then retries and slows down;
+- request limits: public endpoints can rate-limit you, and polkadot-frame-trace then retries and slows down;
 - pricing, for paid providers that charge per request;
 - historical state, if you need old blocks.
 
@@ -67,16 +67,16 @@ The public Parity endpoints, such as `wss://westend-asset-hub-rpc.polkadot.io`, 
 
 ## Make repeated runs faster
 
-- Add `--cache-dir <dir>` to keep fetched state and the compiled runtime between runs.
+- Add `--cache-dir <dir>` to keep a [disk cache](../reference/commands.md#disk-cache) of downloaded state and the compiled runtime between runs.
 - Raise `--proof-concurrency` on a fast connection to send more requests at once.
 
 Defaults and limits are in [Commands and flags](../reference/commands.md).
 
 ## Names and metadata
 
-frame-trace decodes keys such as `System::Account(5Grw…)` using the runtime's own metadata.
+polkadot-frame-trace decodes keys such as `System::Account(5Grw…)` using the runtime's own metadata.
 It gets the metadata by running the runtime's metadata API on your machine, checked like any other state.
-Runtimes need metadata V14 or newer.
-If that fails, frame-trace prints a notice and shows raw keys and hex values.
-`--unauthenticated-metadata` lets it fall back to the node's `state_getMetadata` instead.
+Runtimes need metadata V14, V15 or V16, see [What polkadot-frame-trace supports](../reference/support.md).
+If that fails, polkadot-frame-trace prints a notice and shows raw keys and hex values.
+`--unauthenticated-metadata` uses the node's `state_getMetadata` instead.
 That metadata is not checked, and the output says so.

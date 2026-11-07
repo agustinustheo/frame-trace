@@ -1,4 +1,4 @@
-// Receive OTLP from frame-trace, batch it, and send it to Tempo.
+// Receive OTLP from polkadot-frame-trace, batch it, and send it to Tempo.
 
 otelcol.receiver.otlp "default" {
   http {

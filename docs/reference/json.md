@@ -11,7 +11,7 @@ Some raw values differ from the words in the tables, for example `overlay` for *
 ## Block JSON
 
 ```sh
-frame-trace block --offline fixtures/replay/people-traced --json block.json
+polkadot-frame-trace block --offline fixtures/replay/people-traced --json block.json
 ```
 
 Top-level fields:
@@ -53,10 +53,11 @@ Top-level fields:
 
 | Field | Meaning |
 | --- | --- |
-| `kind` | `initialization`, `apply_extrinsic`, `post_inherents` or `finalization`. |
+| `kind` | `initialization`, `apply_extrinsic`, `post_inherents`, `finalization` or `unsegmented`. `unsegmented` is the one phase of a runtime API call, or of a block without phase markers. |
 | `label` | The name in tables and Jaeger, such as `extrinsic 2: Utility.batch`. |
 | `extrinsic_index`, `call`, `signed` | For extrinsics: the index, `Pallet.call`, and whether it was signed. |
-| `call_error` | Why frame-trace could not decode the extrinsic's call name, otherwise `null`. It says nothing about whether the extrinsic succeeded. |
+| `extrinsic_hash` | For extrinsics: `0x`-prefixed blake2-256 of the encoded extrinsic, the hash `author_submitExtrinsic` returns. Omitted when the bytes were not in the trace, and in JSON written before this field existed. |
+| `call_error` | Why polkadot-frame-trace could not decode the extrinsic's call name, otherwise `null`. It says nothing about whether the extrinsic succeeded. |
 | `stats` | Counts for this phase, see [Stats](#stats). |
 | `wall_time` | `start_ns`, `end_ns`, `duration_ns` and `source`. `source` is `runtime_span` when the runtime reported the phase, or `storage_envelope` when the times run from the first to the last storage call. `null` without times. |
 | `ops` | The storage operations, in order. |
@@ -176,7 +177,7 @@ The `origin` values, which Jaeger also shows as `frame.storage.origin_raw`:
 ## Report JSON
 
 ```sh
-frame-trace report --rpc wss://westend-asset-hub-rpc.polkadot.io --last 5 --json range.json
+polkadot-frame-trace report --rpc wss://westend-asset-hub-rpc.polkadot.io --last 5 --json range.json
 ```
 
 | Field | Meaning |

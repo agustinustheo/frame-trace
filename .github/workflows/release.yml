@@ -1,0 +1,219 @@
+name: Release
+
+# Builds polkadot-frame-trace for each target and creates a DRAFT GitHub release.
+# The owner reviews the draft and publishes it by hand. See dev/RELEASING.md.
+
+on:
+  push:
+    tags: ["v*"]
+  # To re-run by hand, choose the tag (not a branch) under "Use workflow from".
+  # The run then builds and attests the tag's commit.
+  workflow_dispatch:
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  TAG: ${{ github.ref_name }}
+
+jobs:
+  verify:
+    name: Verify tag and run checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      sha: ${{ steps.version.outputs.sha }}
+    steps:
+      - name: Check the run is for a tag
+        run: |
+          if [ "$GITHUB_REF" != "refs/tags/$TAG" ]; then
+            echo "::error::Run this workflow from a tag, not $GITHUB_REF. Choose the tag under 'Use workflow from'."
+            exit 1
+          fi
+
+      - name: Checkout tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Use the runner temp directory
+        run: echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
+
+      - name: Install Rust 1.93.0
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: 1.93.0
+          components: rustfmt, clippy
+
+      - name: Check the tag matches the crate version
+        id: version
+        run: |
+          if ! [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Tag '$TAG' is not of the form vX.Y.Z"
+            exit 1
+          fi
+          version=$(cargo +1.93.0 metadata --no-deps --format-version 1 --locked \
+            | jq -r '.packages[] | select(.name == "polkadot-frame-trace") | .version')
+          if [ "${TAG#v}" != "$version" ]; then
+            echo "::error::Tag $TAG does not match the polkadot-frame-trace version $version in Cargo.toml"
+            exit 1
+          fi
+          heading="^## \\[${version//./\\.}\\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$"
+          if ! grep -Eq "$heading" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md needs a dated heading '## [$version] - YYYY-MM-DD'. Replace 'Unreleased' with the release date."
+            exit 1
+          fi
+          date=$(grep -E "$heading" CHANGELOG.md | head -n 1 | grep -Eo '[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+          # python3 rejects dates such as 2026-02-30 on every runner; date -d differs between GNU and BSD.
+          if ! python3 -c 'import datetime, sys; datetime.datetime.strptime(sys.argv[1], "%Y-%m-%d")' "$date" 2>/dev/null; then
+            echo "::error::The CHANGELOG.md heading for $version has the date $date, which is not a calendar date"
+            exit 1
+          fi
+          # Provenance is attested for the run's commit, so it must be the tag's commit.
+          sha=$(git rev-parse HEAD)
+          if [ "$sha" != "$GITHUB_SHA" ]; then
+            echo "::error::Tag $TAG points to $sha, but the run is for $GITHUB_SHA"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - name: Check formatting
+        run: cargo +1.93.0 fmt --check
+
+      - name: Run clippy
+        run: cargo +1.93.0 clippy --workspace --all-targets --locked -- -D warnings
+
+      - name: Run tests
+        run: cargo +1.93.0 test --workspace --locked
+
+  # The matrix, build and packaging are shared with nightly.yml in build.yml.
+  build:
+    name: Build
+    needs: verify
+    uses: ./.github/workflows/build.yml
+    permissions:
+      contents: read
+    with:
+      ref: ${{ needs.verify.outputs.sha }}
+      package-version: ${{ needs.verify.outputs.version }}
+
+  publish:
+    name: Create draft release
+    needs: [verify, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+
+      - name: Download packages
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: polkadot-frame-trace-*
+          path: dist
+          merge-multiple: true
+
+      - name: Write checksums
+        working-directory: dist
+        run: |
+          sha256sum -- *.tar.gz > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*.tar.gz
+
+      - name: Extract release notes from CHANGELOG.md
+        run: |
+          awk -v heading="## [$VERSION]" '
+            index($0, heading) == 1 { found = 1; next }
+            found && (/^## / || /^\[[^]]+\]: /) { exit }
+            found { print }
+          ' CHANGELOG.md > "$RUNNER_TEMP/notes.md"
+          if ! grep -q '[^[:space:]]' "$RUNNER_TEMP/notes.md"; then
+            echo "::error::The CHANGELOG.md section for $VERSION is empty"
+            exit 1
+          fi
+          cat "$RUNNER_TEMP/notes.md"
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # A version with a suffix, such as 0.2.0-rc.1, is a pre-release.
+          prerelease=""
+          if [[ "$VERSION" == *-* ]]; then
+            prerelease="--prerelease"
+          fi
+          gh release create "$TAG" --verify-tag --draft ${prerelease:+"$prerelease"} \
+            --title "polkadot-frame-trace $VERSION" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            dist/*.tar.gz dist/SHA256SUMS
+
+  # Publishes the crates once the draft release exists. Pre-releases stay on GitHub only.
+  # Crates whose version is already on crates.io are skipped, so a re-run is safe.
+  crates:
+    name: Publish to crates.io
+    needs: [verify, publish]
+    # Only for a tag push to this repository: never from a fork, a branch or a manual run.
+    if: >-
+      ${{ github.event_name == 'push'
+      && startsWith(github.ref, 'refs/tags/v')
+      && github.repository == 'agustinustheo/polkadot-frame-trace'
+      && !contains(needs.verify.outputs.version, '-') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.verify.outputs.version }}
+    steps:
+      - name: Checkout tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.verify.outputs.sha }}
+
+      - name: Use the runner temp directory
+        run: echo "TMPDIR=$RUNNER_TEMP" >> "$GITHUB_ENV"
+
+      - name: Install Rust 1.93.0
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: 1.93.0
+
+      - name: Publish the crates not yet on crates.io
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          exclude=()
+          pending=0
+          for name in $(cargo +1.93.0 metadata --no-deps --format-version 1 --locked \
+              | jq -r '.packages[].name'); do
+            status=$(curl -sS -o /dev/null -w '%{http_code}' \
+              -A "polkadot-frame-trace release workflow ($GITHUB_SERVER_URL/$GITHUB_REPOSITORY)" \
+              "https://crates.io/api/v1/crates/$name/$VERSION")
+            case "$status" in
+              200) echo "$name $VERSION is already on crates.io"; exclude+=(--exclude "$name") ;;
+              404) echo "$name $VERSION will be published"; pending=$((pending + 1)) ;;
+              *) echo "::error::crates.io answered $status for $name $VERSION"; exit 1 ;;
+            esac
+          done
+          if [ "$pending" -eq 0 ]; then
+            echo "Every crate is already on crates.io"
+            exit 0
+          fi
+          cargo +1.93.0 publish --workspace --locked "${exclude[@]}"

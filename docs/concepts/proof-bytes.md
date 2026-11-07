@@ -1,25 +1,25 @@
 # Proof bytes
 
-A block's **storage proof** is the set of trie nodes needed to re-run the block without the full state.
-frame-trace records those nodes while it replays the block.
-The `execution proof` it prints after each replay is an estimate of their encoded size:
+A block's **storage proof** contains the trie nodes needed to replay the block without the full state.
+polkadot-frame-trace records those nodes during the replay.
+After each replay, it prints `execution proof`, an estimate of their encoded size:
 
 ```text
 root check: PASS; RPC calls: 0 (timed replay: 0); execution proof: 6586 bytes
 ```
 
-**Proof bytes** split that total across the storage operations that caused it.
-Each operation is charged the bytes it added to the proof.
+**Proof bytes** divide that total among the storage operations.
+Each operation gets the bytes that it added to the proof.
 
 ## How the bytes are assigned
 
-- The first operation that touches a trie node pays for it.
-- Later operations that use the same node pay nothing.
+- The first operation that uses a trie node gets its bytes.
+- Later operations that use the same node get 0 bytes.
   That is why a [trie (already in proof)](cache-or-trie.md) read usually shows 0.
-- A [cache](cache-or-trie.md) read never touches the trie, so it always shows 0.
-- Work between storage calls that grows the proof is charged to the next storage call.
+- A [cache](cache-or-trie.md) read does not use the trie, so it always shows 0.
+- If work between storage calls makes the proof larger, the next storage call gets those bytes.
 
-So the proof bytes of all operations add up to the execution proof.
+Normally, the proof bytes of all operations add up to the execution proof. For block #4 they total 6,586 bytes.
 `summary` prints the check:
 
 ```text
@@ -40,24 +40,23 @@ Duplicate reads 203 = cache 177, trie (already in proof) 26, trie (new) 0, unkno
 
 ## What proof bytes do not mean
 
-- The execution proof is not the block's proof of validity (PoV).
-  A parachain's PoV also holds the block itself, and collators send a compacted, compressed form of the proof.
-  frame-trace's number is an estimate of the recorded proof before that.
-  Use it to compare blocks and to find which phases and items dominate, not as the exact PoV size.
-
+- The execution proof is not the proof of validity (PoV) of the block.
+  The PoV of a parachain also holds the block, and collators send a smaller, compressed form of the proof.
+  The number from polkadot-frame-trace is an estimate of the proof before those steps.
+  Use it to compare blocks and to find the largest phases and items. Do not use it as the exact PoV size.
 - They are not the size of a proof for one item or one extrinsic on its own.
-  An item that reads a node first pays for it, even if a later item needs it too.
-  Order matters: move an extrinsic earlier and its numbers change.
+  The first item that reads a node gets its bytes, even if later items also need it.
+  Order matters: if you move an extrinsic earlier, its numbers change.
 - They are not the block's weight, and not network traffic.
 - The execution proof covers the storage the block touched.
-  It does not include the runtime code or the metadata frame-trace loaded to decode names.
+  It does not include the runtime code or the metadata polkadot-frame-trace loaded to decode names.
 
 ## When the sum is larger than the proof
 
-A storage transaction that rolls back can drop trie nodes from the proof.
-If a later operation needs them again, it pays for them again.
-Then the per-operation sum is larger than the execution proof.
-frame-trace prints a warning that starts with
+A storage transaction that is reverted may remove trie nodes from the proof.
+If a later operation needs those nodes again, it gets their bytes again.
+Then the sum for all operations is larger than the execution proof.
+polkadot-frame-trace prints a warning that starts with
 `warning: proof bytes assigned to operations exceed the execution proof by <bytes> B`.
 
 Use the execution proof for the block total in that case.

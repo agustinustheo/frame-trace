@@ -1,16 +1,22 @@
 [package]
-name = "frame-trace-replay"
+name = "polkadot-frame-trace-replay"
+description = "Replays Polkadot SDK blocks and runtime API calls outside the node from authenticated state proofs, recording every storage operation"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-publish = false
+homepage.workspace = true
+readme = false
+keywords = ["polkadot", "substrate", "replay", "trie", "tracing"]
+categories = ["cryptography::cryptocurrencies", "development-tools::debugging"]
+include = ["/src/**/*.rs", "/ARTIFACT.md", "/LICENSE"]
+publish = true
 
 [dependencies]
 thiserror.workspace = true
-frame-trace-model.workspace = true
-zstd = "0.13"
+polkadot-frame-trace-model.workspace = true
+zstd = "0.13.4"
 tokio-tungstenite = { version = "0.28", features = ["rustls-tls-webpki-roots"] }
 tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "sync", "macros"] }
 tokio-util = "0.7"
@@ -25,6 +31,8 @@ hex.workspace = true
 hash-db = "0.16"
 trie-db = "0.32"
 parking_lot = "0.12"
+rayon = "1"
+schnellru = "0.2.4"
 reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
 serde.workspace = true
 serde_json.workspace = true
@@ -42,6 +50,7 @@ sp-crypto-ec-utils = { version = "=0.24.0", features = ["rfc163"] }
 cumulus-primitives-proof-size-hostfunction = "=0.21.0"
 tracing = "0.1"
 tracing-core = "0.1"
+rustix = { version = "1.1.5", default-features = false, features = ["std", "process"] }
 
 [lints]
 workspace = true
@@ -49,4 +58,4 @@ workspace = true
 [dev-dependencies]
 tungstenite = "0.28"
 wat = "1"
-frame-trace-decode.workspace = true
+polkadot-frame-trace-decode.workspace = true
