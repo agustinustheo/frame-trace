@@ -155,6 +155,9 @@ pub fn run(args: ReportArgs) -> Result<()> {
                                 let hash =
                                     rpc.call("chain_getBlockHash", serde_json::json!([number]))?;
                                 let hash = hash.as_str().context("block hash unavailable")?;
+                                let _slow = crate::source::warn_if_slow(format!(
+                                    "the replay of block {number}"
+                                ));
                                 let replay = polkadot_frame_trace_replay::online_with_session(
                                     &rpc, hash, session,
                                 )?;

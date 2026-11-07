@@ -58,6 +58,7 @@ These limits protect against a node that sends too much. They apply to every com
 | --- | --- | --- |
 | One RPC response | 64 MiB | A larger response fails the request at once, without another try. The largest real one, the proof of the runtime, is about 5.5 MB. |
 | State the node sends for one block | 1,000,000 pieces or 256 MiB | More fails the block. Recent blocks of Polkadot, Kusama, Westend and their Asset Hubs, and a Westend Asset Hub runtime upgrade, needed at most 3,656 pieces and 5.6 MB. |
+| Running the runtime for one block | 10 minutes | A runtime that never finishes cannot be stopped from inside polkadot-frame-trace. `block`, `summary`, `call` and `report` warn once and keep going: press Ctrl-C to stop them. `follow` exits with code 1, see [follow](#follow). Real blocks take seconds, and compiling a new runtime about a minute. |
 
 Output shows `--rpc` and `--otlp` URLs as scheme, host and port only, so a user name, password or API key in the URL stays out of logs.
 Text from the node or the OTLP receiver in error lines is cut to 512 characters.
@@ -166,6 +167,7 @@ polkadot-frame-trace follow --rpc URL --best
 | Spans per export request | 512 | An acknowledged request is never sent again. A retry sends only the others. A lost acknowledgement can deliver the same spans twice. |
 | Wait between export tries | 1 s, doubling to 30 s | Each request of a try, with the exporter's own retries, takes at most the OTLP timeout. The block is not replayed again. |
 | Wait at stop | 10 s for replays, then 10 s for exports | See below. |
+| Replay deadline | 10 minutes | A replay that runs the runtime this long without waiting on the node stops `follow` with exit code 1, so a supervisor such as systemd starts a fresh process. Time waiting on the node does not count. |
 
 `follow` stops on Ctrl-C, `SIGTERM` or `SIGHUP`. `SIGHUP` does not reload anything.
 At the stop, replays waiting on the node end at once and count as `cancelled`.
@@ -176,7 +178,7 @@ A second signal exits at once.
 | Exit code | Meaning |
 | --- | --- |
 | 0 | Stopped by a signal. Failed blocks and exports are counted in the summary, not in the exit code. |
-| 1 | `follow` could not start, for example a malformed `--rpc` or `--otlp` URL, or its replay or export threads stopped unexpectedly, or it could no longer write to stderr. |
+| 1 | `follow` could not start, for example a malformed `--rpc` or `--otlp` URL, or its replay or export threads stopped unexpectedly, or a replay passed the replay deadline, or it could no longer write to stderr. |
 | 2 | The command line was wrong. |
 | 130 | A second signal arrived during the stop. |
 
