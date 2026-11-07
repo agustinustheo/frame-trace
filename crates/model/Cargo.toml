@@ -1,11 +1,17 @@
 [package]
 name = "polkadot-frame-trace-model"
-description = "Block trace model for polkadot-frame-trace: storage ops, execution phases and stats (no I/O)"
+description = "Block trace model for polkadot-frame-trace: storage operations, execution phases and stats, with no I/O"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
+readme = false
+keywords = ["polkadot", "substrate", "tracing", "storage"]
+categories = ["cryptography::cryptocurrencies", "development-tools::debugging"]
+include = ["/src/**/*.rs", "/LICENSE"]
+publish = true
 
 [dependencies]
 hex.workspace = true

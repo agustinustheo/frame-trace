@@ -1,11 +1,17 @@
 [package]
 name = "polkadot-frame-trace-replay"
+description = "Replays Polkadot SDK blocks and runtime API calls outside the node from authenticated state proofs, recording every storage operation"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
-publish = false
+homepage.workspace = true
+readme = false
+keywords = ["polkadot", "substrate", "replay", "trie", "tracing"]
+categories = ["cryptography::cryptocurrencies", "development-tools::debugging"]
+include = ["/src/**/*.rs", "/ARTIFACT.md", "/LICENSE"]
+publish = true
 
 [dependencies]
 thiserror.workspace = true

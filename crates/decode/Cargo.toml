@@ -6,6 +6,12 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
+readme = false
+keywords = ["polkadot", "substrate", "metadata", "scale", "decode"]
+categories = ["cryptography::cryptocurrencies", "encoding"]
+include = ["/src/**/*.rs", "/LICENSE"]
+publish = true
 
 [dependencies]
 bs58.workspace = true

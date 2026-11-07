@@ -6,6 +6,12 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
+readme = false
+keywords = ["polkadot", "substrate", "opentelemetry", "otlp", "tracing"]
+categories = ["cryptography::cryptocurrencies", "development-tools::debugging"]
+include = ["/src/**/*.rs", "/LICENSE"]
+publish = true
 
 [dependencies]
 polkadot-frame-trace-decode.workspace = true

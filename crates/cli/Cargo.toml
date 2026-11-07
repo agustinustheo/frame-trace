@@ -6,6 +6,12 @@ edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
 repository.workspace = true
+homepage.workspace = true
+readme = "../../README.md"
+keywords = ["polkadot", "substrate", "opentelemetry", "tracing", "storage"]
+categories = ["command-line-utilities", "development-tools::debugging", "development-tools::profiling", "cryptography::cryptocurrencies"]
+include = ["/src/**/*.rs", "/LICENSE"]
+publish = true
 
 [[bin]]
 name = "polkadot-frame-trace"
