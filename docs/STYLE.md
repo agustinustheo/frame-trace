@@ -2,7 +2,7 @@
 
 Rules for anyone editing `README.md`, `docs/` or `examples/`. This file is not part of the book.
 
-The model is Sentry's docs: the README is a shop window, the first page ends with the reader looking at their own trace, guides are named after jobs, and every number says what it means.
+Sentry's docs are the model. The README shows the result. The first guide ends with the reader looking at their own trace. Guides are named after jobs, and every number says what it means.
 
 ## Page types
 
@@ -21,8 +21,8 @@ The model is Sentry's docs: the README is a shop window, the first page ends wit
    - After: "Replay any block on your laptop and see every storage read and write it made."
 2. **Show what the reader should see.** After every command, paste the real output, cut with `...` if long. After opening Jaeger, say what is on screen. Never invent output.
 3. **One term per idea, defined once.** Use these words and no others:
-   - **read** and **write**, not access, hit, fetch or lookup;
-   - **cache** (the value was already in memory for this block), **trie** (polkadot-frame-trace had to look it up in the chain state);
+   - **read** and **write** for storage operations, not access, hit or lookup. Use "fetch" only for requests to the node, as the output does;
+   - **cache** (a value from the block's earlier writes), **trie** (a value from chain state);
    - **disk cache** (what `--cache-dir` keeps between blocks and runs), never plain "cache" for it;
    - **proof bytes** (how much this read added to the storage proof);
    - **phase** (initialization, an extrinsic, on_poll, finalization);
