@@ -1,22 +1,22 @@
 # Releasing
 
-frame-trace has two release channels, like Rust's stable and nightly:
+polkadot-frame-trace has two release channels, like Rust's stable and nightly:
 
 | Channel | Built from | Published as | `--version` prints |
 | --- | --- | --- | --- |
-| Stable | a `vX.Y.Z` tag | a GitHub release, by hand from a draft | `frame-trace X.Y.Z` |
-| Nightly | `main`, each night | the `Nightly` pre-release on the tag `nightly`, replaced each night | `frame-trace X.Y.Z-nightly.YYYYMMDD+<short commit>` |
+| Stable | a `vX.Y.Z` tag | a GitHub release, by hand from a draft | `polkadot-frame-trace X.Y.Z` |
+| Nightly | `main`, each night | the `Nightly` pre-release on the tag `nightly`, replaced each night | `polkadot-frame-trace X.Y.Z-nightly.YYYYMMDD+<short commit>` |
 
 Both build the same four targets with the same packaging, in `.github/workflows/build.yml`.
 `release.yml` and `nightly.yml` call it, so the two cannot drift.
 
-frame-trace is not published on crates.io. The crate name `frame-trace` there belongs to an unrelated crate.
+polkadot-frame-trace is not published on crates.io. The crate name `polkadot-frame-trace` there belongs to an unrelated crate.
 Users install a release binary, a nightly binary, or build from Git; see `docs/getting-started/install.md`.
 
 ## Stable releases
 
 A pushed `v*` tag runs `.github/workflows/release.yml`.
-It checks that the tag matches the `frame-trace` version in `Cargo.toml`, runs rustfmt, clippy and the tests, builds the binaries and creates a **draft** GitHub release.
+It checks that the tag matches the `polkadot-frame-trace` version in `Cargo.toml`, runs rustfmt, clippy and the tests, builds the binaries and creates a **draft** GitHub release.
 The repository and the pushed tag are public, but no release is public until you publish the draft.
 
 1. Set the new version in `[workspace.package]` in `Cargo.toml`, then run `cargo build` so `Cargo.lock` follows.
@@ -25,7 +25,7 @@ The repository and the pushed tag are public, but no release is public until you
 4. Tag the merged commit and push the tag:
 
    ```sh
-   git tag -a vX.Y.Z -m "frame-trace X.Y.Z"
+   git tag -a vX.Y.Z -m "polkadot-frame-trace X.Y.Z"
    git push origin vX.Y.Z
    ```
 
@@ -35,14 +35,14 @@ The repository and the pushed tag are public, but no release is public until you
 
 | File | Built on |
 | --- | --- |
-| `frame-trace-X.Y.Z-x86_64-unknown-linux-gnu.tar.gz` | `ubuntu-22.04`, for an older glibc |
-| `frame-trace-X.Y.Z-aarch64-unknown-linux-gnu.tar.gz` | `ubuntu-22.04-arm` |
-| `frame-trace-X.Y.Z-aarch64-apple-darwin.tar.gz` | `macos-15` |
-| `frame-trace-X.Y.Z-x86_64-apple-darwin.tar.gz` | `macos-15-intel` |
+| `polkadot-frame-trace-X.Y.Z-x86_64-unknown-linux-gnu.tar.gz` | `ubuntu-22.04`, for an older glibc |
+| `polkadot-frame-trace-X.Y.Z-aarch64-unknown-linux-gnu.tar.gz` | `ubuntu-22.04-arm` |
+| `polkadot-frame-trace-X.Y.Z-aarch64-apple-darwin.tar.gz` | `macos-15` |
+| `polkadot-frame-trace-X.Y.Z-x86_64-apple-darwin.tar.gz` | `macos-15-intel` |
 | `SHA256SUMS` | SHA-256 of each archive |
 
-Each archive holds the `frame-trace` binary, `README.md` and `LICENSE`.
-Each archive also has a build provenance attestation. Check one with `gh attestation verify <archive> --repo agustinustheo/frame-trace`.
+Each archive holds the `polkadot-frame-trace` binary, `README.md` and `LICENSE`.
+Each archive also has a build provenance attestation. Check one with `gh attestation verify <archive> --repo agustinustheo/polkadot-frame-trace`.
 
 ### Re-running a release
 
@@ -59,7 +59,7 @@ A version with a suffix, such as `0.2.0-rc.1`, becomes a draft pre-release.
 Only one nightly runs at a time; a second one waits for the first.
 
 1. The `test` job checks out the run's commit and runs rustfmt, clippy, the offline tests, the ignored live tests and a live replay of the latest finalized Westend Asset Hub block. Live failures can come from the public endpoints. The run's commit is the head of `main` when the run was triggered, even if the run waited in the queue while `main` moved. The provenance attestation names that commit, so the workflow builds it and checks it built it.
-2. If they pass and the published `Nightly` release is not complete and built from this commit, the `build` job builds the four archives with `build.yml`. The archives are named `frame-trace-nightly-<target>.tar.gz`, so their download links stay the same. The version comes from `FRAME_TRACE_BUILD_VERSION`, which only this workflow sets; local builds and `release.yml` builds print the crate version.
+2. If they pass and the published `Nightly` release is not complete and built from this commit, the `build` job builds the four archives with `build.yml`. The archives are named `polkadot-frame-trace-nightly-<target>.tar.gz`, so their download links stay the same. The version comes from `FRAME_TRACE_BUILD_VERSION`, which only this workflow sets; local builds and `release.yml` builds print the crate version.
 3. The `publish` job writes `SHA256SUMS` and attests build provenance. It uploads the new release in full as a draft under a temporary tag name, which creates no tag. Then it deletes the old `Nightly` release and its assets, moves the `nightly` tag to the built commit, and publishes the draft as the `Nightly` pre-release on that tag. If any of this fails, it deletes the draft. It is never marked as the latest release. Its notes give the date, the commit, the run and a line pointing stable users to the latest `v*` release.
 
 The run still tests but does not publish if a published, not draft, `Nightly` release exists, has all four archives and `SHA256SUMS`, and its tag points to the run's commit.
