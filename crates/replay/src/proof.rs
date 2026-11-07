@@ -563,7 +563,9 @@ mod prediction_tests {
         let hash = H256::from(sp_io::hashing::blake2_256(&bytes));
         first.insert_nodes([bytes.clone()]);
         // A memory cache hit counts towards this replay's limits, and is refused past them.
-        second.held_bytes.store(MAX_REPLAY_NODE_BYTES, Ordering::Relaxed);
+        second
+            .held_bytes
+            .store(MAX_REPLAY_NODE_BYTES, Ordering::Relaxed);
         assert!(second.cached(&hash).is_err());
         assert!(second.nodes.lock().is_empty());
         second.held_bytes.store(0, Ordering::Relaxed);
