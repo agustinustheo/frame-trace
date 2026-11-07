@@ -3,8 +3,8 @@ use std::{path::PathBuf, time::Duration};
 
 use anyhow::{Context, Result};
 use clap::{ArgGroup, Args};
-use frame_trace_decode::{AnnotatedCall, Metadata, annotate};
-use frame_trace_replay::{
+use polkadot_frame_trace_decode::{AnnotatedCall, Metadata, annotate};
+use polkadot_frame_trace_replay::{
     Artifact, ReplaySession, call,
     rpc::{hex0, unhex},
 };
@@ -165,7 +165,7 @@ pub fn run(args: CallArgs) -> Result<()> {
             .ok()
     });
     let mut trace = annotate(
-        &frame_trace_model::TracedBlock::from_call(&replay.capture)?,
+        &polkadot_frame_trace_model::TracedBlock::from_call(&replay.capture)?,
         metadata.as_ref(),
     );
     trace.block_number = Some(replay.block_number);

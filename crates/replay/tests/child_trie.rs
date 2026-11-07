@@ -4,9 +4,9 @@
 //! 0x0d78e5414aa8c45f40e4c40b0c862ff0486e3262. pallet-revive keeps each contract's storage
 //! in its own default child trie, named by the trie id stored in the contract's account info.
 #![allow(clippy::unwrap_used)]
-use frame_trace_decode::{Metadata, annotate};
-use frame_trace_model::{OpKind, TracedBlock};
-use frame_trace_replay::{Artifact, replay};
+use polkadot_frame_trace_decode::{Metadata, annotate};
+use polkadot_frame_trace_model::{OpKind, TracedBlock};
+use polkadot_frame_trace_replay::{Artifact, replay};
 use std::path::PathBuf;
 
 const TRIE_ID: &str = "efdd7b91c3f1506385cbe9ee6e0255a6e4d12d4d2dd1f45975d5160872c45a2d";

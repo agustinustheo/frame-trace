@@ -1,4 +1,4 @@
-//! Block trace model for frame-trace.
+//! Block trace model for polkadot-frame-trace.
 //!
 //! Parses a `state_traceBlock` response ([`rpc`]), turns its `state` events into ordered
 //! [`StorageOp`]s, splits them into execution [`Phase`]s and computes [`Stats`]. Pure data and

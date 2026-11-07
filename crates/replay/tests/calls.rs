@@ -1,8 +1,8 @@
 //! Small calls at the existing People #1 state, without any network connection.
 #![allow(clippy::unwrap_used)]
-use frame_trace_decode::Metadata;
-use frame_trace_model::{OpKind, TracedBlock};
-use frame_trace_replay::{Artifact, ReplaySession, call, rpc::unhex};
+use polkadot_frame_trace_decode::Metadata;
+use polkadot_frame_trace_model::{OpKind, TracedBlock};
+use polkadot_frame_trace_replay::{Artifact, ReplaySession, call, rpc::unhex};
 use std::path::PathBuf;
 fn fixture(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -113,7 +113,7 @@ fn offline_calls_reject_wrong_result_state_and_missing_proofs() {
         !error.contains("root") && !error.contains("backtrace"),
         "{error}"
     );
-    assert!(frame_trace_replay::replay(original.clone(), None).is_err());
+    assert!(polkadot_frame_trace_replay::replay(original.clone(), None).is_err());
     assert!(call::replay(original, None, &session, true).is_err());
 }
 

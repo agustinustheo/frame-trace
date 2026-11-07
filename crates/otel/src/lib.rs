@@ -1,4 +1,4 @@
-//! OpenTelemetry export for frame-trace.
+//! OpenTelemetry export for polkadot-frame-trace.
 //!
 //! One trace per block, following the trace model in `dev/SPEC.md`:
 //!
@@ -26,8 +26,6 @@ mod delivery;
 mod http;
 
 pub use delivery::{Delivery, DeliveryHandle, Tracked};
-use frame_trace_decode::{AnnotatedBlock, AnnotatedOp, AnnotatedPhase};
-use frame_trace_model::Stats;
 pub use http::HttpExporter;
 use opentelemetry::{
     Array, Context, KeyValue, StringValue, Value,
@@ -40,12 +38,14 @@ use opentelemetry_sdk::{
         SpanExporter,
     },
 };
+use polkadot_frame_trace_decode::{AnnotatedBlock, AnnotatedOp, AnnotatedPhase};
+use polkadot_frame_trace_model::Stats;
 
 /// `db.system.name` for every storage op.
 pub const DB_SYSTEM: &str = "substrate";
 
 /// Instrumentation scope name.
-const SCOPE: &str = "frame-trace";
+const SCOPE: &str = "polkadot-frame-trace";
 
 /// Longest span name; longer labels are cut.
 const MAX_NAME_CHARS: usize = 160;
@@ -115,7 +115,7 @@ pub fn span_count(block: &AnnotatedBlock) -> usize {
 
 // The runtime's whole-block wrapper is represented by the OTel block itself. Keeping it
 // below initialization would incorrectly stretch that phase across the entire block.
-fn runtime_span(span: &frame_trace_model::RuntimeSpan) -> bool {
+fn runtime_span(span: &polkadot_frame_trace_model::RuntimeSpan) -> bool {
     span.wasm && span.name != "execute_block" && span.name != "Core_execute_block"
 }
 
@@ -624,10 +624,12 @@ fn record_measured(tracer: &SdkTracer, block: &AnnotatedBlock, timing: Timing) -
                 .filter(|id| owners.get(id) == Some(&i))
                 .and_then(|id| contexts.get(&id))
                 .unwrap_or(cx);
-            let t = op.timing.unwrap_or(frame_trace_model::MeasuredTiming {
-                start_ns: bounds[i].0,
-                duration_ns: 0,
-            });
+            let t = op
+                .timing
+                .unwrap_or(polkadot_frame_trace_model::MeasuredTiming {
+                    start_ns: bounds[i].0,
+                    duration_ns: 0,
+                });
             let mut span = tracer
                 .span_builder(truncate(&op.label))
                 .with_start_time(at(t.start_ns))
@@ -704,7 +706,7 @@ fn phase_label(kind: &str) -> &str {
     match kind {
         "apply_extrinsic" => "extrinsic",
         "unsegmented" => "no phase markers",
-        other => frame_trace_model::PhaseKind::label(other),
+        other => polkadot_frame_trace_model::PhaseKind::label(other),
     }
 }
 

@@ -1,8 +1,8 @@
 //! Bounded, finality-aware replay sampling. Unfinished jobs are marked cancelled at shutdown.
 use crate::{FollowArgs, source};
 use anyhow::{Context, Result};
-use frame_trace_otel::{Error as OtelError, PreparedTrace, Timing};
-use frame_trace_replay::{ReplaySession, rpc::CancellationToken};
+use polkadot_frame_trace_otel::{Error as OtelError, PreparedTrace, Timing};
+use polkadot_frame_trace_replay::{ReplaySession, rpc::CancellationToken};
 use std::{
     collections::{BTreeMap, VecDeque},
     sync::{
@@ -360,14 +360,14 @@ fn job_outcome(run: impl FnOnce() -> Result<()>) -> Outcome {
                 return Outcome::Skipped;
             }
             if matches!(
-                error.downcast_ref::<frame_trace_replay::Error>(),
-                Some(frame_trace_replay::Error::Cancelled)
+                error.downcast_ref::<polkadot_frame_trace_replay::Error>(),
+                Some(polkadot_frame_trace_replay::Error::Cancelled)
             ) {
                 say!("replay job cancelled");
                 return Outcome::Cancelled;
             }
             let retry = error
-                .downcast_ref::<frame_trace_replay::Error>()
+                .downcast_ref::<polkadot_frame_trace_replay::Error>()
                 .is_some_and(|e| e.is_transient());
             shout!(
                 "replay job failed: {error:#}; {}",
@@ -428,7 +428,7 @@ fn ancestry(
     let mut pending = Vec::new();
     loop {
         let height = number(&header)?;
-        let hash = frame_trace_replay::header_hash(&header)?;
+        let hash = polkadot_frame_trace_replay::header_hash(&header)?;
         if height < lower
             || known
                 .get(&hash)
@@ -451,7 +451,7 @@ fn ancestry(
         }
         let fetched = parent(hash)?;
         anyhow::ensure!(
-            frame_trace_replay::header_hash(&fetched)? == hash,
+            polkadot_frame_trace_replay::header_hash(&fetched)? == hash,
             "ancestry header hash mismatch"
         );
         anyhow::ensure!(
@@ -503,7 +503,7 @@ fn report_reorg(pending: &[(String, u64)], tip: u64, entries: &mut BTreeMap<Stri
 /// a blocked stderr cannot keep it from exiting.
 pub fn run(args: FollowArgs) -> Result<()> {
     crate::log::start();
-    frame_trace_replay::set_log_hook(|line| {
+    polkadot_frame_trace_replay::set_log_hook(|line| {
         let kind = if line.starts_with("warning") {
             crate::log::Kind::Failure
         } else {
@@ -560,7 +560,7 @@ fn follow(args: FollowArgs) -> Result<()> {
     let sender = args
         .otlp
         .as_deref()
-        .map(frame_trace_otel::OtlpSender::new)
+        .map(polkadot_frame_trace_otel::OtlpSender::new)
         .transpose()
         .context("--otlp")?;
     let session =
@@ -626,10 +626,10 @@ fn follow(args: FollowArgs) -> Result<()> {
                         }
                         let start = Instant::now();
                         let replay =
-                            frame_trace_replay::online_with_session(&rpc, &job.hash, &session)?;
+                            polkadot_frame_trace_replay::online_with_session(&rpc, &job.hash, &session)?;
                         drop(cold_start);
                         let loaded = source::replay_loaded(replay, None)?;
-                        let mut block = frame_trace_decode::annotate_at_block(
+                        let mut block = polkadot_frame_trace_decode::annotate_at_block(
                             &loaded.traced,
                             loaded.metadata.as_deref(),
                             loaded.block_number,
@@ -639,7 +639,7 @@ fn follow(args: FollowArgs) -> Result<()> {
                         let trace = otlp.then(|| Trace {
                             number: job.number,
                             hash: job.hash.clone(),
-                            spans: frame_trace_otel::prepare(&block, Timing::default()),
+                            spans: polkadot_frame_trace_otel::prepare(&block, Timing::default()),
                         });
                         let admitted = shared.admit(trace, || {
                             let _ = events.send(Event::Finished(
@@ -664,7 +664,7 @@ fn follow(args: FollowArgs) -> Result<()> {
                         }
                         if !admitted {
                             // Finished after the stop wait; the block counts as cancelled.
-                            return Err(frame_trace_replay::Error::Cancelled.into());
+                            return Err(polkadot_frame_trace_replay::Error::Cancelled.into());
                         }
                         Ok(())
                     });
@@ -955,7 +955,7 @@ fn status_line(
     totals: &Totals,
     shared: &Shared,
     otlp: bool,
-    memory: frame_trace_replay::MemoryCacheStats,
+    memory: polkadot_frame_trace_replay::MemoryCacheStats,
 ) -> (String, String) {
     let count = |state| entries.values().filter(|e| e.state == state).count();
     let problems = format!(
@@ -1042,13 +1042,13 @@ mod tests {
     fn reorg_walk_stops_at_start_height_and_reports_traced_reversions() {
         let zero = format!("0x{}", "00".repeat(32));
         let old = header(100, &zero, 1);
-        let old_hash = frame_trace_replay::header_hash(&old).unwrap();
+        let old_hash = polkadot_frame_trace_replay::header_hash(&old).unwrap();
         let mut entries = BTreeMap::from([(old_hash.clone(), entry(100, State::Done))]);
         let mut fork = Vec::new();
         let mut parent = zero;
         for number in 100..=102 {
             let h = header(number, &parent, 2);
-            parent = frame_trace_replay::header_hash(&h).unwrap();
+            parent = polkadot_frame_trace_replay::header_hash(&h).unwrap();
             fork.push(h);
         }
         let mut calls = 0;
@@ -1056,7 +1056,7 @@ mod tests {
             calls += 1;
             Ok(fork
                 .iter()
-                .find(|h| frame_trace_replay::header_hash(h).unwrap() == hash)
+                .find(|h| polkadot_frame_trace_replay::header_hash(h).unwrap() == hash)
                 .unwrap()
                 .clone())
         })
@@ -1083,7 +1083,7 @@ mod tests {
         let mut parent = format!("0x{}", "00".repeat(32));
         for n in 1..=100 {
             let h = header(n, &parent, 1);
-            parent = frame_trace_replay::header_hash(&h).unwrap();
+            parent = polkadot_frame_trace_replay::header_hash(&h).unwrap();
             chain.push(h);
         }
         let entries = BTreeMap::new();
@@ -1100,7 +1100,7 @@ mod tests {
             calls += 1;
             Ok(chain
                 .iter()
-                .find(|h| frame_trace_replay::header_hash(h).unwrap() == hash)
+                .find(|h| polkadot_frame_trace_replay::header_hash(h).unwrap() == hash)
                 .unwrap()
                 .clone())
         })
@@ -1121,7 +1121,7 @@ mod tests {
             let mut tip = serde_json::Value::Null;
             for height in start + 1..=start + capacity as u64 - 1 {
                 tip = header(height, &parent, 1);
-                parent = frame_trace_replay::header_hash(&tip).unwrap();
+                parent = polkadot_frame_trace_replay::header_hash(&tip).unwrap();
                 chain.insert(parent.clone(), tip.clone());
             }
             let pending = ancestry(tip, Some(start), &known, capacity, |hash| {
@@ -1165,8 +1165,8 @@ mod tests {
         assert_eq!(duration_text(Duration::from_secs(3723)), "1h02m03s");
     }
     fn trace(number: u64) -> Trace {
-        let block = frame_trace_decode::annotate_at_block(
-            &frame_trace_model::TracedBlock {
+        let block = polkadot_frame_trace_decode::annotate_at_block(
+            &polkadot_frame_trace_model::TracedBlock {
                 runtime_spans: Vec::new(),
                 timing: None,
                 block_hash: String::new(),
@@ -1181,13 +1181,13 @@ mod tests {
         Trace {
             number,
             hash: format!("0x{number}"),
-            spans: frame_trace_otel::prepare(&block, Timing::default()),
+            spans: polkadot_frame_trace_otel::prepare(&block, Timing::default()),
         }
     }
     #[test]
     fn status_line_shows_state_in_memory_without_reprinting_for_it() {
         let shared = Shared::default();
-        let memory = |bytes, hits| frame_trace_replay::MemoryCacheStats {
+        let memory = |bytes, hits| polkadot_frame_trace_replay::MemoryCacheStats {
             bytes,
             budget: 128 << 20,
             entries: 1234,
@@ -1220,7 +1220,7 @@ mod tests {
             &Totals::default(),
             &shared,
             false,
-            frame_trace_replay::MemoryCacheStats::default(),
+            polkadot_frame_trace_replay::MemoryCacheStats::default(),
         );
         assert!(
             empty.ends_with("state-memory=0MiB state-pieces=0 state-from-memory=0%"),
@@ -1334,14 +1334,14 @@ mod tests {
             );
         }
         for error in [
-            frame_trace_replay::Error::Execution("root mismatch".into()),
-            frame_trace_replay::Error::Unavailable("pruned".into()),
-            frame_trace_replay::Error::Invalid("bad block".into()),
+            polkadot_frame_trace_replay::Error::Execution("root mismatch".into()),
+            polkadot_frame_trace_replay::Error::Unavailable("pruned".into()),
+            polkadot_frame_trace_replay::Error::Invalid("bad block".into()),
         ] {
             assert_eq!(job_outcome(|| Err(error.into())), Outcome::Terminal);
         }
         assert_eq!(
-            job_outcome(|| Err(frame_trace_replay::Error::Cancelled.into())),
+            job_outcome(|| Err(polkadot_frame_trace_replay::Error::Cancelled.into())),
             Outcome::Cancelled
         );
         assert_eq!(
@@ -1359,7 +1359,9 @@ mod tests {
         finish(&mut skipped, &Outcome::Skipped);
         assert_eq!(skipped.state, State::Skipped);
         assert_eq!(
-            job_outcome(|| Err(frame_trace_replay::Error::TransientRpc("timeout".into()).into())),
+            job_outcome(|| Err(
+                polkadot_frame_trace_replay::Error::TransientRpc("timeout".into()).into()
+            )),
             Outcome::Retryable
         );
     }
@@ -1372,7 +1374,7 @@ mod canonical_again_tests {
     fn reverted_tip_is_eligible_again_and_new_generation_survives_old_completion() {
         let header = serde_json::json!({"number":"0x1", "parentHash":format!("0x{}", "00".repeat(32)),
             "stateRoot":format!("0x{}", "11".repeat(32)), "extrinsicsRoot":format!("0x{}", "00".repeat(32)), "digest":{"logs":[]}});
-        let hash = frame_trace_replay::header_hash(&header).expect("header");
+        let hash = polkadot_frame_trace_replay::header_hash(&header).expect("header");
         let old = Arc::new(AtomicBool::new(true));
         let mut entries = BTreeMap::from([(
             hash.clone(),

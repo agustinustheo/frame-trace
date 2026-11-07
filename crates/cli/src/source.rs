@@ -8,7 +8,7 @@ use std::{
 
 use anyhow::{Context, Result, bail};
 use clap::{ArgGroup, Args};
-use frame_trace_decode::Metadata;
+use polkadot_frame_trace_decode::Metadata;
 
 /// Arguments that select the block to trace.
 #[derive(Args)]
@@ -84,9 +84,9 @@ pub fn rpc(
     url: &str,
     concurrency: u8,
     timeout: Duration,
-    cancel: frame_trace_replay::rpc::CancellationToken,
-) -> Result<frame_trace_replay::rpc::Rpc> {
-    Ok(frame_trace_replay::rpc::Rpc::with_options(
+    cancel: polkadot_frame_trace_replay::rpc::CancellationToken,
+) -> Result<polkadot_frame_trace_replay::rpc::Rpc> {
+    Ok(polkadot_frame_trace_replay::rpc::Rpc::with_options(
         url,
         usize::from(concurrency),
         timeout * 4,
@@ -106,7 +106,7 @@ pub fn read_runtime_override(path: Option<&Path>) -> Result<Option<Vec<u8>>> {
         "--runtime-override {} is empty",
         path.display()
     );
-    frame_trace_replay::check_runtime_wasm(&wasm)
+    polkadot_frame_trace_replay::check_runtime_wasm(&wasm)
         .with_context(|| format!("--runtime-override {}", path.display()))?;
     say!(
         "RUNTIME OVERRIDE: {} will execute instead of the chain's authenticated :code",
@@ -117,10 +117,10 @@ pub fn read_runtime_override(path: Option<&Path>) -> Result<Option<Vec<u8>>> {
 
 /// The JSON/OTLP label for a substitute runtime.
 pub fn override_info(
-    o: Option<frame_trace_replay::RuntimeOverride>,
+    o: Option<polkadot_frame_trace_replay::RuntimeOverride>,
     path: Option<&Path>,
-) -> Option<frame_trace_decode::RuntimeOverrideInfo> {
-    o.map(|o| frame_trace_decode::RuntimeOverrideInfo {
+) -> Option<polkadot_frame_trace_decode::RuntimeOverrideInfo> {
+    o.map(|o| polkadot_frame_trace_decode::RuntimeOverrideInfo {
         path: path.map(|p| p.display().to_string()).unwrap_or_default(),
         code_hash: format!("{:?}", o.override_code_hash),
         chain_code_hash: format!("{:?}", o.chain_code_hash),
@@ -130,22 +130,22 @@ pub fn override_info(
 
 /// A block trace and what is needed to decode it.
 pub struct Loaded {
-    pub traced: frame_trace_model::TracedBlock,
+    pub traced: polkadot_frame_trace_model::TracedBlock,
     pub metadata: Option<Arc<Metadata>>,
     pub block_number: Option<u64>,
-    pub execution: Option<frame_trace_decode::ExecutionInfo>,
-    pub runtime_override: Option<frame_trace_replay::RuntimeOverride>,
+    pub execution: Option<polkadot_frame_trace_decode::ExecutionInfo>,
+    pub runtime_override: Option<polkadot_frame_trace_replay::RuntimeOverride>,
 }
 
 pub fn load(args: &SourceArgs) -> Result<Loaded> {
     let runtime_override = read_runtime_override(args.runtime_override.as_deref())?;
     if let Some(dir) = &args.offline {
-        let replay = frame_trace_replay::Artifact::load(dir)
+        let replay = polkadot_frame_trace_replay::Artifact::load(dir)
             .and_then(|artifact| {
-                frame_trace_replay::replay_with_session(
+                polkadot_frame_trace_replay::replay_with_session(
                     artifact,
                     None,
-                    &frame_trace_replay::ReplaySession::with_cache_max_bytes(
+                    &polkadot_frame_trace_replay::ReplaySession::with_cache_max_bytes(
                         args.cache_dir.as_deref(),
                         args.cache_max_bytes,
                     )?
@@ -171,10 +171,10 @@ pub fn load(args: &SourceArgs) -> Result<Loaded> {
             .inspect_err(|_| {
                 say!("root check: NOT VERIFIED; RPC calls: 0");
             })?;
-            let replay = frame_trace_replay::online_with_session(
+            let replay = polkadot_frame_trace_replay::online_with_session(
                 &rpc,
                 args.block.as_deref().unwrap_or_default(),
-                &frame_trace_replay::ReplaySession::with_cache_max_bytes(
+                &polkadot_frame_trace_replay::ReplaySession::with_cache_max_bytes(
                     args.cache_dir.as_deref(),
                     args.cache_max_bytes,
                 )?
@@ -197,11 +197,11 @@ mod file {
         let json = std::fs::read_to_string(trace)
             .with_context(|| format!("reading {}", trace.display()))?;
         let trace_path = trace;
-        let trace = frame_trace_model::rpc::parse_trace_block(&json)
+        let trace = polkadot_frame_trace_model::rpc::parse_trace_block(&json)
             .with_context(|| format!("parsing {}", trace.display()))?;
         let metadata = metadata.map(load_metadata).transpose()?.map(Arc::new);
         Ok(Loaded {
-            traced: frame_trace_model::TracedBlock::from_trace(&trace)
+            traced: polkadot_frame_trace_model::TracedBlock::from_trace(&trace)
                 .with_context(|| format!("converting trace from {}", trace_path.display()))?,
             metadata,
             block_number: None,
@@ -239,7 +239,7 @@ mod file {
 /// Both block and summary consume the same faithful measured result.
 /// The decoded metadata of the last few runtimes. `follow` and `report` replay many blocks of
 /// one runtime: they decode its metadata once, not once per block.
-fn decoded(hex: &str) -> std::result::Result<Arc<Metadata>, frame_trace_decode::Error> {
+fn decoded(hex: &str) -> std::result::Result<Arc<Metadata>, polkadot_frame_trace_decode::Error> {
     static DECODED: Mutex<Vec<(String, Arc<Metadata>)>> = Mutex::new(Vec::new());
     let found = DECODED
         .lock()
@@ -258,7 +258,10 @@ fn decoded(hex: &str) -> std::result::Result<Arc<Metadata>, frame_trace_decode::
     Ok(metadata)
 }
 
-pub fn replay_loaded(replay: frame_trace_replay::Replay, save: Option<&Path>) -> Result<Loaded> {
+pub fn replay_loaded(
+    replay: polkadot_frame_trace_replay::Replay,
+    save: Option<&Path>,
+) -> Result<Loaded> {
     say!(
         "root check: {}{}; RPC calls: {} (timed replay: {}); execution proof: {} bytes",
         if replay.root_check { "PASS" } else { "FAIL" },
@@ -299,10 +302,10 @@ pub fn replay_loaded(replay: frame_trace_replay::Replay, save: Option<&Path>) ->
         }
     };
     Ok(Loaded {
-        traced: frame_trace_model::TracedBlock::from_replay(&replay.capture)?,
+        traced: polkadot_frame_trace_model::TracedBlock::from_replay(&replay.capture)?,
         metadata,
         block_number: Some(replay.block_number),
-        execution: Some(frame_trace_decode::ExecutionInfo {
+        execution: Some(polkadot_frame_trace_decode::ExecutionInfo {
             root_check: replay.root_check,
             proof_bytes: replay.proof_bytes,
             rpc_calls: replay.rpc_count,

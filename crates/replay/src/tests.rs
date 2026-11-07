@@ -389,7 +389,10 @@ fn a_failed_root_check_records_no_hints_and_writes_no_disk_cache() {
         }
         method => panic!("unexpected RPC {method}"),
     });
-    let dir = std::env::temp_dir().join(format!("frame-trace-root-fail-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!(
+        "polkadot-frame-trace-root-fail-{}",
+        std::process::id()
+    ));
     let session = ReplaySession::new(Some(&dir))
         .unwrap()
         .with_speculative_discovery(false);
@@ -506,8 +509,8 @@ fn unknown_host_import_error_names_the_import() {
     assert!(!text.contains("override"), "{text}");
     assert!(
         text.starts_with(
-            "the runtime needs host functions frame-trace does not have: \
-             env:ext_frame_trace_unknown_version_1. frame-trace's host functions are fixed"
+            "the runtime needs host functions polkadot-frame-trace does not have: \
+             env:ext_frame_trace_unknown_version_1. polkadot-frame-trace's host functions are fixed"
         ),
         "{text}"
     );
@@ -621,8 +624,10 @@ fn disk_cache_write_failures_are_cut_back_counted_and_warned_once() {
         assert_eq!(files, disk.segment_count());
         return;
     }
-    let dir =
-        std::env::temp_dir().join(format!("frame-trace-write-failure-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!(
+        "polkadot-frame-trace-write-failure-{}",
+        std::process::id()
+    ));
     let _ = std::fs::remove_dir_all(&dir);
     let out = std::process::Command::new("/bin/sh")
         .args(["-c", "trap '' XFSZ; ulimit -f 40; exec \"$0\" \"$@\""])
@@ -656,7 +661,10 @@ fn disk_cache_write_failures_are_cut_back_counted_and_warned_once() {
 fn persistent_node_cache_reuses_and_heals_corrupt_nodes() {
     use sp_state_machine::TrieBackendStorage;
     use std::os::unix::fs::FileExt;
-    let dir = std::env::temp_dir().join(format!("frame-trace-node-cache-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!(
+        "polkadot-frame-trace-node-cache-{}",
+        std::process::id()
+    ));
     let _ = std::fs::remove_dir_all(&dir);
     let session = |dir: &Path| {
         let session = ReplaySession::new(Some(dir)).unwrap();
@@ -840,7 +848,10 @@ fn speculative_pending_preserves_top_and_both_child_namespaces() {
 
 #[test]
 fn disk_cache_limit_bounds_nodes_and_unused_runtimes_together() {
-    let dir = std::env::temp_dir().join(format!("frame-trace-eviction-{}", std::process::id()));
+    let dir = std::env::temp_dir().join(format!(
+        "polkadot-frame-trace-eviction-{}",
+        std::process::id()
+    ));
     let _ = std::fs::remove_dir_all(&dir);
     let cap = 256 * 1024;
     let session = ReplaySession::with_cache_max_bytes(Some(&dir), cap).unwrap();
@@ -1363,7 +1374,7 @@ fn real_contract_call_fetches_pinned_child_proofs_and_rejects_bad_ones() {
     // The child keys the block reads and writes, from the offline replay.
     let offline = replay(artifact.clone(), None).unwrap();
     let block_keys: std::collections::BTreeSet<String> =
-        frame_trace_model::TracedBlock::from_replay(&offline.capture)
+        polkadot_frame_trace_model::TracedBlock::from_replay(&offline.capture)
             .unwrap()
             .ops
             .iter()
@@ -1499,7 +1510,8 @@ fn real_contract_call_fetches_pinned_child_proofs_and_rejects_bad_ones() {
                     .collect();
                 assert_eq!(requested, block_keys);
                 // Every child op in the online trace is on the contract's trie, as offline.
-                let traced = frame_trace_model::TracedBlock::from_replay(&result.capture).unwrap();
+                let traced =
+                    polkadot_frame_trace_model::TracedBlock::from_replay(&result.capture).unwrap();
                 assert!(
                     traced
                         .ops

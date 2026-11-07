@@ -10,10 +10,10 @@ license = "Apache-2.0"
 repository = "https://github.com/agustinustheo/frame-trace"
 
 [workspace.dependencies]
-frame-trace-model = { path = "crates/model" }
-frame-trace-decode = { path = "crates/decode" }
-frame-trace-otel = { path = "crates/otel" }
-frame-trace-replay = { path = "crates/replay" }
+polkadot-frame-trace-model = { path = "crates/model" }
+polkadot-frame-trace-decode = { path = "crates/decode" }
+polkadot-frame-trace-otel = { path = "crates/otel" }
+polkadot-frame-trace-replay = { path = "crates/replay" }
 
 anyhow = "1.0.104"
 bs58 = "0.5.1"

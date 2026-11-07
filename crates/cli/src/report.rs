@@ -1,7 +1,7 @@
 //! Aggregation of the public JSON format. No replay is needed for saved traces.
 use anyhow::{Context, Result, ensure};
 use clap::{ArgGroup, Args, ValueEnum};
-use frame_trace_decode::{AnnotatedBlock, AnnotatedOp};
+use polkadot_frame_trace_decode::{AnnotatedBlock, AnnotatedOp};
 use serde::Serialize;
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -111,7 +111,7 @@ pub fn read_trace(path: &Path) -> Result<AnnotatedBlock> {
 pub fn run(args: ReportArgs) -> Result<()> {
     let mut accumulator = Accumulator::default();
     if let Some(url) = &args.rpc {
-        use frame_trace_replay::ReplaySession;
+        use polkadot_frame_trace_replay::ReplaySession;
         let rpc = crate::source::rpc(
             url,
             args.proof_concurrency,
@@ -156,10 +156,11 @@ pub fn run(args: ReportArgs) -> Result<()> {
                                 let hash =
                                     rpc.call("chain_getBlockHash", serde_json::json!([number]))?;
                                 let hash = hash.as_str().context("block hash unavailable")?;
-                                let replay =
-                                    frame_trace_replay::online_with_session(&rpc, hash, session)?;
+                                let replay = polkadot_frame_trace_replay::online_with_session(
+                                    &rpc, hash, session,
+                                )?;
                                 let loaded = crate::source::replay_loaded(replay, None)?;
-                                let mut block = frame_trace_decode::annotate_at_block(
+                                let mut block = polkadot_frame_trace_decode::annotate_at_block(
                                     &loaded.traced,
                                     loaded.metadata.as_deref(),
                                     loaded.block_number,
@@ -349,7 +350,7 @@ pub struct ExtrinsicAggregate {
 pub struct OverriddenBlock {
     pub block_hash: String,
     #[serde(flatten)]
-    pub runtime: frame_trace_decode::RuntimeOverrideInfo,
+    pub runtime: polkadot_frame_trace_decode::RuntimeOverrideInfo,
 }
 #[derive(Serialize, Default)]
 pub struct Report {
@@ -687,7 +688,7 @@ pub fn render_body(r: &Report, top: usize, sort: SortKey) -> String {
     for name in &r.phase_order {
         let p = &r.phases[name];
         phases.add_row(vec![
-            frame_trace_model::PhaseKind::label(name).to_owned(),
+            polkadot_frame_trace_model::PhaseKind::label(name).to_owned(),
             format!("{:.1}", p.ops_share * 100.0),
             format!("{:.1}", p.storage_time_share * 100.0),
             p.proof_bytes_share
@@ -891,9 +892,9 @@ mod tests {
     use super::*;
     fn trace() -> AnnotatedBlock {
         let json = include_str!("../../../fixtures/model/two-extrinsics.json");
-        let raw = frame_trace_model::rpc::parse_trace_block(json).expect("fixture");
-        let traced = frame_trace_model::TracedBlock::from_trace(&raw).expect("trace");
-        frame_trace_decode::annotate(&traced, None)
+        let raw = polkadot_frame_trace_model::rpc::parse_trace_block(json).expect("fixture");
+        let traced = polkadot_frame_trace_model::TracedBlock::from_trace(&raw).expect("trace");
+        polkadot_frame_trace_decode::annotate(&traced, None)
     }
     #[test]
     fn nested_intervals_are_unioned_and_percentiles_use_nearest_rank() {
@@ -1082,7 +1083,7 @@ mod round5_tests {
                 phase.ops.resize(100, op);
             }
             for op in &mut phase.ops {
-                op.timing = Some(frame_trace_model::MeasuredTiming {
+                op.timing = Some(polkadot_frame_trace_model::MeasuredTiming {
                     start_ns: 0,
                     duration_ns: if i == 0 { 1 } else { 10000 },
                 });

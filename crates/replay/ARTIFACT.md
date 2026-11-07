@@ -33,7 +33,7 @@ Every execution uses a fresh overlay and backend recorder. The stable2609 defaul
 `ExecutionExtensions` factory is empty, then adds executor-backed
 `ReadRuntimeVersionExt`: both import and ordinary `state_call` receive that reader.
 Import with `enable_import_proof_recording` additionally supplies `ProofSizeExt`;
-ordinary `state_call` supplies none. These are the two policies frame-trace mirrors.
+ordinary `state_call` supplies none. These are the two policies polkadot-frame-trace mirrors.
 No node-specific custom extension factory, keystore or offchain-worker capability
 is inferred from RPC. Unsupported custom host/extension requirements fail explicitly.
 See SDK [execution extensions](https://github.com/paritytech/polkadot-sdk/blob/polkadot-stable2609/substrate/client/api/src/execution_extensions.rs),

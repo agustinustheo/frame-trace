@@ -3,9 +3,9 @@
 #![allow(clippy::unwrap_used)] // Tests may panic on bad fixtures.
 
 use frame_metadata::{RuntimeMetadata, RuntimeMetadataPrefixed};
-use frame_trace_decode::{KeyName, Metadata, annotate};
-use frame_trace_model::{TracedBlock, rpc::parse_trace_block};
 use parity_scale_codec::{Decode, Encode};
+use polkadot_frame_trace_decode::{KeyName, Metadata, annotate};
+use polkadot_frame_trace_model::{TracedBlock, rpc::parse_trace_block};
 use sp_crypto_hashing::{blake2_128, blake2_256, twox_64, twox_128};
 
 const ALICE: &str = "d43593c715fdd31c61141abd04a99fd6822c8558854ccde39a5684e7a56da27d";
@@ -277,7 +277,7 @@ fn extrinsic_phases_carry_the_transaction_hash() {
     let value = serde_json::to_value(&annotated).unwrap();
     assert_eq!(value["phases"][1]["extrinsic_hash"], TIMESTAMP_SET);
     assert!(value["phases"][0].get("extrinsic_hash").is_none());
-    let back: frame_trace_decode::AnnotatedBlock = serde_json::from_value(value).unwrap();
+    let back: polkadot_frame_trace_decode::AnnotatedBlock = serde_json::from_value(value).unwrap();
     assert_eq!(back.phases[2].extrinsic_hash.as_deref(), Some(TRANSFER));
 }
 
@@ -422,7 +422,7 @@ fn runtime_api_json_args_and_complete_results() {
         "/../../fixtures/metadata/westend-v16.scale"
     ))
     .unwrap();
-    let md = frame_trace_decode::Metadata::from_bytes(&bytes).unwrap();
+    let md = polkadot_frame_trace_decode::Metadata::from_bytes(&bytes).unwrap();
     let account = vec![7u8; 32];
     let positional = md
         .encode_runtime_args(
