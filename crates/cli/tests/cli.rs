@@ -144,24 +144,52 @@ fn ignored_source_options_are_rejected_before_loading_or_connecting() {
 
 #[test]
 fn command_help_has_plain_descriptions_examples_and_hidden_compatible_aliases() {
-    for (command, description) in [
+    for (command, description, words) in [
         (
             "block",
             "Trace storage use in one block and export it to JSON or a trace viewer",
+            &[
+                "best",
+                "--proof-concurrency",
+                "--cache-dir",
+                "--cache-max-bytes",
+                "http://127.0.0.1:4318",
+            ][..],
         ),
         (
             "summary",
             "Show storage use by block phase and storage item",
+            &[],
         ),
         (
             "call",
             "Trace storage use and the result of a runtime API call",
+            &[
+                "--check-state-call",
+                "stdout",
+                "--json",
+                "OTLP/HTTP",
+                "32 proof keys",
+                "compiled Wasm",
+                "cache limit",
+                "--unauthenticated-metadata",
+            ],
         ),
         (
             "report",
             "Compare storage use across saved blocks or a range of finalized blocks",
+            &[],
         ),
-        ("follow", "Trace new finalized blocks as they arrive"),
+        (
+            "follow",
+            "Trace new finalized blocks as they arrive",
+            &[
+                "http://127.0.0.1:4318",
+                "--best",
+                "finalized",
+                "--rpc-timeout <SECONDS>",
+            ],
+        ),
     ] {
         let out = run(&[command, "--help"]);
         assert!(out.status.success());
@@ -177,8 +205,8 @@ fn command_help_has_plain_descriptions_examples_and_hidden_compatible_aliases() 
             !help.contains("--oracle") && !help.contains("--rpc-metadata-fallback"),
             "{help}"
         );
-        if command == "call" {
-            assert!(help.contains("--check-state-call"), "{help}");
+        for word in words {
+            assert!(help.contains(word), "{command}: {word}: {help}");
         }
         if matches!(command, "block" | "summary" | "call") {
             let flag = if command == "call" { "--at" } else { "--block" };
@@ -1434,42 +1462,6 @@ fn rpc_timeout_lets_a_slow_node_answer() {
     }
     let out = run(&["block", "--offline", "missing", "--rpc-timeout", "3"]);
     assert_eq!(out.status.code(), Some(2));
-}
-
-#[test]
-fn help_describes_best_concurrency_cache_and_otlp_default() {
-    let output = run(&["block", "--help"]);
-    let text = String::from_utf8_lossy(&output.stdout);
-    for word in [
-        "best",
-        "--proof-concurrency",
-        "--cache-dir",
-        "--cache-max-bytes",
-        "http://127.0.0.1:4318",
-    ] {
-        assert!(text.contains(word), "{text}");
-    }
-    let output = run(&["call", "--help"]);
-    let text = String::from_utf8_lossy(&output.stdout);
-    for word in [
-        "stdout",
-        "--json",
-        "OTLP/HTTP",
-        "32 proof keys",
-        "compiled Wasm",
-        "cache limit",
-        "--unauthenticated-metadata",
-    ] {
-        assert!(text.contains(word), "{text}");
-    }
-    let output = run(&["follow", "--help"]);
-    let text = String::from_utf8_lossy(&output.stdout);
-    assert!(
-        text.contains("http://127.0.0.1:4318")
-            && text.contains("--best")
-            && text.contains("finalized")
-            && text.contains("--rpc-timeout <SECONDS>")
-    );
 }
 
 #[test]
