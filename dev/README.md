@@ -9,9 +9,9 @@ Material for people working on polkadot-frame-trace itself. User documentation i
 | Path | What it is |
 | --- | --- |
 | [`SPEC.md`](SPEC.md) | The original design: goals, trace model, crate layout and roadmap. |
-| [`STATUS.md`](STATUS.md) | Project status, how it was built, known limits and open decisions. |
+| [`STATUS.md`](STATUS.md) | Known limits, open decisions and upstream bugs. |
 | [`RELEASING.md`](RELEASING.md) | How to cut a release: version bump, changelog, tag, draft release. |
-| [`performance.md`](performance.md) | Measurement log across the fix rounds: replay times, follow throughput and test counts. |
+| [`performance.md`](performance.md) | Current numbers: follow throughput, the memory limit, disk cache segments, and how to reproduce them. |
 
 The replay artifact format is specified in [`crates/replay/ARTIFACT.md`](../crates/replay/ARTIFACT.md). Fixture provenance is in [`fixtures/replay/README.md`](../fixtures/replay/README.md).
 

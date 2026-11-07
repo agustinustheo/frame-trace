@@ -1,5 +1,7 @@
 # polkadot-frame-trace: spec
 
+> **Historical.** This is the original design from before the first release. It is not kept up to date. For what the tool does now, see the [README](../README.md) and [STATUS.md](STATUS.md).
+
 polkadot-frame-trace shows what a Polkadot SDK chain did, step by step, as OpenTelemetry traces: for each block and each extrinsic, which storage items it read and wrote, in what order, how big the values were, and (later) how long each step took.
 
 Research notes behind every decision here are in `dev/research/` at commit 2e5c243.
