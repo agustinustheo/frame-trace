@@ -70,9 +70,8 @@ pub struct ProofDb {
     rpc_failure: Arc<Mutex<Option<Error>>>,
     pub failure: Arc<Mutex<Option<String>>>,
     pub round_trips: Arc<AtomicUsize>,
-    /// Distinct nodes this replay holds, and their bytes, bounded by [`MAX_REPLAY_NODES`] and
-    /// [`MAX_REPLAY_NODE_BYTES`] for what the node sends.
-    held: Arc<(AtomicUsize, AtomicUsize)>,
+    /// Bytes of the distinct nodes in `nodes`, changed only under its lock, in [`Self::admit`].
+    held_bytes: Arc<AtomicUsize>,
 }
 impl ProofDb {
     #[cfg(test)]
@@ -103,7 +102,7 @@ impl ProofDb {
             rpc_failure: Default::default(),
             failure: Default::default(),
             round_trips: Default::default(),
-            held: Default::default(),
+            held_bytes: Default::default(),
         }
     }
     pub fn rpc(&self) -> Option<&Rpc> {
@@ -190,7 +189,7 @@ impl ProofDb {
         let nodes = proof["proof"]
             .as_array()
             .ok_or_else(|| Error::Invalid("proof nodes are not an array".into()))?;
-        self.insert_nodes(
+        self.admit_nodes(
             nodes
                 .iter()
                 .map(|v| {
@@ -199,20 +198,15 @@ impl ProofDb {
                         .and_then(unhex)
                 })
                 .collect::<Result<Vec<_>>>()?,
-        );
-        let (nodes, bytes) = (
-            self.held.0.load(Ordering::Relaxed),
-            self.held.1.load(Ordering::Relaxed),
-        );
-        if nodes > MAX_REPLAY_NODES || bytes > MAX_REPLAY_NODE_BYTES {
-            return Err(Error::Invalid(format!(
-                "the node sent {nodes} proof nodes ({bytes} bytes) for this block, more than \
-                 the limit of {MAX_REPLAY_NODES} nodes or {MAX_REPLAY_NODE_BYTES} bytes per replay"
-            )));
-        }
-        Ok(())
+        )
     }
+    #[cfg(test)]
     pub fn insert_nodes(&self, fetched: impl IntoIterator<Item = Vec<u8>>) {
+        self.admit_nodes(fetched).expect("within the replay limits");
+    }
+    /// Adds nodes from the node, the disk cache or a saved replay, and shares them with the
+    /// session's memory cache. Fails at the first node past the replay limits.
+    pub fn admit_nodes(&self, fetched: impl IntoIterator<Item = Vec<u8>>) -> Result<()> {
         let fetched: Vec<_> = fetched
             .into_iter()
             .map(|bytes| (H256::from(sp_io::hashing::blake2_256(&bytes)), bytes))
@@ -220,14 +214,42 @@ impl ProofDb {
         let mut nodes = self.nodes.lock();
         let mut shared = self.session.nodes.lock();
         for (hash, bytes) in fetched {
+            let len = bytes.len();
             // Keep one immutable allocation per content hash across active replays.
-            let bytes = shared.intern(hash, bytes);
-            if let std::collections::btree_map::Entry::Vacant(entry) = nodes.entry(hash) {
-                self.held.0.fetch_add(1, Ordering::Relaxed);
-                self.held.1.fetch_add(bytes.len(), Ordering::Relaxed);
-                entry.insert(bytes);
-            }
+            self.admit(&mut nodes, hash, len, || shared.intern(hash, bytes))?;
         }
+        Ok(())
+    }
+    /// The one way a distinct node enters this replay, from any source. The limits are checked
+    /// before it is added, under the lock of `nodes`, which also guards `held_bytes`.
+    fn admit(
+        &self,
+        nodes: &mut BTreeMap<H256, Arc<[u8]>>,
+        hash: H256,
+        len: usize,
+        node: impl FnOnce() -> Arc<[u8]>,
+    ) -> Result<()> {
+        let count = nodes.len() + 1;
+        let std::collections::btree_map::Entry::Vacant(entry) = nodes.entry(hash) else {
+            node();
+            return Ok(());
+        };
+        let bytes = self.held_bytes.load(Ordering::Relaxed) + len;
+        if count > MAX_REPLAY_NODES || bytes > MAX_REPLAY_NODE_BYTES {
+            return Err(Error::Invalid(format!(
+                "this block needs more than {MAX_REPLAY_NODES} proof nodes or \
+                 {MAX_REPLAY_NODE_BYTES} bytes of them, the limit per replay"
+            )));
+        }
+        entry.insert(node());
+        self.held_bytes.store(bytes, Ordering::Relaxed);
+        Ok(())
+    }
+    /// Keeps `error` as the replay's error, and returns its text for the trie.
+    fn fail_with(&self, error: Error) -> String {
+        let text = error.to_string();
+        *self.rpc_failure.lock() = Some(error);
+        text
     }
     fn cached(&self, hash: &H256) -> std::result::Result<Option<Vec<u8>>, String> {
         if let Some(node) = self.nodes.lock().get(hash).cloned() {
@@ -239,11 +261,13 @@ impl ProofDb {
         }
         let cached = self.session.nodes.lock().get(hash);
         if let Some(node) = cached {
-            self.nodes.lock().insert(*hash, node.clone());
+            self.admit(&mut self.nodes.lock(), *hash, node.len(), || node.clone())
+                .map_err(|e| self.fail_with(e))?;
             return Ok(Some(node.to_vec()));
         }
         if let Some(node) = self.session.disk.as_ref().and_then(|disk| disk.get(hash)) {
-            self.insert_nodes([node.clone()]);
+            self.admit_nodes([node.clone()])
+                .map_err(|e| self.fail_with(e))?;
             return Ok(Some(node));
         }
         Ok(None)
@@ -325,13 +349,14 @@ impl ProofDb {
         }
         Ok(())
     }
-    pub fn retain_nodes(&self, nodes: &[Vec<u8>]) {
-        self.insert_nodes(nodes.iter().cloned());
+    pub fn retain_nodes(&self, nodes: &[Vec<u8>]) -> Result<()> {
+        self.admit_nodes(nodes.iter().cloned())?;
         self.used.lock().extend(
             nodes
                 .iter()
                 .map(|n| H256::from(sp_io::hashing::blake2_256(n))),
         );
+        Ok(())
     }
     pub fn export(&self) -> Vec<String> {
         let used = self.used.lock();
@@ -537,8 +562,15 @@ mod prediction_tests {
         let bytes = vec![7; 1024];
         let hash = H256::from(sp_io::hashing::blake2_256(&bytes));
         first.insert_nodes([bytes.clone()]);
+        // A memory cache hit counts towards this replay's limits, and is refused past them.
+        second.held_bytes.store(MAX_REPLAY_NODE_BYTES, Ordering::Relaxed);
+        assert!(second.cached(&hash).is_err());
+        assert!(second.nodes.lock().is_empty());
+        second.held_bytes.store(0, Ordering::Relaxed);
         assert_eq!(second.cached(&hash).expect("cached"), Some(bytes.clone()));
+        assert_eq!(second.held_bytes.load(Ordering::Relaxed), bytes.len());
         second.insert_nodes([bytes]);
+        assert_eq!(second.held_bytes.load(Ordering::Relaxed), 1024);
         assert!(Arc::ptr_eq(
             &first.nodes.lock()[&hash],
             &second.nodes.lock()[&hash]
