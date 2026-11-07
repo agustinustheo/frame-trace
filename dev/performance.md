@@ -20,7 +20,7 @@ All workers share the downloaded state in memory. The limit is 128 MiB, counted 
 
 Three runs set the limit to 32, 128 and 512 MiB for 60 minutes each. All three read 44–45% of state from memory, with 31.5–37 RPC calls and a 6.3–7.2 s median replay per block. A 16 times larger limit changed nothing, because most misses are pieces that no earlier block read. 128 MiB stays as headroom for chains whose blocks read more state.
 
-On Westend Asset Hub the entry limit binds first, because pieces average about 200 bytes. An 80-minute run reached it at minute 40 and stayed at 99–108 MiB charged. Heap in use was 139–150 MiB. In a 150-minute run beside the old code, the old heap grew by 128 MiB from minute 60 to 140, and the new heap by 72 MiB.
+On Westend Asset Hub the entry limit binds first, because pieces average about 200 bytes. An 80-minute run reached it at minute 40 and stayed at 99–108 MiB charged. Heap in use was 139–150 MiB. A 150-minute run beside the old code compared the heaps. From minute 60 to 140 the old heap grew by 128 MiB, and the new heap by 72 MiB.
 
 The estimate is high on purpose. On macOS it overcounts pieces of 200–600 bytes by about 43%, and pieces of 1–4 KiB by about 23%.
 
