@@ -69,7 +69,11 @@ zstd -dc fixtures/replay/people-traced/artifact.json.zst \
   | xxd -r -p > people-traced.wasm
 ```
 
-That runtime was built from the Individuality `next-people-paseo` runtime with one extra feature line, [`dev/experiments/e1/people-with-tracing.patch`](https://github.com/agustinustheo/polkadot-frame-trace/blob/main/dev/experiments/e1/people-with-tracing.patch).
+That runtime was built from the Individuality `next-people-paseo` runtime with one extra line in the `[features]` table of its `Cargo.toml`:
+
+```toml
+with-tracing = ["sp-io/with-tracing", "frame-executive/with-tracing"]
+```
 
 Now replay the untraced block with it:
 

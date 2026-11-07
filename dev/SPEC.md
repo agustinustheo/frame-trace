@@ -2,7 +2,7 @@
 
 polkadot-frame-trace shows what a Polkadot SDK chain did, step by step, as OpenTelemetry traces: for each block and each extrinsic, which storage items it read and wrote, in what order, how big the values were, and (later) how long each step took.
 
-Research notes behind every decision here are in [`research/`](research/).
+Research notes behind every decision here are in `dev/research/` at commit 2e5c243.
 
 ## Goals
 
@@ -16,7 +16,7 @@ Research notes behind every decision here are in [`research/`](research/).
 
 - Setting weights. Benchmarks stay the source of truth.
 - A custom UI. Use Jaeger/Tempo/Perfetto first.
-- Changing the Polkadot SDK. Upstream proposals (drafts in `upstream/`) come after we have numbers.
+- Changing the Polkadot SDK. Upstream proposals (drafts in `dev/upstream/` at commit 2e5c243) come after we have numbers.
 
 ## Why not `state_traceBlock`
 

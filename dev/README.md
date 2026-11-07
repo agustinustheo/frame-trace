@@ -1,6 +1,8 @@
 # Internal notes
 
-The project was renamed from frame-trace to polkadot-frame-trace on 7 November 2026. Dated measurements, research, experiments and upstream drafts keep the old name.
+The project was renamed from frame-trace to polkadot-frame-trace on 7 November 2026. Dated measurements keep the old name.
+
+The pre-project research, experiments E1 and E2, and the upstream bug drafts were removed on 7 November 2026. They are in commit 2e5c243.
 
 Material for people working on polkadot-frame-trace itself. User documentation is in [`docs/`](../docs/README.md).
 
@@ -10,10 +12,6 @@ Material for people working on polkadot-frame-trace itself. User documentation i
 | [`STATUS.md`](STATUS.md) | Project status, how it was built, known limits and open decisions. |
 | [`RELEASING.md`](RELEASING.md) | How to cut a release: version bump, changelog, tag, draft release. |
 | [`performance.md`](performance.md) | Measurement log across the fix rounds: replay times, follow throughput and test counts. |
-| [`research/`](research/) | Background research: SDK internals, prior art, Rust OpenTelemetry, the Individuality setup, first findings from 65 blocks, docs inspiration and the docs audit. |
-| [`experiments/e1/`](experiments/e1/README.md) | Experiment E1: `state_traceBlock` on a local People chain, with scripts and patches. `people-with-tracing.patch` adds the `with-tracing` feature to that runtime. |
-| [`experiments/e2/`](experiments/e2/README.md) | Experiment E2: self-replay from safe RPC, which became the main design. Its results back the fixtures in `fixtures/replay/`. |
-| [`upstream/`](upstream/) | Original drafts of the polkadot-sdk bug reports, filed as #13594 and #13595. Both are fixed by merged PRs #13665 and #13666. |
 
 The replay artifact format is specified in [`crates/replay/ARTIFACT.md`](../crates/replay/ARTIFACT.md). Fixture provenance is in [`fixtures/replay/README.md`](../fixtures/replay/README.md).
 
