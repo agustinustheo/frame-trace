@@ -58,8 +58,8 @@ What the lines mean:
 1. Open <http://127.0.0.1:16686>.
 2. In **Service**, pick `polkadot-frame-trace`.
 3. Click **Find Traces**.
-4. In the results, click the trace named `polkadot-frame-trace: block #<number> (0x<first 8 hex digits>…<last 4>)`, for example `polkadot-frame-trace: block #18598757 (0xb971c31a…8875)`. Jaeger puts the service name in front of the root span name, `block #18598757 (0xb971c31a…8875)`.
-5. Click the `>>` button above the span list to collapse everything, then click the block row to open one level.
+4. Click the trace for your block. Its name starts with `polkadot-frame-trace: block #<number>`, followed by a short hash, for example `polkadot-frame-trace: block #18598757 (0xb971c31a…8875)`. Jaeger puts the service name in front of the root span name.
+5. Click `>>` above the span list to collapse the trace. Click the block row to open one level.
 
 You should see this:
 

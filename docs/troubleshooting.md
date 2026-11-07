@@ -169,7 +169,7 @@ Start the receiver again, or fix the `--otlp` URL. The steps for [`<N> of <M> sp
 OTLP export queue full (32 traces); dropped the oldest, block #19025706 0x4c91709d161faccb5df6c0561e7a745f7b27d8d9b6e472c8d60f5e19dd2538ed (1 dropped so far)
 ```
 
-The receiver was down so long that `follow` holds the most traces it keeps.
+The receiver stopped responding, and the export queue reached its limit of 32 traces.
 To make room for a new trace, it drops the oldest one. The status line counts it as `export-dropped`.
 While this goes on, it logs the line again once a minute.
 
@@ -320,7 +320,8 @@ Error: range must be ordered, non-genesis and finalized (head #18597087)
 
 `report --from --to` got a range that is too long, starts at block 0, runs backwards, or ends after the latest finalized block.
 Keep a range to 10,000 blocks or fewer.
-Start at block 1 or later, and end at or before the head in the message.
+Start at block 1 or later.
+End at or before the finalized head shown in the message.
 
 ## `state_call check: MISMATCH`
 

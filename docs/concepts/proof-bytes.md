@@ -1,6 +1,6 @@
 # Proof bytes
 
-The **storage proof** of a block is the set of trie nodes that you need to run the block again without the full state.
+A block's **storage proof** contains the trie nodes needed to replay the block without the full state.
 polkadot-frame-trace records those nodes during the replay.
 After each replay, it prints `execution proof`, an estimate of their encoded size:
 
@@ -19,7 +19,7 @@ Each operation gets the bytes that it added to the proof.
 - A [cache](cache-or-trie.md) read does not use the trie, so it always shows 0.
 - If work between storage calls makes the proof larger, the next storage call gets those bytes.
 
-Thus the proof bytes of all operations add up to the execution proof.
+Normally, the proof bytes of all operations add up to the execution proof. For block #4 they total 6,586 bytes.
 `summary` prints the check:
 
 ```text
@@ -45,8 +45,8 @@ Duplicate reads 203 = cache 177, trie (already in proof) 26, trie (new) 0, unkno
   The number from polkadot-frame-trace is an estimate of the proof before those steps.
   Use it to compare blocks and to find the largest phases and items. Do not use it as the exact PoV size.
 - They are not the size of a proof for one item or one extrinsic on its own.
-  The item that reads a node first gets its bytes, also when a later item needs the node.
-  The order is important: if you move an extrinsic earlier, its numbers change.
+  The first item that reads a node gets its bytes, even if later items also need it.
+  Order matters: if you move an extrinsic earlier, its numbers change.
 - They are not the block's weight, and not network traffic.
 - The execution proof covers the storage the block touched.
   It does not include the runtime code or the metadata polkadot-frame-trace loaded to decode names.

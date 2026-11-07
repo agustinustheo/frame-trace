@@ -167,7 +167,7 @@ polkadot-frame-trace follow --rpc URL --best
 | Waiting blocks | 4 × `--workers`, at least 8 | Blocks queued for replay. A block older than this many recent heights is skipped. |
 | Check for new blocks | every 2 s | How often `follow` asks the node for its newest block. |
 | Wait after a failed check | 2 s, doubling to 60 s | Resets after the next check that works. |
-| Attempts per block | 4 | For failures that can pass, such as a timeout. Other failures stop the block at once. |
+| Attempts per block | 4 | For temporary failures, such as a timeout. Other failures stop the block at once. |
 | Status line | on change, and every 60 s | Printed at once when `retrying`, `stopped`, `skipped`, `reverted`, `export-rejected` or `export-failed` changes. A check for new blocks that waits on the node delays it. |
 | Repeated failure lines | first, then at most once a minute | For failed checks, failed exports and a full queue. A failure that comes back within the minute is not logged again. |
 | State kept in memory | 128 MiB | Downloaded state shared by all workers. Counts an upper estimate of what each piece and its index take in memory, so the real use is lower. When full, the least recently read piece goes first. With `--cache-dir`, an evicted piece may still be in the [disk cache](#disk-cache). |

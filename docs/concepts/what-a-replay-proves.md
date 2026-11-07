@@ -2,8 +2,8 @@
 
 A **replay** runs a block again on your machine, with the chain's own runtime.
 polkadot-frame-trace records every storage call during the replay.
-At the end, it does the **root check**: the replay must give the same state root as the block header.
-If the roots are the same, the trace shows what the block really did to storage.
+At the end, the **root check** confirms that the replay produced the state root in the block header.
+If it did, the trace shows what the block really did to storage.
 
 ```mermaid
 flowchart LR
@@ -16,9 +16,9 @@ flowchart LR
 
 ## The steps
 
-1. **Fetch.** polkadot-frame-trace gets the block and its parent header from the node with normal RPC methods.
-   It uses no unsafe methods. The node must still have the state of the parent block.
-2. **Check the proofs.** polkadot-frame-trace gets a proof for each storage value that the block needs.
+1. **Fetch the block.** polkadot-frame-trace fetches the block and its parent header with safe RPC methods.
+   The node must still have the parent block's state.
+2. **Check the proofs.** polkadot-frame-trace fetches a proof for each storage value the block needs.
    It checks each proof against the parent's state root before it uses the value.
    The runtime code, `:code`, gets the same check.
 3. **Run the block.** Your machine runs `Core_execute_block` with that runtime.
@@ -27,9 +27,9 @@ flowchart LR
    polkadot-frame-trace compares it with the root in the block header, and prints both roots.
 5. **Export.** polkadot-frame-trace sends the trace to OTLP or writes JSON only after a pass.
 
-Before the final replay, polkadot-frame-trace finds and gets the state that the block reads.
-To find that state, it may run the block more than once.
-Then it does a last **timed replay**. This replay uses only the state it already has, and makes no network calls.
+Before the timed replay, polkadot-frame-trace fetches the state the block needs.
+To find out which state that is, it may run the block more than once.
+The final **timed replay** uses only that state and makes no RPC requests.
 The trace and its times come from the timed replay.
 That is why the output says `RPC calls: 92 (timed replay: 0)`.
 
@@ -57,21 +57,21 @@ When the root check fails, polkadot-frame-trace stops with an error and exports 
 
 - Reads from chain state are checked against the parent's state root. Cache reads use the block's earlier writes.
 - The runtime that ran is the runtime on chain, unless you used a [runtime override](../guides/see-runtime-calls.md).
-- The writes of the block give the same state root that the chain recorded.
-  Thus the reads and writes in the trace are complete, and in the real order.
+- The block's writes produce the state root recorded in its header.
+  So the reads and writes in the trace are complete and in the real order.
 
 ## Runtime upgrades
 
-A block always runs with the runtime in the state of its parent.
-A block that upgrades the runtime runs on the old code, and writes the new `:code`.
-The next block is the first block that runs the new code.
+A block always uses the runtime stored in its parent's state.
+A block that upgrades the runtime runs on the old code and writes the new `:code`.
+The next block is the first to run the new code.
 The storage and extrinsic names in each trace come from the runtime that ran that block.
 
 ## What a pass does not mean
 
 - It does not check consensus.
   polkadot-frame-trace trusts the node to send a block header from the correct chain.
-  The root check proves that the block agrees with that header. It does not prove that the header is finalized.
+  The root check confirms that the block matches that header. It does not check finality.
 - Timings are from your machine.
   They are not the node's import time, its database speed or the block's weight.
   See [Timings](timings.md).
@@ -82,7 +82,7 @@ The storage and extrinsic names in each trace come from the runtime that ran tha
 
 `polkadot-frame-trace call` runs a runtime API, such as `AccountNonceApi_account_nonce`, against a block's state.
 A call does not produce a new block, so there is no root to compare.
-Every value it reads is still checked by proof against that block's state root.
+Every value it reads from chain state is still checked by proof against that block's state root.
 The output says `root check: NOT APPLICABLE (runtime API call)`.
 `--check-state-call` compares the result with the node's own `state_call`.
 See [Trace a runtime API call](../guides/trace-a-runtime-api-call.md).

@@ -28,7 +28,7 @@
 
 ---
 
-polkadot-frame-trace runs a block again on your machine, with the chain's own runtime and state from any node's normal RPC.
+polkadot-frame-trace replays a block on your machine with the chain's own runtime, using state from any node's normal RPC.
 It records every storage read and write and checks that the replay reached the block's state root.
 It exports the result as an OpenTelemetry trace for Jaeger or Grafana Tempo, or as JSON.
 

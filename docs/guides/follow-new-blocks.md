@@ -52,8 +52,8 @@ Each traced block shows in Jaeger as its own trace.
 | `export-rejected` | Traces the receiver refused in part. They are not sent again. Only with `--otlp`. |
 | `export-failed` | Traces whose export crashed inside polkadot-frame-trace. They are not sent again. Only with `--otlp`. |
 | `export-dropped` | Traces dropped because too many were waiting. Only with `--otlp`. |
-| `retrying` | Blocks that failed for a passing reason, such as a dropped connection, and will be tried again. |
-| `stopped` | Blocks that failed for good, such as pruned state or a failed root check. The log says `stopped retrying block <hash> after <N> attempt(s)`. |
+| `retrying` | Blocks waiting for another attempt after a timeout, a dropped connection or another temporary failure. |
+| `stopped` | Blocks `follow` will not retry, such as blocks with pruned state or a failed root check. The log says `stopped retrying block <hash> after <N> attempt(s)`. |
 | `skipped` | Blocks not replayed, or not retried, because newer blocks arrived first. |
 | `reverted` | Blocks that left the chain in a reorg, counted once whatever their state. Only with `--best`. |
 | `state-memory` | Memory used by downloaded state kept for all workers, in MiB. An upper estimate: the real use is lower. It stops growing at the [limit](../reference/commands.md#follow). |
@@ -95,7 +95,7 @@ The [reference](../reference/commands.md#follow) lists the limits.
 A reorg may replace them. `follow` then logs the reorg and counts the replaced block as `reverted`.
 If a reverted block comes back to the chain, `follow` may trace it again.
 
-## 5. When the node or the receiver goes away
+## 5. When the node or the receiver stops responding
 
 If a check for new blocks fails, `follow` logs it and tries again. It waits longer after each failure.
 
