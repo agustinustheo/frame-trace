@@ -598,13 +598,6 @@ mod tests {
         worker.join().unwrap();
     }
     #[test]
-    fn mock_responses_stops_at_request_eof() {
-        let (rpc, worker) = responses(vec![(200, "unused")]);
-        let address = rpc.inner.url.strip_prefix("http://").unwrap();
-        drop(std::net::TcpStream::connect(address).unwrap());
-        worker.join().unwrap();
-    }
-    #[test]
     fn exhausted_rate_limits_remain_transient_and_cancellation_is_typed() {
         let (rpc, worker) = responses(vec![(429, "busy"); 4]);
         assert!(

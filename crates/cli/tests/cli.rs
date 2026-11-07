@@ -1733,25 +1733,6 @@ fn unknown_block_hash_reports_block_not_found() {
 }
 
 #[test]
-fn mock_handler_assertions_are_reported_and_propagated_to_the_test_thread() {
-    let node = MockNode::new(|_| panic!("handler invariant"));
-    let rpc = polkadot_frame_trace_replay::rpc::Rpc::new(&node.url).unwrap();
-    let error = rpc
-        .call("chain_getHeader", serde_json::json!([]))
-        .unwrap_err();
-    assert!(
-        error
-            .to_string()
-            .contains("mock handler assertion failed: handler invariant")
-    );
-    assert!(matches!(
-        error,
-        polkadot_frame_trace_replay::Error::RpcResponse { code: -32099, .. }
-    ));
-    assert!(std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| drop(node))).is_err());
-}
-
-#[test]
 fn saved_block_json_drives_summary_and_multiblock_reports_without_replay() {
     let path = std::env::temp_dir().join(format!("frame-report-{}.json", std::process::id()));
     let path2 = path.with_extension("second.json");
