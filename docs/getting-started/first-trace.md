@@ -26,7 +26,7 @@ A block number or a full block hash also works.
 `--otlp` with no URL sends the trace to `http://127.0.0.1:4318`.
 
 You should see output like this.
-Your block number, byte counts and hashes will differ.
+Your block number, byte counts and hashes will be different.
 
 ```text
 replay #18598757: fetching state (shared limit: 8 concurrent RPC requests)
@@ -38,7 +38,7 @@ exported 555 spans to http://127.0.0.1:4318
 ```
 
 A run like this took 23 seconds on a laptop with a fresh cache.
-Most of that time is spent fetching state from the node.
+Most of that time goes to fetching state from the node.
 
 What the lines mean:
 

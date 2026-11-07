@@ -37,7 +37,7 @@ Find the storage items a block reads most, the reads it repeats, and the bytes e
 
 ![A Utility.batch block in Jaeger. Callouts mark the block, a phase, the runtime calls, a storage read, its origin, its proof bytes and its duration.](https://raw.githubusercontent.com/agustinustheo/polkadot-frame-trace/main/docs/images/hero.png)
 
-*Block #4 of a People chain in Jaeger: (1) the block, (2) the `Utility.batch` extrinsic, (3) the runtime calls inside it, (4) a read of Bob's account, (5) where it was answered, (6) the bytes it added to the proof, (7) its duration.*
+*Block #4 of a People chain in Jaeger. (1) The block, (2) the `Utility.batch` extrinsic and (3) the runtime calls inside it. (4) A read of Bob's account, (5) where it was answered, (6) the bytes it added to the proof and (7) its duration.*
 
 ## Highlights
 

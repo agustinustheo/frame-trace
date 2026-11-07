@@ -72,7 +72,7 @@ A span is one timed operation with attributes, such as one storage read. A trace
 
 ## State root
 
-A 32-byte hash that commits to the whole chain state after a block. Each block header contains one.
+A 32-byte hash of the whole chain state after a block. Each block header contains one.
 
 ## Storage item and key
 

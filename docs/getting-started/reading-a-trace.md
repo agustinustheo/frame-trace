@@ -1,6 +1,6 @@
 # Reading a trace
 
-This page walks through one trace on screen, region by region.
+This page explains one trace on screen, region by region.
 It uses block #4 of a [People chain](../reference/glossary.md#people-chain), which ships with the repository.
 Its runtime was built with tracing, so you also see runtime calls such as `set`.
 
@@ -113,7 +113,7 @@ Click the block row or a phase row to see its totals:
 
 ## Clean up
 
-When you've finished exploring, stop Jaeger:
+When you are done, stop Jaeger:
 
 ```sh
 docker stop jaeger

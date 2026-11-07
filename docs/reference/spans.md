@@ -20,7 +20,8 @@ block #4 (0x06618995…0637)                  block span
 └─ finalization                             phase span
 ```
 
-Phases are children of the block span, except `post inherents (on_poll)`: it sits inside the first extrinsic that is not an inherent, or is a top-level phase before finalization when the block has only inherents.
+Phases are children of the block span, except `post inherents (on_poll)`.
+That phase is inside the first extrinsic that is not an inherent. If the block has only inherents, it is a top-level phase before finalization.
 See [Phases of a block](../concepts/phases.md).
 
 ## Span names
