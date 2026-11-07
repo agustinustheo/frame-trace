@@ -10,7 +10,10 @@ use std::{
     time::Duration,
 };
 use tokio::{runtime::Runtime, sync::Mutex};
-use tokio_tungstenite::{MaybeTlsStream, WebSocketStream, tungstenite::Message};
+use tokio_tungstenite::{
+    MaybeTlsStream, WebSocketStream,
+    tungstenite::{Message, protocol::WebSocketConfig},
+};
 pub use tokio_util::sync::CancellationToken;
 
 const ALLOWED: &[&str] = &[
@@ -46,6 +49,9 @@ struct Inner {
     pool: OnceLock<std::result::Result<rayon::ThreadPool, String>>,
 }
 
+/// Largest RPC response read, over HTTP or WebSocket. The largest real one is the proof of
+/// `:code`, about 5.5 MB as hex JSON.
+pub const MAX_RESPONSE_BYTES: usize = 64 * 1024 * 1024;
 fn runtime() -> Result<&'static Runtime> {
     static RUNTIME: OnceLock<std::result::Result<Runtime, String>> = OnceLock::new();
     RUNTIME
@@ -310,9 +316,19 @@ impl Rpc {
                     status.as_u16() == 429 || status.is_server_error(),
                 ));
             }
-            return response
-                .json()
+            let mut response = response;
+            let mut body = Vec::new();
+            while let Some(chunk) = response
+                .chunk()
                 .await
+                .map_err(|e| (e.without_url().to_string(), true))?
+            {
+                if body.len() + chunk.len() > MAX_RESPONSE_BYTES {
+                    return Err((too_large(), false));
+                }
+                body.extend_from_slice(&chunk);
+            }
+            return serde_json::from_slice(&body)
                 .map_err(|e| (format!("malformed response: {e}"), false));
         }
         let index = self.inner.next.fetch_add(1, Ordering::Relaxed) % self.parallelism();
@@ -334,7 +350,11 @@ impl Rpc {
                     Duration::from_secs(10),
                     tokio_tungstenite::connect_async_tls_with_config(
                         self.inner.url.as_str(),
-                        None,
+                        Some(
+                            WebSocketConfig::default()
+                                .max_message_size(Some(MAX_RESPONSE_BYTES))
+                                .max_frame_size(Some(MAX_RESPONSE_BYTES)),
+                        ),
                         true,
                         Some(tokio_tungstenite::Connector::Rustls(self.inner.tls.clone())),
                     ),
@@ -358,7 +378,13 @@ impl Rpc {
             .await
             .map_err(|e| (e.to_string(), true))?;
         while let Some(message) = socket.next().await {
-            match message.map_err(|e| (e.to_string(), true))? {
+            let message = match message {
+                Err(tokio_tungstenite::tungstenite::Error::Capacity(_)) => {
+                    return Err((too_large(), false));
+                }
+                message => message.map_err(|e| (e.to_string(), true))?,
+            };
+            match message {
                 Message::Text(text) => {
                     let value: Value = serde_json::from_str(&text)
                         .map_err(|e| (format!("malformed response: {e}"), false))?;
@@ -388,6 +414,9 @@ impl Rpc {
     pub fn count(&self) -> usize {
         self.calls.load(Ordering::SeqCst)
     }
+}
+fn too_large() -> String {
+    format!("response larger than {MAX_RESPONSE_BYTES} bytes")
 }
 /// A JSON-RPC error the node sent without an ID, because it could not read the request.
 fn null_id_error(body: &Value) -> bool {
@@ -584,6 +613,24 @@ mod tests {
             assert_eq!(rpc.count(), 1);
             worker.join().unwrap();
         }
+    }
+    #[test]
+    fn a_response_over_the_size_limit_is_refused_and_not_retried() {
+        let body = format!(
+            r#"{{"jsonrpc":"2.0","id":$ID,"result":"{}"}}"#,
+            "0".repeat(MAX_RESPONSE_BYTES)
+        );
+        let (rpc, worker) = responses(vec![(200, Box::leak(body.into_boxed_str()))]);
+        let error = rpc
+            .call("chain_getFinalizedHead", json!([]))
+            .unwrap_err()
+            .to_string();
+        assert!(
+            error.contains("response larger than 67108864 bytes"),
+            "{error}"
+        );
+        assert_eq!(rpc.count(), 1);
+        worker.join().unwrap();
     }
     #[test]
     fn malformed_json_envelopes_and_null_blocks_have_specific_errors() {
