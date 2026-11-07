@@ -966,24 +966,6 @@ mod tests {
         std::fs::remove_dir_all(dir).unwrap();
     }
 
-    #[test]
-    fn evicted_files_that_cannot_be_deleted_stay_counted_until_they_are() {
-        let dir = dir("undeletable");
-        let store = NodeStore::open(&dir, 1024 * 1024, None).unwrap();
-        put(&store, &(0..100).map(|i| node(i, 200)).collect::<Vec<_>>());
-        let before = store.total();
-        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o555)).unwrap();
-        store.set_budget(0);
-        assert_eq!(files(&dir), 1);
-        assert_eq!(store.total(), before, "an undeleted file was forgotten");
-        assert_eq!(store.node_count(), 0);
-        std::fs::set_permissions(&dir, std::fs::Permissions::from_mode(0o755)).unwrap();
-        store.set_budget(0);
-        assert_eq!(files(&dir), 0);
-        assert_eq!(store.total(), 0);
-        std::fs::remove_dir_all(dir).unwrap();
-    }
-
     /// A file in the way of a deletion: removing a segment path that is a folder fails on
     /// every Unix system, while new files can still be created.
     #[test]
@@ -1029,7 +1011,7 @@ mod tests {
         std::fs::remove_dir_all(dir).unwrap();
     }
 
-    /// The case found in review: the folder lets files be created but not deleted.
+    /// A folder whose ACL lets files be created but not deleted.
     #[cfg(target_os = "macos")]
     #[test]
     fn a_folder_that_denies_deletion_does_not_grow_the_cache() {
