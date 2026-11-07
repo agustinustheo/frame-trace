@@ -1,6 +1,6 @@
 name: Release
 
-# Builds frame-trace for each target and creates a DRAFT GitHub release.
+# Builds polkadot-frame-trace for each target and creates a DRAFT GitHub release.
 # The owner reviews the draft and publishes it by hand. See dev/RELEASING.md.
 
 on:
@@ -57,9 +57,9 @@ jobs:
             exit 1
           fi
           version=$(cargo +1.93.0 metadata --no-deps --format-version 1 --locked \
-            | jq -r '.packages[] | select(.name == "frame-trace") | .version')
+            | jq -r '.packages[] | select(.name == "polkadot-frame-trace") | .version')
           if [ "${TAG#v}" != "$version" ]; then
-            echo "::error::Tag $TAG does not match the frame-trace version $version in Cargo.toml"
+            echo "::error::Tag $TAG does not match the polkadot-frame-trace version $version in Cargo.toml"
             exit 1
           fi
           heading="^## \\[${version//./\\.}\\] - [0-9]{4}-[0-9]{2}-[0-9]{2}$"
@@ -122,7 +122,7 @@ jobs:
       - name: Download packages
         uses: actions/download-artifact@v8
         with:
-          pattern: frame-trace-*
+          pattern: polkadot-frame-trace-*
           path: dist
           merge-multiple: true
 
@@ -160,6 +160,6 @@ jobs:
             prerelease="--prerelease"
           fi
           gh release create "$TAG" --verify-tag --draft ${prerelease:+"$prerelease"} \
-            --title "frame-trace $VERSION" \
+            --title "polkadot-frame-trace $VERSION" \
             --notes-file "$RUNNER_TEMP/notes.md" \
             dist/*.tar.gz dist/SHA256SUMS
