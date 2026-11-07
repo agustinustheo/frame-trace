@@ -61,6 +61,10 @@ struct Inner {
 /// Largest RPC response read, over HTTP or WebSocket. The largest real one is the proof of
 /// `:code`, about 5.5 MB as hex JSON.
 pub const MAX_RESPONSE_BYTES: usize = 64 * 1024 * 1024;
+/// Largest WebSocket frame. A response can come in one frame, and tungstenite reserves a
+/// frame's declared length before its data arrives, so this stays well below the response
+/// limit: about three times the largest real response.
+pub const MAX_FRAME_BYTES: usize = 16 * 1024 * 1024;
 fn runtime() -> Result<&'static Runtime> {
     static RUNTIME: OnceLock<std::result::Result<Runtime, String>> = OnceLock::new();
     RUNTIME
@@ -378,7 +382,7 @@ impl Rpc {
                         Some(
                             WebSocketConfig::default()
                                 .max_message_size(Some(MAX_RESPONSE_BYTES))
-                                .max_frame_size(Some(MAX_RESPONSE_BYTES)),
+                                .max_frame_size(Some(MAX_FRAME_BYTES)),
                         ),
                         true,
                         Some(tokio_tungstenite::Connector::Rustls(self.inner.tls.clone())),
@@ -404,8 +408,8 @@ impl Rpc {
             .map_err(|e| (e.to_string(), true))?;
         while let Some(message) = socket.next().await {
             let message = match message {
-                Err(tokio_tungstenite::tungstenite::Error::Capacity(_)) => {
-                    return Err((too_large(), false));
+                Err(tokio_tungstenite::tungstenite::Error::Capacity(e)) => {
+                    return Err((format!("response too large: {e}"), false));
                 }
                 message => message.map_err(|e| (e.to_string(), true))?,
             };

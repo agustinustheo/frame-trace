@@ -57,6 +57,7 @@ These limits protect against a node that sends too much. They apply to every com
 | Limit | Value | Meaning |
 | --- | --- | --- |
 | One RPC response | 64 MiB | A larger response fails the request at once, without another try. The largest real one, the proof of the runtime, is about 5.5 MB. |
+| One WebSocket frame | 16 MiB | A response over `ws://` or `wss://` may come in one frame. A larger frame fails the request at once, without another try. |
 | State the node sends for one block | 1,000,000 pieces or 256 MiB | More fails the block. Recent blocks of Polkadot, Kusama, Westend and their Asset Hubs, and a Westend Asset Hub runtime upgrade, needed at most 3,656 pieces and 5.6 MB. |
 | Running the runtime for one block | 10 minutes | A runtime that never finishes cannot be stopped from inside polkadot-frame-trace. `block`, `summary`, `call` and `report` warn once and keep going: press Ctrl-C to stop them. `follow` exits with code 1, see [follow](#follow). Real blocks take seconds, and compiling a new runtime about a minute. |
 
