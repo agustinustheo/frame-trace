@@ -13,7 +13,7 @@ use opentelemetry_proto::tonic::collector::trace::v1::{
 };
 use opentelemetry_sdk::{
     Resource,
-    error::{OTelSdkError, OTelSdkResult},
+    error::OTelSdkError,
     trace::{SpanData, SpanExporter},
 };
 use prost::Message;
@@ -24,9 +24,9 @@ pub(crate) struct Rejections {
     pub message: String,
 }
 
-/// OTLP/HTTP exporter that treats partial rejection as an export failure.
+/// OTLP/HTTP exporter that reports partial rejection.
 #[derive(Debug)]
-pub struct HttpExporter {
+pub(crate) struct HttpExporter {
     inner: opentelemetry_otlp::SpanExporter,
     pub(crate) rejections: Arc<Mutex<Rejections>>,
     // Ends every request of the batch [`HttpExporter::send`] is sending, retries included.
@@ -104,8 +104,8 @@ impl HttpExporter {
         futures_executor::block_on(self.export_batch(batch))
     }
 
-    /// The one scope of a batch, for both entry points: starts its deadline, clears the
-    /// previous batch's rejection message, and returns this batch's rejections.
+    /// Starts the batch's deadline, clears the previous batch's rejection message, and
+    /// returns this batch's rejections.
     async fn export_batch(&self, batch: Vec<SpanData>) -> Result<(u64, String), OTelSdkError> {
         let before = {
             let mut rejections = self
@@ -126,30 +126,9 @@ impl HttpExporter {
             .unwrap_or_else(PoisonError::into_inner);
         Ok((rejections.rejected - before, rejections.message.clone()))
     }
-}
 
-impl SpanExporter for HttpExporter {
-    async fn export(&self, batch: Vec<SpanData>) -> OTelSdkResult {
-        let total = batch.len();
-        let (rejected, message) = self.export_batch(batch).await?;
-        if rejected > 0 {
-            return Err(OTelSdkError::InternalFailure(format!(
-                "{rejected} of {total} spans rejected by the receiver: {message}"
-            )));
-        }
-        Ok(())
-    }
-
-    fn set_resource(&mut self, resource: &Resource) {
+    pub(crate) fn set_resource(&mut self, resource: &Resource) {
         self.inner.set_resource(resource);
-    }
-
-    fn force_flush(&self) -> OTelSdkResult {
-        self.inner.force_flush()
-    }
-
-    fn shutdown_with_timeout(&self, timeout: Duration) -> OTelSdkResult {
-        self.inner.shutdown_with_timeout(timeout)
     }
 }
 

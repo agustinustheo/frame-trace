@@ -8,17 +8,13 @@ use polkadot_frame_trace_decode::{
     AnnotatedBlock, AnnotatedOp, AnnotatedPhase, Metadata, annotate,
 };
 use polkadot_frame_trace_model::{Stats, TracedBlock, rpc::parse_trace_block};
-use std::sync::atomic::{AtomicUsize, Ordering};
 
 use opentelemetry::{
     Value,
     trace::{SpanId, TracerProvider},
 };
-use opentelemetry_sdk::{
-    error::{OTelSdkError, OTelSdkResult},
-    trace::{InMemorySpanExporter, SpanData, SpanExporter},
-};
-use polkadot_frame_trace_otel::{Timing, export_block, provider, record_block, span_count};
+use opentelemetry_sdk::trace::{InMemorySpanExporter, SdkTracerProvider, SpanData};
+use polkadot_frame_trace_otel::{Timing, record_block};
 
 fn fixture(path: &str) -> Vec<u8> {
     std::fs::read(format!(
@@ -30,9 +26,11 @@ fn fixture(path: &str) -> Vec<u8> {
 
 fn export(block: &AnnotatedBlock, timing: Timing) -> Vec<SpanData> {
     let exporter = InMemorySpanExporter::default();
-    let provider = provider(exporter.clone(), span_count(block));
+    let provider = SdkTracerProvider::builder()
+        .with_max_attributes_per_span(256)
+        .with_simple_exporter(exporter.clone())
+        .build();
     let created = record_block(&provider.tracer("test"), block, timing);
-    provider.force_flush().unwrap();
     let spans = exporter.get_finished_spans().unwrap();
     assert_eq!(spans.len(), created);
     spans
@@ -244,15 +242,8 @@ fn exports_thousands_of_ops_without_drops() {
     let spans = export(&synthetic_block(5000), Timing::default());
     assert_eq!(spans.len(), 5002);
     assert!(spans.iter().any(|s| s.name == "block #7 (0x01)"));
-
-    // `export_block` counts what the exporter accepted (the in-memory exporter clears its
-    // spans on shutdown, so the count is the check).
-    let exported = export_block(
-        InMemorySpanExporter::default(),
-        &synthetic_block(5000),
-        Timing::default(),
-    );
-    assert_eq!(exported.unwrap(), 5002);
+    let trace = polkadot_frame_trace_otel::prepare(&synthetic_block(5000), Timing::default());
+    assert_eq!((trace.total(), trace.unsent()), (5002, 5002));
 }
 
 /// An OTLP/HTTP receiver that answers each request with the next `(status, delay)` and
@@ -443,27 +434,6 @@ fn the_exporters_own_retries_stay_within_the_timeout() {
     assert!(sender.send(&mut trace).is_err());
     let took = start.elapsed();
     assert!(took < Duration::from_millis(1000), "{took:?}");
-    // The same bound on the public span exporter path, with a fresh receiver.
-    let url = raw_receiver(|index, stream| {
-        if index == 0 {
-            std::thread::sleep(Duration::from_millis(500));
-            let _ = stream.write_all(
-                b"HTTP/1.1 503 Service Unavailable\r\ncontent-length: 0\r\nconnection: close\r\n\r\n",
-            );
-        } else {
-            std::thread::sleep(Duration::from_secs(10));
-        }
-    });
-    let exporter = polkadot_frame_trace_otel::otlp_http_exporter_with_timeout(
-        &url,
-        Duration::from_millis(800),
-    )
-    .unwrap();
-    let spans = export(&synthetic_block(10), Timing::default());
-    let start = std::time::Instant::now();
-    assert!(futures_executor::block_on(exporter.export(spans)).is_err());
-    let took = start.elapsed();
-    assert!(took < Duration::from_millis(1000), "{took:?}");
 }
 
 /// Answers request `index` with one span rejected: "quota" first, "invalid label" after.
@@ -500,69 +470,6 @@ fn a_rejection_message_belongs_to_the_trace_it_came_with() {
             format!("1 of 12 spans rejected by the receiver: {message}")
         );
     }
-    // The public span exporter path keeps each batch's own message too.
-    let exporter =
-        polkadot_frame_trace_otel::otlp_http_exporter(&raw_receiver(partially_rejecting)).unwrap();
-    for message in ["quota", "invalid label"] {
-        let spans = export(&synthetic_block(10), Timing::default());
-        let error = futures_executor::block_on(exporter.export(spans))
-            .unwrap_err()
-            .to_string();
-        assert!(
-            error.ends_with(&format!(
-                "1 of 12 spans rejected by the receiver: {message}"
-            )),
-            "{error}"
-        );
-    }
-}
-
-#[test]
-fn an_awaited_export_does_not_block_its_runtime_thread() {
-    use std::io::Write;
-    // The receiver answers after 2 s; the caller's own 50 ms timeout must still fire on time.
-    let url = raw_receiver(|_, stream| {
-        std::thread::sleep(Duration::from_secs(2));
-        let _ =
-            stream.write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 0\r\nconnection: close\r\n\r\n");
-    });
-    let exporter =
-        polkadot_frame_trace_otel::otlp_http_exporter_with_timeout(&url, Duration::from_secs(5))
-            .unwrap();
-    let spans = export(&synthetic_block(10), Timing::default());
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap();
-    let start = std::time::Instant::now();
-    let result = runtime.block_on(async {
-        tokio::time::timeout(Duration::from_millis(50), exporter.export(spans)).await
-    });
-    let took = start.elapsed();
-    assert!(result.is_err(), "the caller's timeout fired");
-    assert!(took < Duration::from_millis(300), "{took:?}");
-}
-
-#[test]
-fn senders_and_exporters_work_inside_an_async_runtime() {
-    let (url, seen) = scripted_receiver(Vec::new());
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .unwrap();
-    runtime.block_on(async {
-        // Built, used and dropped inside the caller's runtime: no nested runtime, no panic.
-        let sender = polkadot_frame_trace_otel::OtlpSender::new(&url).unwrap();
-        let mut trace = polkadot_frame_trace_otel::prepare(&synthetic_block(10), Timing::default());
-        assert_eq!(sender.send(&mut trace).unwrap(), 12);
-        drop(sender);
-        let exporter = polkadot_frame_trace_otel::otlp_http_exporter(&url).unwrap();
-        let spans = export(&synthetic_block(10), Timing::default());
-        exporter.export(spans).await.unwrap();
-        drop(exporter);
-    });
-    drop(runtime);
-    assert_eq!(seen.lock().unwrap().len(), 2);
 }
 
 #[test]
@@ -687,50 +594,6 @@ fn runtime_override_is_labelled_on_the_root_span() {
     assert_eq!(
         attr(root, "frame.runtime.override_version_differences"),
         Some(Value::from("spec_version 1 -> 2"))
-    );
-}
-
-/// Rejects the first batch, accepts the rest (like a backend answering HTTP 400 once).
-#[derive(Debug, Default)]
-struct RejectFirstBatch {
-    calls: AtomicUsize,
-}
-
-impl SpanExporter for RejectFirstBatch {
-    async fn export(&self, _batch: Vec<SpanData>) -> OTelSdkResult {
-        match self.calls.fetch_add(1, Ordering::SeqCst) {
-            0 => Err(OTelSdkError::InternalFailure("HTTP 400".into())),
-            _ => Ok(()),
-        }
-    }
-}
-
-#[test]
-fn reports_spans_lost_to_export_errors() {
-    let err = export_block(
-        RejectFirstBatch::default(),
-        &synthetic_block(2000),
-        Timing::default(),
-    )
-    .unwrap_err();
-    let polkadot_frame_trace_otel::Error::Incomplete {
-        lost,
-        total,
-        first_error,
-    } = &err
-    else {
-        panic!("expected Incomplete, got {err}");
-    };
-    // The batch processor exports in batches of 512.
-    assert_eq!((*lost, *total), (512, 2002));
-    assert!(
-        first_error
-            .as_deref()
-            .is_some_and(|e| e.contains("HTTP 400"))
-    );
-    assert!(
-        err.to_string()
-            .starts_with("512 of 2002 spans were not exported")
     );
 }
 
@@ -1248,7 +1111,10 @@ fn runtime_call_root_and_empty_calls_export_one_trace_with_explicit_semantics() 
                 .iter()
                 .all(|s| s.span_context.trace_id() == root.span_context.trace_id())
         );
-        assert_eq!(spans.len(), span_count(&trace));
+        assert_eq!(
+            spans.len(),
+            polkadot_frame_trace_otel::prepare(&trace, Timing::default()).total()
+        );
     }
 }
 

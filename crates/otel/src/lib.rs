@@ -22,21 +22,16 @@ use std::{
     time::{Duration, SystemTime},
 };
 
-mod delivery;
 mod http;
 
-pub use delivery::{Delivery, DeliveryHandle, Tracked};
-pub use http::HttpExporter;
+use http::HttpExporter;
 use opentelemetry::{
     Array, Context, KeyValue, StringValue, Value,
     trace::{SpanKind, TraceContextExt, Tracer, TracerProvider as _},
 };
 use opentelemetry_sdk::{
     Resource,
-    trace::{
-        BatchConfigBuilder, BatchSpanProcessor, SdkTracer, SdkTracerProvider, SpanData,
-        SpanExporter,
-    },
+    trace::{SdkTracer, SdkTracerProvider, SpanData, SpanExporter},
 };
 use polkadot_frame_trace_decode::{AnnotatedBlock, AnnotatedOp, AnnotatedPhase};
 use polkadot_frame_trace_model::Stats;
@@ -56,9 +51,6 @@ pub enum Error {
     /// The OTLP exporter could not be built.
     #[error("cannot build OTLP exporter: {0}")]
     Build(#[from] opentelemetry_otlp::ExporterBuildError),
-    /// Export or shutdown failed.
-    #[error("export failed: {0}")]
-    Export(#[from] opentelemetry_sdk::error::OTelSdkError),
     /// The receiver accepted the HTTP request but rejected some of its spans.
     #[error("{rejected} of {total} spans rejected by the receiver: {message}")]
     Rejected {
@@ -69,7 +61,7 @@ pub enum Error {
         /// The first rejection message from the receiver.
         message: String,
     },
-    /// Some spans never reached the backend: rejected by the exporter or dropped by the SDK.
+    /// Some spans never reached the backend.
     #[error(
         "{lost} of {total} spans were not exported{}",
         first_error.as_ref().map(|e| format!(" (first error: {e})")).unwrap_or_default()
@@ -104,7 +96,7 @@ impl Default for Timing {
 }
 
 /// Spans [`record_block`] creates for `block`: root, phases and ops.
-pub fn span_count(block: &AnnotatedBlock) -> usize {
+fn span_count(block: &AnnotatedBlock) -> usize {
     1 + block.all_phases().map(|p| 1 + p.ops.len()).sum::<usize>()
         + block
             .runtime_spans
@@ -119,23 +111,6 @@ fn runtime_span(span: &polkadot_frame_trace_model::RuntimeSpan) -> bool {
     span.wasm && span.name != "execute_block" && span.name != "Core_execute_block"
 }
 
-/// A tracer provider exporting through `exporter` with a batch processor whose queue holds
-/// `max_spans` spans, so a whole block is exported without drops (the SDK default queue of 2048
-/// would drop most of a busy block).
-pub fn provider<E: SpanExporter + 'static>(exporter: E, max_spans: usize) -> SdkTracerProvider {
-    let batch = BatchConfigBuilder::default()
-        .with_max_queue_size(max_spans.max(2048))
-        .with_max_export_batch_size(BATCH_SPANS)
-        .build();
-    builder()
-        .with_span_processor(
-            BatchSpanProcessor::builder(exporter)
-                .with_batch_config(batch)
-                .build(),
-        )
-        .build()
-}
-
 /// Spans per OTLP request.
 const BATCH_SPANS: usize = 512;
 
@@ -147,20 +122,6 @@ fn builder() -> opentelemetry_sdk::trace::TracerProviderBuilder {
 
 fn resource() -> Resource {
     Resource::builder().with_service_name(SCOPE).build()
-}
-
-/// An OTLP/HTTP (protobuf) span exporter. `/v1/traces` is appended to `endpoint` unless present,
-/// so `http://127.0.0.1:4318` works.
-pub fn otlp_http_exporter(endpoint: &str) -> Result<HttpExporter, Error> {
-    HttpExporter::new(traces_url(endpoint), None)
-}
-
-/// Like [`otlp_http_exporter`], with at most `timeout` for each batch, retries included.
-pub fn otlp_http_exporter_with_timeout(
-    endpoint: &str,
-    timeout: Duration,
-) -> Result<HttpExporter, Error> {
-    HttpExporter::new(traces_url(endpoint), Some(timeout))
 }
 
 fn traces_url(endpoint: &str) -> String {
@@ -293,34 +254,6 @@ impl OtlpSender {
         }
         Ok(trace.total)
     }
-}
-
-/// Exports `block` through `exporter` and waits until every span was handed over. Returns the
-/// number of spans, or [`Error::Incomplete`] if any span was rejected or dropped.
-pub fn export_block<E: SpanExporter + 'static>(
-    exporter: E,
-    block: &AnnotatedBlock,
-    timing: Timing,
-) -> Result<usize, Error> {
-    let (exporter, delivery) = Tracked::new(exporter);
-    let provider = provider(exporter, span_count(block));
-    let total = record_block(&provider.tracer(SCOPE), block, timing);
-    let flushed = provider.force_flush();
-    let shutdown = provider.shutdown();
-
-    let delivery = delivery.get();
-    if delivery.exported < total {
-        return Err(Error::Incomplete {
-            lost: total - delivery.exported,
-            total,
-            first_error: delivery
-                .first_error
-                .or_else(|| flushed.err().map(|e| e.to_string())),
-        });
-    }
-    flushed?;
-    shutdown?;
-    Ok(total)
 }
 
 /// Records `block` as one trace on `tracer`. Returns the number of spans created.
