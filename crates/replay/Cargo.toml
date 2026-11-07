@@ -16,7 +16,7 @@ publish = true
 [dependencies]
 thiserror.workspace = true
 polkadot-frame-trace-model.workspace = true
-zstd = "0.13"
+zstd = "0.13.4"
 tokio-tungstenite = { version = "0.28", features = ["rustls-tls-webpki-roots"] }
 tokio = { version = "1", features = ["rt-multi-thread", "net", "time", "sync", "macros"] }
 tokio-util = "0.7"
