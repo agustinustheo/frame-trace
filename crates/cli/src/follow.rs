@@ -574,6 +574,9 @@ fn follow(args: FollowArgs) -> Result<()> {
         args.rpc_timeout,
         cancel.clone(),
     )?;
+    if let Some(endpoint) = &args.otlp {
+        source::warn_unencrypted("--otlp", endpoint);
+    }
     let sender = args
         .otlp
         .as_deref()

@@ -193,6 +193,7 @@ fn emit(
         write_json(trace, path)?;
     }
     if let Some(endpoint) = otlp {
+        source::warn_unencrypted("--otlp", endpoint);
         let shown = polkadot_frame_trace_model::redact::endpoint(endpoint);
         let spans = polkadot_frame_trace_otel::export_otlp(trace, endpoint, Default::default())
             .with_context(|| format!("exporting to {shown}"))?;
