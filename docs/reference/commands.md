@@ -48,9 +48,13 @@ polkadot-frame-trace block --offline fixtures/replay/people-traced --json block.
 
 Without `--otlp` or `--json`, `block` prints a one-line count of phases and operations.
 
-Flags that do not apply to the chosen source are refused, with exit code 2: `--block`, `--proof-concurrency` and `--rpc-timeout` need `--rpc`, `--metadata` needs `--from-file`, and the cache and metadata flags do not work with `--from-file` or `--from-json`.
+A flag that does not apply to the source fails with exit code 2.
+`--block`, `--proof-concurrency` and `--rpc-timeout` need `--rpc`, and `--metadata` needs `--from-file`.
+The cache and metadata flags do not work with `--from-file` or `--from-json`.
 
-Without `--cache-dir`, compiled runtimes are still kept in `$XDG_CACHE_HOME/polkadot-frame-trace/wasm` (or `~/.cache/polkadot-frame-trace/wasm`, or `polkadot-frame-trace-<uid>/wasm` in the temporary directory when `HOME` is not set), and downloaded state stays in memory only. See [Disk cache](#disk-cache) for the limits.
+Without `--cache-dir`, downloaded state stays in memory only.
+Compiled runtimes are still kept in `$XDG_CACHE_HOME/polkadot-frame-trace/wasm`, or `~/.cache/polkadot-frame-trace/wasm`.
+Without `HOME`, they go to `polkadot-frame-trace-<uid>/wasm` in the temporary directory.
 
 These limits protect against a node that sends too much. They apply to every command that uses `--rpc`.
 
@@ -61,7 +65,8 @@ These limits protect against a node that sends too much. They apply to every com
 | State the node sends for one block | 1,000,000 pieces or 256 MiB | More fails the block. Recent blocks of Polkadot, Kusama, Westend and their Asset Hubs, and a Westend Asset Hub runtime upgrade, needed at most 3,656 pieces and 5.6 MB. |
 | Running the runtime for one block | 10 minutes | A runtime that never finishes cannot be stopped from inside polkadot-frame-trace. `block`, `summary`, `call` and `report` warn once and keep going: press Ctrl-C to stop them. `follow` exits with code 1, see [follow](#follow). Real blocks take seconds, and compiling a new runtime about a minute. |
 
-Output shows `--rpc` and `--otlp` URLs as scheme, host and port only, so a user name, password or API key in the URL stays out of logs.
+Output shows `--rpc` and `--otlp` URLs as scheme, host and port only.
+A user name, password or API key in the URL stays out of logs.
 Text from the node or the OTLP receiver in error lines is cut to 512 characters.
 A plain `ws://` or `http://` URL to another machine prints one warning, because anyone on the way can read and change what is sent. `localhost` and loopback addresses do not.
 
@@ -78,7 +83,8 @@ polkadot-frame-trace summary --from-json block.json
 | --- | --- | --- |
 | `--top <N>` | 15 | Rows in each item, extrinsic and hook table, and per phase in the duplicate reads table. |
 
-It prints these tables: **Storage per phase**, **Phase shares**, **Top items by proof bytes**, **Extrinsic distributions**, **Hooks** (only with runtime spans) and **Duplicate reads per phase**.
+It prints the tables **Storage per phase**, **Phase shares**, **Top items by proof bytes** and **Extrinsic distributions**.
+Then **Hooks**, only with runtime spans, and **Duplicate reads per phase**.
 [Find the heaviest storage items](../guides/find-heaviest-items.md) explains the columns.
 
 ## call
@@ -215,41 +221,22 @@ They are hidden from `--help`.
 
 ## Disk cache
 
-`--cache-dir <DIR>` keeps two things between blocks and runs: chain state downloaded from the node, with its proofs, in `<DIR>/proof-nodes`, and compiled runtimes in `<DIR>/wasm`.
+`--cache-dir <DIR>` keeps downloaded state with its proofs in `<DIR>/proof-nodes`, and compiled runtimes in `<DIR>/wasm`, between blocks and runs.
 `--cache-max-bytes` limits both together.
 
-The cache directory must be private, because compiled runtimes are native code that polkadot-frame-trace runs.
-polkadot-frame-trace creates the directory, `wasm` and `proof-nodes` with mode 0700, readable and writable by you alone.
-It refuses a directory owned by another user or writable by group or others, and a `wasm` or `proof-nodes` that is a symlink.
-It then logs one warning and runs without that part of the disk cache.
-A symlink as the cache directory itself is followed, and the directory it leads to is checked.
-Every directory above it must be owned by root or by you, and not writable by group or others unless it has the sticky bit, as `/tmp` does. Otherwise another user could replace the whole cache.
+The directory must be private, because compiled runtimes are native code that polkadot-frame-trace runs.
+polkadot-frame-trace creates the directory, `wasm` and `proof-nodes` readable and writable by you alone (mode 0700).
+It does not use a directory that another user owns or that group or others can write.
+It does not use a `wasm` or `proof-nodes` that is a symlink.
+Every directory above it must be owned by root or by you.
+Group and others must not write to those directories, unless they are sticky, as `/tmp` is.
+If a check fails, it logs one warning and runs without that part of the disk cache. See [Disk cache warnings](../troubleshooting.md#disk-cache-warnings).
 
-| Limit | Value |
-| --- | --- |
-| Directories above the cache | Owned by root or by you. Not writable by group or others, unless sticky. |
-| What counts | Bytes on disk of both folders. Each file counts its size rounded up to 4 KiB, or the space the file system gave it if that is more, plus 4 KiB. |
-| State file size | The limit divided by 16, at least 64 KiB and at most 64 MiB. |
-| Largest piece of state kept | A sixteenth of the state file size: 4 MiB at the default limit. Larger pieces stay in memory only. |
-| Number of state files | At most 18 at or below 1 GiB. Above that, one more per 60 MiB. |
-| Space kept for state | At least 64 MiB, or a quarter of the limit if that is less, even when runtimes in use need more. |
-| Written by one block | At most a quarter of the space for state. |
-| What goes first when full | Compiled runtimes not in use, then the oldest state file. State in the older half that a block reads again is written again, so it stays. |
-| Memory | 30 to 40 bytes per piece of state on disk. A full 1 GiB of 200-byte pieces is 130 to 180 MB. |
-| `--cache-max-bytes 0` | Keeps no state on disk, and deletes runtimes not in use. The runtime in use is still kept. |
+The limit counts bytes on disk. Each file counts its size rounded up to 4 KiB, plus 4 KiB.
+If the file system gave the file more space, that space counts instead of the size.
+When the disk cache is full, compiled runtimes not in use go first, then the oldest state file.
+The runtime in use is always kept, and so is space for state: 64 MiB, or a quarter of the limit if that is less.
+So the disk cache may go over a small limit.
+`--cache-max-bytes 0` keeps no state on disk and deletes runtimes not in use.
 
-The disk cache can go over the limit in these cases:
-
-- the runtimes in use plus the space kept for state are more than the limit. polkadot-frame-trace keeps both, and logs a warning once when it first sees it;
-- a file polkadot-frame-trace could not delete. It keeps counting it: a runtime not in use leaves less room for state, and an old state file stops new writes until it is deleted. It logs a warning once;
-- a runtime compiled since the last check. polkadot-frame-trace checks the runtime folder when it loads a new runtime, and every 10 minutes;
-- the `nodes` folder of an older version, until it is deleted;
-- the files of another polkadot-frame-trace using the same directory.
-
-Use one polkadot-frame-trace per cache directory.
-A second one never gets wrong state, but each counts only its own files, and each one's deletions cost the other requests to the node.
-
-An older version kept state in `<DIR>/nodes`, one file per piece.
-polkadot-frame-trace deletes the files it wrote there in the background, and keeps anything else in the folder.
-An older polkadot-frame-trace still using the same directory can lose files it needs, and fail a replay.
-
+Use one polkadot-frame-trace per cache directory. Each process counts only its own files.
